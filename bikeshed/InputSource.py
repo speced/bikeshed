@@ -180,8 +180,8 @@ class UrlInputSource(InputSource):
             date = email.utils.parsedate_to_datetime(response.headers["Date"]).date()
         return InputContent([x + "\n" for x in response.text.splitlines(False)], date)
 
-    def relative(self, relativePath: str) -> UrlInputSource:
-        return UrlInputSource(urllib.parse.urljoin(self.sourceName, relativePath))
+    def relative(self, *relativePathSegs: str) -> UrlInputSource:
+        return UrlInputSource(urllib.parse.urljoin(self.sourceName, "/".join(relativePathSegs)))
 
 
 class FileInputSource(InputSource):
@@ -212,9 +212,9 @@ class FileInputSource(InputSource):
     def directory(self) -> str:
         return os.path.dirname(os.path.abspath(self.sourceName))
 
-    def relative(self, relativePath: str) -> FileInputSource:
+    def relative(self, *relativePathSegs: str) -> FileInputSource:
         return FileInputSource(
-            os.path.join(self.directory(), relativePath),
+            os.path.join(self.directory(), *relativePathSegs),
             chroot=False,
             chrootPath=self.chrootPath,
         )
@@ -269,10 +269,10 @@ class TarInputSource(InputSource):
         msg = f"{type(self)} instances don't have directories."
         raise TypeError(msg)
 
-    def relative(self, relativePath: str) -> TarInputSource:
+    def relative(self, *relativePathSegs: str) -> TarInputSource:
         """Returns an InputSource relative to this file. Since a TarInputSource is always inside the
         tar file, any relative InputSource is also inside the tar file."""
-        memberPath = os.path.join(os.path.dirname(self.tarMemberName), relativePath)
+        memberPath = os.path.join(os.path.dirname(self.tarMemberName), *relativePathSegs)
         return TarInputSource(self.sourceName, tarMemberName=memberPath)
 
     def cheaplyExists(self, relativePath: str) -> bool | None:

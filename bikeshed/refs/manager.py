@@ -214,15 +214,17 @@ class ReferenceManager:
             status = self.defaultStatus
         return specHeadings.get(id, status, el)
 
-    def initializeBiblio(self) -> None:
+    def initializeBiblio(self, doc: t.SpecT) -> None:
         self.biblioKeys.update(json.loads(self.dataFile.fetch("biblio-keys.json", str=True)))
         self.biblioNumericSuffixes.update(json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True)))
 
         # Get local bibliography data
         try:
             storage: t.BiblioStorageT = defaultdict(list)
-            with open("biblio.json", encoding="utf-8") as fh:
-                biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
+            localBiblioPath = config.docPath(doc, "biblio.json")
+            if localBiblioPath:
+                with open(localBiblioPath, encoding="utf-8") as fh:
+                    biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
         except OSError:
             # Missing file is fine
             pass
