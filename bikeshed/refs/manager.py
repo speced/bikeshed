@@ -9,6 +9,7 @@ from collections import defaultdict
 from .. import biblio, config, constants, h, retrieve, t
 from .. import messages as m
 from . import headingdata, source, utils, wrapper
+from .utils import LinkFailure
 
 if t.TYPE_CHECKING:
     from .wrapper import RefWrapper
@@ -213,15 +214,17 @@ class ReferenceManager:
             status = self.defaultStatus
         return specHeadings.get(id, status, el)
 
-    def initializeBiblio(self) -> None:
+    def initializeBiblio(self, doc: t.SpecT) -> None:
         self.biblioKeys.update(json.loads(self.dataFile.fetch("biblio-keys.json", str=True)))
         self.biblioNumericSuffixes.update(json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True)))
 
         # Get local bibliography data
         try:
             storage: t.BiblioStorageT = defaultdict(list)
-            with open("biblio.json", encoding="utf-8") as fh:
-                biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
+            localBiblioPath = config.docPath(doc, "biblio.json")
+            if localBiblioPath:
+                with open(localBiblioPath, encoding="utf-8") as fh:
+                    biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
         except OSError:
             # Missing file is fine
             pass
@@ -298,9 +301,12 @@ class ReferenceManager:
                 dfnForAttr = h.treeAttr(el, "data-dfn-for")
                 if dfnForAttr is None:
                     dfnFor: set[str] = set()
-                    existingRefs = self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[
-                        0
-                    ]
+                    existingRefs, _, _ = self.localRefs.queryRefs(
+                        linkType=linkType,
+                        text=linkText,
+                        linkFor="/",
+                        exact=True,
+                    )
                     if existingRefs and existingRefs[0].el is not el:
                         m.die(f"Multiple local '{linkType}' <dfn>s have the same linking text '{linkText}'.", el=el)
                         continue
@@ -308,12 +314,12 @@ class ReferenceManager:
                     dfnFor = set(config.splitForValues(dfnForAttr))
                     encounteredError = False
                     for singleFor in dfnFor:
-                        existingRefs = self.localRefs.queryRefs(
+                        existingRefs, _, _ = self.localRefs.queryRefs(
                             linkType=linkType,
                             text=linkText,
                             linkFor=singleFor,
                             exact=True,
-                        )[0]
+                        )
                         if existingRefs and existingRefs[0].el is not el:
                             encounteredError = True
                             m.die(
@@ -365,9 +371,9 @@ class ReferenceManager:
         )
 
     def queryAllRefs(self, **kwargs: t.Any) -> list[RefWrapper]:
-        r1, _ = self.localRefs.queryRefs(**kwargs)
-        r2, _ = self.anchorBlockRefs.queryRefs(**kwargs)
-        r3, _ = self.foreignRefs.queryRefs(**kwargs)
+        r1, _, _ = self.localRefs.queryRefs(**kwargs)
+        r2, _, _ = self.anchorBlockRefs.queryRefs(**kwargs)
+        r3, _, _ = self.foreignRefs.queryRefs(**kwargs)
         refs = r1 + r2 + r3
         if kwargs.get("ignoreObsoletes") is True:
             refs = self.filterObsoletes(refs)
@@ -385,9 +391,10 @@ class ReferenceManager:
         linkForHint: str | None = None,
         error: bool = True,
         el: t.ElementT | None = None,
-    ) -> RefWrapper | None:
+    ) -> RefWrapper | str | None:
         # If error is False, this function just shuts up and returns a reference or None
-        # Otherwise, it pops out debug messages for the user.
+        # Otherwise, it pops out debug messages for the user,
+        # and might return an error message as a str.
 
         # 'maybe' links might not link up, so it's fine for them to have no references.
         # The relevent errors are gated by this variable.
@@ -410,7 +417,7 @@ class ReferenceManager:
 
         # Local refs always get precedence, unless you manually specified a spec.
         if spec is None:
-            localRefs, _ = self.localRefs.queryRefs(
+            localRefs, _, _ = self.localRefs.queryRefs(
                 linkType=linkType,
                 text=text,
                 linkFor=linkFor,
@@ -422,7 +429,7 @@ class ReferenceManager:
             # but there was a for-less version in a foreign spec,
             # emit a warning (unless it was supressed).
             if localRefs and linkFor is None and any(x.for_ for x in localRefs):
-                forlessRefs, _ = self.anchorBlockRefs.queryRefs(
+                forlessRefs, _, _ = self.anchorBlockRefs.queryRefs(
                     linkType=linkType,
                     text=text,
                     linkFor="/",
@@ -431,7 +438,7 @@ class ReferenceManager:
                 )
                 forlessRefs = self.filterObsoletes(forlessRefs)
                 if not forlessRefs:
-                    forlessRefs, _ = self.foreignRefs.queryRefs(
+                    forlessRefs, _, _ = self.foreignRefs.queryRefs(
                         linkType=linkType,
                         text=text,
                         linkFor="/",
@@ -440,8 +447,7 @@ class ReferenceManager:
                     )
                 forlessRefs = self.filterObsoletes(forlessRefs)
                 if forlessRefs:
-                    reportAmbiguousForlessLink(el, text, forlessRefs, localRefs)
-                    return None
+                    return reportAmbiguousForlessLink(el, text, forlessRefs, localRefs)
             if len(localRefs) == 1:
                 return localRefs[0]
             elif len(localRefs) > 1:
@@ -481,7 +487,7 @@ class ReferenceManager:
                     break
 
         # Then anchor-block refs get preference
-        blockRefs, _ = self.anchorBlockRefs.queryRefs(
+        blockRefs, _, _ = self.anchorBlockRefs.queryRefs(
             linkType=linkType,
             text=text,
             spec=spec,
@@ -491,11 +497,16 @@ class ReferenceManager:
             el=el,
         )
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
-            forlessRefs, _ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+            forlessRefs, _, _ = self.foreignRefs.queryRefs(
+                linkType=linkType,
+                text=text,
+                linkFor="/",
+                export=True,
+                el=el,
+            )
             forlessRefs = self.filterObsoletes(forlessRefs)
             if forlessRefs:
-                reportAmbiguousForlessLink(el, text, forlessRefs, blockRefs)
-                return None
+                return reportAmbiguousForlessLink(el, text, forlessRefs, blockRefs)
         if len(blockRefs) == 1:
             return blockRefs[0]
         elif len(blockRefs) > 1:
@@ -514,7 +525,7 @@ class ReferenceManager:
             export = True
         else:
             export = None
-        refs, failure = self.foreignRefs.queryRefs(
+        refs, failure, oldRefs = self.foreignRefs.queryRefs(
             text=text,
             linkType=linkType,
             spec=spec,
@@ -576,7 +587,7 @@ class ReferenceManager:
                 for p in linkForPatterns:
                     for s in statuses:
                         for method in possibleMethods[0]:
-                            refs, failure = self.foreignRefs.queryRefs(
+                            refs, _, _ = self.foreignRefs.queryRefs(
                                 text=text,
                                 linkType=linkType,
                                 spec=spec,
@@ -595,11 +606,11 @@ class ReferenceManager:
 
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]
-            candidates, _ = self.localRefs.queryRefs(linkType="functionish", linkFor=interfaceName)
+            candidates, _, _ = self.localRefs.queryRefs(linkType="functionish", linkFor=interfaceName)
             methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if not methodRefs:
                 # Look for non-locals, then
-                c1, _ = self.anchorBlockRefs.queryRefs(
+                c1, _, _ = self.anchorBlockRefs.queryRefs(
                     linkType="functionish",
                     spec=spec,
                     status=status,
@@ -608,7 +619,7 @@ class ReferenceManager:
                     export=export,
                     ignoreObsoletes=True,
                 )
-                c2, _ = self.foreignRefs.queryRefs(
+                c2, _, _ = self.foreignRefs.queryRefs(
                     linkType="functionish",
                     spec=spec,
                     status=status,
@@ -621,55 +632,23 @@ class ReferenceManager:
                 methodRefs = list({c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values())
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
-                m.linkerror(
-                    f"Too many possible method targets to disambiguate '{linkFor}/{text}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.",
-                    el=el,
-                )
-                return None
+                msg = f"Too many possible method targets to disambiguate '{linkFor}/{text}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute."
+                m.linkerror(msg, el=el)
+                return msg
             # Otherwise
 
-        if failure in ("text", "type"):
-            if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
-                # Custom properties/descriptors aren't ever defined anywhere
-                return None
-            if zeroRefsError:
-                m.linkerror(f"No '{linkType}' refs found for '{text}'.", el=el)
-            return None
-        elif failure == "export":
-            if zeroRefsError:
-                m.linkerror(f"No '{linkType}' refs found for '{text}' that are marked for export.", el=el)
-            return None
-        elif failure == "spec":
-            if zeroRefsError:
-                m.linkerror(f"No '{linkType}' refs found for '{text}' with spec '{spec}'.", el=el)
-            return None
-        elif failure == "for":
-            if zeroRefsError:
-                if spec is None:
-                    m.linkerror(f"No '{linkType}' refs found for '{text}' with for='{linkFor}'.", el=el)
-                else:
-                    m.linkerror(
-                        f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'.",
-                        el=el,
-                    )
-            return None
-        elif failure == "status":
-            if zeroRefsError:
-                if spec is None:
-                    m.linkerror(f"No '{linkType}' refs found for '{text}' compatible with status '{status}'.", el=el)
-                else:
-                    m.linkerror(
-                        f"No '{linkType}' refs found for '{text}' compatible with status '{status}' in spec '{spec}'.",
-                        el=el,
-                    )
-            return None
-        elif failure == "ignored-specs":
-            if zeroRefsError:
-                m.linkerror(f"The only '{linkType}' refs for '{text}' were in ignored specs:\n{h.outerHTML(el)}", el=el)
-            return None
-        elif failure:
-            m.die(f"Programming error - I'm not catching '{failure}'-type link failures. Please report!", el=el)
-            return None
+        if failure:
+            return errorFromFailureCategory(
+                failure,
+                oldRefs,
+                zeroRefsError,
+                linkType=linkType,
+                text=text,
+                linkFor=linkFor,
+                spec=spec,
+                status=status,
+                el=el,
+            )
 
         if len(refs) == 1:
             # Success!
@@ -902,7 +881,7 @@ def reportMultiplePossibleRefs(
     linkFor: str | list[str] | None,
     defaultRef: RefWrapper,
     el: t.ElementT | None,
-) -> None:
+) -> str:
     # Sometimes a badly-written spec has indistinguishable dfns.
     # Detect this by seeing if more than one stringify to the same thing.
     allRefs = defaultdict(list)
@@ -931,6 +910,7 @@ def reportMultiplePossibleRefs(
             for ref in refs:
                 error += "\n  " + ref.url
     m.linkerror(error, el=el)
+    return error
 
 
 def reportAmbiguousForlessLink(
@@ -938,10 +918,70 @@ def reportAmbiguousForlessLink(
     text: str,
     forlessRefs: list[RefWrapper],
     localRefs: list[RefWrapper],
-) -> None:
+) -> str:
     localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
     forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])
+    msg = f"Ambiguous for-less link for '{text}', please see <https://speced.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{localRefText}\nfor-less references:\n{forlessRefText}"
     m.linkerror(
-        f"Ambiguous for-less link for '{text}', please see <https://speced.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{localRefText}\nfor-less references:\n{forlessRefText}",
+        msg,
         el=el,
     )
+    return msg
+
+
+def errorFromFailureCategory(
+    failure: LinkFailure,
+    oldRefs: list[t.RefWrapper],
+    zeroRefsError: bool,
+    linkType: str,
+    text: str,
+    linkFor: str | list[str] | None,
+    spec: str | None,
+    status: str | None,
+    el: t.ElementT | None,
+) -> str | None:
+    if not zeroRefsError:
+        return None
+    if failure == LinkFailure.Text or failure == LinkFailure.Type:  # noqa: PLR1714
+        if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
+            # Custom properties/descriptors aren't ever defined anywhere
+            return None
+        msg = f"No '{linkType}' refs found for '{text}'."
+        m.linkerror(msg, el=el)
+        return msg
+    elif failure == LinkFailure.Export:
+        msg = f"No '{linkType}' refs found for '{text}' that are marked for export."
+        if oldRefs:
+            msg += "\n  (Possible specs this could be from: "
+            msg += config.englishFromList(sorted({x.spec for x in oldRefs if x.spec is not None}), "or")
+            msg += ")"
+        m.linkerror(msg, el=el)
+        return msg
+    elif failure == LinkFailure.Spec:
+        msg = f"No '{linkType}' refs found for '{text}' with spec '{spec}'."
+        m.linkerror(msg, el=el)
+        return msg
+    elif failure == LinkFailure.For:
+        if spec is None:
+            msg = f"No '{linkType}' refs found for '{text}' with for='{linkFor}'."
+            m.linkerror(msg, el=el)
+            return msg
+        else:
+            msg = f"No '{linkType}' refs found for '{text}' with for='{linkFor}' in spec '{spec}'."
+            m.linkerror(msg, el=el)
+            return msg
+    elif failure == LinkFailure.Status:
+        if spec is None:
+            msg = f"No '{linkType}' refs found for '{text}' compatible with status '{status}'."
+            m.linkerror(msg, el=el)
+            return msg
+        else:
+            msg = f"No '{linkType}' refs found for '{text}' compatible with status '{status}' in spec '{spec}'."
+            m.linkerror(msg, el=el)
+            return msg
+    elif failure == LinkFailure.IgnoredSpecs:
+        msg = f"The only '{linkType}' refs for '{text}' were in ignored specs:\n{h.outerHTML(el)}"
+        m.linkerror(msg, el=el)
+        return msg
+    else:
+        t.assert_never(failure)

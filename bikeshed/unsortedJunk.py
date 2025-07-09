@@ -366,8 +366,30 @@ def determineDfnType(doc: t.SpecT, dfn: t.ElementT, inferCSS: bool = False) -> s
             if "[" in text and "]" in text:
                 # has a range, *must* be a value
                 return "value"
-            else:
-                return "type"
+            if "@" in text:
+                # Trying to dfn an at-rule production
+                m.die(
+                    "CSS at-rules must be defined in prose, with <dfn>@foo</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
+            elif "(" in text and ")" in text:
+                # Trying to define a function production
+                m.die(
+                    "CSS functions must be defined in prose, with <dfn>foo(args)</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
+            elif "''" in text:
+                m.die(
+                    "CSS values must be defined in prose, with <dfn value>foo</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
+            elif "'" in text:
+                m.die(
+                    "CSS properties must be defined in prose, with a <pre class=propdef> table or <dfn property>foo</dfn>. Remove the dfn from this grammar term.",
+                    el=dfn,
+                )
+            # Regardless of errors above, return "type""
+            return "type"
         if text[0:1] == ":":
             return "selector"
         if re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get("id") or "").startswith("dom-"):
@@ -745,6 +767,14 @@ def processAutolinks(doc: t.SpecT) -> None:
             el=el,
             error=not okayToFail and not ignorable,
         )
+
+        if isinstance(ref, str):
+            # Error message, annotate the link with it and continue.
+            el.tag = "u"
+            h.addClass(doc, el, "link-error")
+            el.set("title", f"LINK ERROR: {ref}")
+            continue
+
         # Capture the reference (and ensure we add a biblio entry) if it
         # points to an external specification.
         if ref and ref.status != "local":
