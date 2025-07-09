@@ -227,7 +227,9 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
         ref = None
         cddlText = None
         for cddlText in (el.get("data-lt") or "").split("|"):
-            linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-cddl-for", ""))) or [None]
+            linkFors: t.Sequence[str | None] | None = config.splitForValues(el.get("data-cddl-for"))
+            if linkFors is None:
+                linkFors = [None]
             for linkFor in linkFors:
                 ref = doc.refs.getRef(
                     cddlType,
@@ -237,11 +239,14 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                     el=el,
                     error=True,
                 )
+                if isinstance(ref, str):
+                    ref = None
                 if ref:
                     url = ref.url
                     break
             if ref:
                 break
+
         if url is None:
             el.tag = "dfn"
             el.set("data-dfn-type", cddlType)

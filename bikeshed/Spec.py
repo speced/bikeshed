@@ -218,7 +218,7 @@ class Spec:
 
         # Initialize things
         self.refs.initializeRefs(doc=self, datablocks=datablocks)
-        self.refs.initializeBiblio()
+        self.refs.initializeBiblio(doc=self)
 
         if "mixed-indents" in self.md.complainAbout:
             if self.md.indentInfo and self.md.indentInfo.char:

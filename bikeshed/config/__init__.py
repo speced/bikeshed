@@ -26,6 +26,7 @@ from .dfnTypes import (
 )
 from .main import (
     chrootPath,
+    docPath,
     doEvery,
     englishFromList,
     flatten,
