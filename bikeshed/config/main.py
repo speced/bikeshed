@@ -163,6 +163,13 @@ def scriptPath(*pathSegs: str) -> str:
     return path
 
 
+def docPath(doc: t.SpecT, *pathSegs: str) -> str | None:
+    ret = doc.inputSource.relative(*pathSegs)
+    if ret:
+        return str(ret)
+    return None
+
+
 def chrootPath(rootPath: str, path: str) -> str:
     rootPath = os.path.abspath(rootPath)
     path = os.path.abspath(path)

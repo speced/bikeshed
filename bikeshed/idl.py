@@ -467,7 +467,7 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                     break
             if ref:
                 break
-        if ref is None or forceDfn:
+        if ref is None or isinstance(ref, str) or forceDfn:
             el.tag = "dfn"
             el.set("data-dfn-type", idlType)
             del el.attrib["data-idl-type"]

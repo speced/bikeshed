@@ -30,6 +30,7 @@ if t.TYPE_CHECKING:
         title: t.Required[str]
         level: t.Required[int]
         number: str
+        alternateIds: list[str]
 
     class HeadingT(t.TypedDict):
         url: str
@@ -345,15 +346,26 @@ def addToHeadings(
             page = "/" + page
             fragment = "#"
         shorthand = page + fragment
-    if shorthand not in specHeadings:
-        specHeadings[shorthand] = {}
-    headingGroup = t.cast("HeadingGroupT", specHeadings[shorthand])
-    headingGroup[status] = heading
-    if fragment not in specHeadings:
-        specHeadings[fragment] = []
-    keyList = t.cast("list[HeadingKeyT]", specHeadings[fragment])
-    if shorthand not in specHeadings[fragment]:
-        keyList.append(shorthand)
+
+    def addShorthandAndFragmentToSpecHeadings(shorthand: str, fragment: str) -> None:
+        if shorthand not in specHeadings:
+            specHeadings[shorthand] = {}
+        headingGroup = t.cast("HeadingGroupT", specHeadings[shorthand])
+        headingGroup[status] = heading
+        if fragment not in specHeadings:
+            specHeadings[fragment] = []
+        keyList = t.cast("list[HeadingKeyT]", specHeadings[fragment])
+        if shorthand not in specHeadings[fragment]:
+            keyList.append(shorthand)
+
+    addShorthandAndFragmentToSpecHeadings(shorthand, fragment)
+
+    # A heading may have multiple IDs: add the others as aliases of the primary one.
+    if "alternateIds" in rawAnchor:
+        shorthandBase, _, _ = shorthand.partition("#")
+        for alternateId in rawAnchor["alternateIds"]:
+            fragment = "#" + alternateId
+            addShorthandAndFragmentToSpecHeadings(shorthandBase + fragment, fragment)
 
 
 def cleanSpecHeadings(headings: AllHeadingsT) -> None:

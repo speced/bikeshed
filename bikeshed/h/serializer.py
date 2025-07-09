@@ -124,17 +124,6 @@ class Serializer:
                 lastBlock.append(node)
         return blocks
 
-    def fixWS(self, text: str) -> str:
-        import string
-
-        t1 = text.lstrip(string.whitespace)
-        if text != t1:
-            t1 = " " + t1
-        t2 = t1.rstrip(string.whitespace)
-        if t1 != t2:
-            t2 = t2 + " "
-        return t2
-
     def startTag(self, tag: str, el: Nodes, write: WriterFn) -> None:
         if isinstance(el, list):
             return
@@ -238,7 +227,7 @@ class Serializer:
                 self._serializeEl(node, write, inline=inline)
             else:
                 assert isinstance(node, str)
-                write(dom.escapeHTML(self.fixWS(node)))
+                write(dom.escapeHTML(node))
         self.endTag(tag, write)
 
     def _blocksFromChildren(self, children: t.Iterable[t.NodeT]) -> Nodes:
