@@ -44,7 +44,7 @@ def verify_requirements() -> None:
             "requirements.txt",
         )
         print(f'Run "pip3 install -r {requirements_file_path}" to complete installation')
-        sys.exit(1)
+        print("Meanwhile, attempting to run Bikeshed anyway...")
 
 
 verify_requirements()

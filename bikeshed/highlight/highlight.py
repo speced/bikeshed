@@ -167,12 +167,12 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
     All other text is colored with the attr currently on top of the stack.
     """
 
-    class IDLUI:
+    class SilentUI:
         def warn(self, msg: str) -> None:
-            m.die(msg.rstrip())
+            pass
 
         def note(self, msg: str) -> None:
-            m.warn(msg.rstrip())
+            pass
 
     class HighlightMarker:
         # Just applies highlighting classes to IDL stuff.
@@ -208,7 +208,7 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
         )
         return None
 
-    widl = widlparser.parser.Parser(text, IDLUI())
+    widl = widlparser.parser.Parser(text, SilentUI())
     return coloredTextFromWidlStack(str(widl.markup(t.cast(widlparser.protocols.Marker, HighlightMarker()))))
 
 
