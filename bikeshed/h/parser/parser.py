@@ -61,6 +61,8 @@ def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None
     lastNode: ParserNode | None = None
     heldLast = False
     for node in generateNodes(s, start):
+        if isinstance(node, SafeText):
+            node = RawText.fromSafeText(node)
         if isinstance(node, RawText):
             node.curlifyApostrophes(lastNode)
             if node.needsLCCs():
@@ -1658,7 +1660,7 @@ def parseCSSPropdesc(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
     startTag = startTag.finalize()
 
     nodeEnd = innerEnd + 1
-    middleText = RawText.fromStream(s, innerStart, innerEnd, lt)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, lt)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     return Ok([startTag, middleText, endTag], nodeEnd)
 
@@ -1711,7 +1713,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
-    middleText = RawText.fromStream(s, innerStart, innerEnd, lt)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, lt)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     return Ok([startTag, middleText, endTag], nodeEnd)
 
@@ -1764,7 +1766,7 @@ def parseAutolinkAbstract(s: Stream, start: int) -> ResultT[SafeText | list[Pars
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
-    middleText = RawText.fromStream(s, innerStart, innerEnd, lt)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, lt)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     return Ok([startTag, middleText, endTag], nodeEnd)
 
@@ -1822,7 +1824,7 @@ def parseAutolinkHeader(s: Stream, start: int) -> ResultT[SafeText | list[Parser
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
-    middleText = RawText.fromStream(s, innerStart, innerEnd, lt)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, lt)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
     endTick = RawText.fromStream(s, nodeEnd, nodeEnd, "`")
@@ -1896,7 +1898,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
-    middleText = RawText.fromStream(s, innerStart, innerEnd, visibleText)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, visibleText)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
     return Ok([startCode, startTag, middleText, endTag, endCode], nodeEnd)
@@ -1961,7 +1963,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
-    middleText = RawText.fromStream(s, innerStart, innerEnd, visibleText)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, visibleText)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
     return Ok([startCode, startTag, middleText, endTag, endCode], nodeEnd)
@@ -2023,7 +2025,7 @@ def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[Par
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
-    middleText = RawText.fromStream(s, innerStart, innerEnd, lt)
+    middleText = SafeText.fromStream(s, innerStart, innerEnd, lt)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     endCode = EndTag.fromStream(s, nodeEnd, nodeEnd, startCode)
     return Ok([startCode, startTag, middleText, endTag, endCode], nodeEnd)

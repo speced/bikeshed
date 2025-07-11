@@ -53,6 +53,17 @@ class RawText(Text):
             text=text if text is not None else s.slice(start, end),
         )
 
+    @classmethod
+    def fromSafeText(cls, node: SafeText) -> t.Self:
+        return cls(
+            line=node.line,
+            endLine=node.endLine,
+            loc=node.loc,
+            endLoc=node.endLoc,
+            context=node.context,
+            text=str(node)
+        )
+
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
         if re.match(r"'\w", self.text):
             if isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
