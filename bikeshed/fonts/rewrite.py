@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import glob
 import re
 import sys
 
@@ -42,8 +43,6 @@ def getInputLines(inputFilename: str | None) -> tuple[list[str], str]:
         # Default to looking for a *.bs file.
         # Otherwise, look for a *.src.html file.
         # Otherwise, use standard input.
-        import glob
-
         if glob.glob("*.bs"):
             inputFilename = glob.glob("*.bs")[0]
         elif glob.glob("*.src.html"):

@@ -7,6 +7,8 @@ import logging
 import tarfile
 import tempfile
 
+import requests
+
 from . import extensions, t
 from . import messages as m
 
@@ -21,7 +23,6 @@ def publishEchidna(
     editorial: bool = False,
     timeout: float = 3,
 ) -> None:
-    import requests
 
     logging.captureWarnings(True)  # Silence SNIMissingWarning
     tarBytes = prepareTar(doc, additionalDirectories=additionalDirectories)

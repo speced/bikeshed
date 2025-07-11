@@ -449,7 +449,7 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
         assert isinstance(idlType, str)
         forceDfn = False
         ref = None
-        idlText = None
+        idlText: str
         for idlText in (el.get("data-lt") or "").split("|"):
             if idlType == "interface" and idlText in forcedInterfaces:
                 forceDfn = True

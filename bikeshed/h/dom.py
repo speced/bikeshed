@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import hashlib
+import html
 import re
 from collections import OrderedDict
 
@@ -26,8 +27,6 @@ def flatten(arr: t.Iterable) -> t.Iterator:
 
 
 def unescape(string: str) -> str:
-    import html
-
     return html.unescape(string)
 
 

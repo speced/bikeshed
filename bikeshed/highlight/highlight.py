@@ -7,24 +7,22 @@ import dataclasses
 import itertools
 import re
 
-from .. import h, t
+import pygments
+import widlparser
+from pygments.lexers import get_lexer_by_name
+
+from .. import h, lexers, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
-    import pygments
-
-    from .. import lexers
-
     T = t.TypeVar("T")
 
 
 def loadCSSLexer() -> lexers.CSSLexer:
-    from ..lexers import CSSLexer
-
-    return CSSLexer()
+    return lexers.CSSLexer()
 
 
-customLexers: dict[str, pygments.lexer.Lexer] = {"css": loadCSSLexer}
+customLexers: dict[str, t.Callable[[], pygments.lexer.Lexer]] = {"css": loadCSSLexer}
 
 
 @dataclasses.dataclass
@@ -168,8 +166,6 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
     A \3 indicates a stack pop.
     All other text is colored with the attr currently on top of the stack.
     """
-    import widlparser
-    from widlparser import parser
 
     class IDLUI:
         def warn(self, msg: str) -> None:
@@ -212,7 +208,7 @@ def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | Non
         )
         return None
 
-    widl = parser.Parser(text, IDLUI())
+    widl = widlparser.parser.Parser(text, IDLUI())
     return coloredTextFromWidlStack(str(widl.markup(t.cast(widlparser.protocols.Marker, HighlightMarker()))))
 
 
@@ -262,9 +258,6 @@ def coloredTextFromWidlStack(widlText: str) -> t.Deque[ColoredText]:
 
 
 def highlightWithPygments(text: str, lang: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
-    import pygments  # pylint: disable=redefined-outer-name
-    from pygments.formatters.other import RawTokenFormatter
-
     lexer = lexerFromLang(lang)
     if lexer is None:
         m.die(
@@ -273,10 +266,7 @@ def highlightWithPygments(text: str, lang: str, el: t.ElementT) -> t.Deque[Color
             el=el,
         )
         return None
-    rawTokens = str(
-        pygments.highlight(text, lexer, RawTokenFormatter()),
-        encoding="utf-8",
-    )
+    rawTokens = [(str(ttype), val) for (ttype, val) in pygments.lex(text, lexer)]
     coloredText = coloredTextFromRawTokens(rawTokens)
     return coloredText
 
@@ -330,7 +320,7 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
     colorizeEl(el, filtered)
 
 
-def coloredTextFromRawTokens(text: str) -> t.Deque[ColoredText]:
+def coloredTextFromRawTokens(rawTokens: t.Sequence[tuple[str, str]]) -> t.Deque[ColoredText]:
     colorFromName = {
         "Token.Comment": "c",
         "Token.Keyword": "k",
@@ -400,12 +390,8 @@ def coloredTextFromRawTokens(text: str) -> t.Deque[ColoredText]:
 
     textList: t.Deque[ColoredText] = collections.deque()
     currentCT: ColoredText | None = None
-    for line in text.split("\n"):
-        if not line:
-            continue
-        tokenName, _, tokenTextRepr = line.partition("\t")
+    for tokenName, text in rawTokens:
         color = colorFromName.get(tokenName)
-        text = eval(tokenTextRepr)  # noqa: S307
         if not text:
             continue
         if not currentCT:
@@ -444,11 +430,8 @@ def lexerFromLang(lang: str) -> pygments.lexer.Lexer | None:
     if lang in customLexers:
         return customLexers[lang]()
     try:
-        from pygments.lexers import get_lexer_by_name
-        from pygments.util import ClassNotFound
-
         return get_lexer_by_name(lang, encoding="utf-8", stripnl=False)
-    except ClassNotFound:
+    except pygments.util.ClassNotFound:
         return None
 
 

@@ -91,6 +91,9 @@ class RefWrapper:
             return NotImplemented
         return self._ref == other._ref
 
+    def __hash__(self) -> int:
+        return hash(frozenset(self._ref))
+
     def __json__(self) -> t.JSONT:
         return {
             "text": self.text,

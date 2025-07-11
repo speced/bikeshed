@@ -6,6 +6,7 @@ import re
 from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 
+import requests
 from PIL import Image
 
 from . import biblio, cddl, config, dfnpanels, h, idl, printjson, repository, t
@@ -1338,8 +1339,6 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
         h.removeAttr(el, "data-inline-github")
     if not inlineIssues:
         return
-
-    import requests
 
     logging.captureWarnings(True)
 

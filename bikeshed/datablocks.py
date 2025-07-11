@@ -1,13 +1,14 @@
 # pylint: disable=unused-argument
 from __future__ import annotations
 
+import io
 import re
 from collections import OrderedDict, defaultdict
 from functools import reduce
 
 import attr
 
-from . import biblio, config, constants, h, printjson, refs, t
+from . import biblio, config, constants, h, printjson, railroadparser, refs, t
 from . import messages as m
 from .line import Line
 
@@ -643,10 +644,6 @@ def parseDefBlock(
 
 
 def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    import io
-
-    from . import railroadparser
-
     ret = ["<div class='railroad'>"]
     doc.extraJC.addRailroad()
     code = "".join(lines)

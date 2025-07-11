@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import errno
 import http
 import os
+import shutil
 
 from .. import config, t
 from .. import messages as m
@@ -186,14 +188,11 @@ def cleanupFiles(root: str, touchedPaths: dict[str, set[str] | None], dryRun: bo
 
 
 def copyanything(src: str, dst: str) -> None:
-    import errno
-    import shutil
-
     try:
         shutil.rmtree(dst, ignore_errors=True)
         shutil.copytree(src, dst)
     except OSError as exc:
-        if exc.errno in [errno.ENOTDIR, errno.EINVAL]:
+        if exc.errno in (errno.ENOTDIR, errno.EINVAL):
             shutil.copy(src, dst)
         else:
             raise

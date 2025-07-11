@@ -7,6 +7,11 @@ from .. import config, h, t
 from .. import messages as m
 
 
+def annotateDfns(doc: t.SpecT) -> None:
+    addAttributeInfoSpans(doc)
+    fillAttributeInfoSpans(doc)
+
+
 def addAttributeInfoSpans(doc: t.SpecT) -> None:
     # <dt><dfn attribute> automatically gets a <span attribute-info> appended to it
     # (and same for <dfn dict-member> and <span dict-member-info>).

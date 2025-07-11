@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import dataclasses
+import json
 from collections import defaultdict
 
 from . import constants, h, t
@@ -223,8 +224,6 @@ def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -
 
     <wg>: {*url:<url>, *shortname:<string>}
     """
-    import json
-
     try:
         datas = json.loads(text)
     except Exception as e:

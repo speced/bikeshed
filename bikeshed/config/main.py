@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections.abc
 import os
 import re
+import time
 
 import lxml
 
@@ -190,8 +191,6 @@ def doEvery(s: float, action: t.Callable, lastTime: float | None = None) -> floa
     # If you want to take action on first call,
     # pass 0 as lastTime;
     # otherwise it won't take action until N seconds.
-    import time
-
     newTime = time.time()
     if lastTime is None:
         lastTime = newTime

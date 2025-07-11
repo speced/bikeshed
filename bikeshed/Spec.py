@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
@@ -416,8 +417,6 @@ class Spec:
             return
 
     def watch(self, outputFilename: str | None, port: int | None = None, localhost: bool = False) -> None:
-        import time
-
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
             m.die(f"Watch mode doesn't support {self.inputSource}")
@@ -428,9 +427,9 @@ class Spec:
 
         if port:
             # Serve the folder on an HTTP server
-            import http.server
-            import socketserver
-            import threading
+            import http.server  # noqa: PLC0415
+            import socketserver  # noqa: PLC0415
+            import threading  # noqa: PLC0415
 
             class SilentServer(http.server.SimpleHTTPRequestHandler):
                 def log_message(self, format: t.Any, *args: t.Any) -> None:

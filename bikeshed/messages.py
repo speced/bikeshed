@@ -4,6 +4,7 @@ import contextlib
 import dataclasses
 import io
 import json
+import os
 import sys
 from collections import Counter
 
@@ -352,8 +353,6 @@ def withMessageState(
 
 @contextlib.contextmanager
 def messagesSilent() -> t.Generator[t.TextIO, None, None]:
-    import os
-
     fh = open(os.devnull, "w", encoding="utf-8")
     global state
     oldState = state

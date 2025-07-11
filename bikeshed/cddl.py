@@ -225,7 +225,7 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
         assert isinstance(cddlType, str)
         url = None
         ref = None
-        cddlText = None
+        cddlText: str
         for cddlText in (el.get("data-lt") or "").split("|"):
             linkFors: t.Sequence[str | None] | None = config.splitForValues(el.get("data-cddl-for"))
             if linkFors is None:

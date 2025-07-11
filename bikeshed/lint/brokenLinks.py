@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import time
 
+import requests
+
 from .. import h, t
 from .. import messages as m
 
@@ -14,7 +16,6 @@ def brokenLinks(doc: t.SpecT) -> None:
     """
     if not doc.md.complainAbout["broken-links"]:
         return
-    import requests
 
     timeout = doc.md.linkCheckerTimeout
 

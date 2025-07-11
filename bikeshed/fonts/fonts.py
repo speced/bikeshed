@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import string
 
@@ -183,8 +184,6 @@ def inferHeight(glyphs: Glyphs) -> int:
 
 
 def main() -> None:
-    import argparse
-
     argparser = argparse.ArgumentParser(description="Outputs text as giant ASCII art.")
     argparser.add_argument(
         "--font",

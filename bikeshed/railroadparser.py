@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 
 from . import messages as m
 from . import railroaddiagrams as rr
@@ -22,7 +23,6 @@ def parse(string: str) -> rr.Diagram | None:
             Terminal: foo
             Terminal raw: bar
     """
-    import re
 
     lines = string.splitlines()
 
