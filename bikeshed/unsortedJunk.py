@@ -824,9 +824,9 @@ def processAutolinks(doc: t.SpecT) -> None:
             if linkType == "maybe":
                 el.tag = "css"
                 if el.get("data-link-type"):
-                    pass#del el.attrib["data-link-type"]
+                    del el.attrib["data-link-type"]
                 if el.get("data-lt"):
-                    pass#del el.attrib["data-lt"]
+                    del el.attrib["data-lt"]
 
     h.dedupIDs(doc)
 
@@ -988,7 +988,6 @@ def addSelfLinks(doc: t.SpecT) -> None:
 
 def cleanupHTML(doc: t.SpecT) -> None:
     # Cleanup done immediately before serialization.
-    return
 
     head = None
     inBody = False

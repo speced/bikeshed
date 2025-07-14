@@ -61,7 +61,7 @@ class RawText(Text):
             loc=node.loc,
             endLoc=node.endLoc,
             context=node.context,
-            text=str(node)
+            text=str(node),
         )
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
