@@ -28,6 +28,7 @@ if t.TYPE_CHECKING:
         tag: t.Required[str]
         nest: t.Required[bool]
         prefixLen: int | float
+        virtualPrefix: str
         start: int
 
 
@@ -187,12 +188,12 @@ def tokenizeLines(
             endTag = rawStack[-1]
             if lineEndsRawBlock(line, endTag):
                 rawStack.pop()
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix":""})
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix": ""})
                 continue
             elif not endTag["nest"]:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix":""})
+                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix": ""})
                 continue
 
         # We're either in a nesting raw element or not in a raw element at all,
@@ -219,20 +220,26 @@ def tokenizeLines(
                         "type": "element",
                         "tag": "</{}>".format(tagName),
                         "nest": nest,
-                    "virtualPrefix": virtualPrefix,
+                        "virtualPrefix": virtualPrefix,
                     },
                 )
             continue
         if rawStack:
-            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix":""})
+            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix": ""})
             continue
 
         lineText = line.text.strip()
         virtualPrefix = ""
         if lineText.startswith(constants.virtualEndTagStartChar):
-            match = re.match(rf"((?:{constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})+)(.*)", lineText)
+            match = re.match(
+                rf"((?:{constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})+)(.*)",
+                lineText,
+            )
             if not match:
-                m.die("PROGRAMMING ERROR: Spotted the start of a virtual end tag, but couldn't find the tag itself.", lineNum=line.i)
+                m.die(
+                    "PROGRAMMING ERROR: Spotted the start of a virtual end tag, but couldn't find the tag itself.",
+                    lineNum=line.i,
+                )
             else:
                 virtualPrefix = match[1]
                 lineText = match[2]

@@ -386,6 +386,7 @@ def escapeAttr(text: str) -> str:
 class TagStack:
     tags: list[TagStackEntry] = field(default_factory=list)
     opaqueTags: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
+    distinguishVirtualTags: bool = False
     _opaqueCount: int = 0
     _tagCounts: Counter[str] = field(default_factory=Counter)
 
@@ -704,7 +705,7 @@ class TagStack:
         if self.tags[-1].startTag.tag in tags:
             # If the tag is top of the stack, silently pop it
             entry = self.popEntry()
-            yield makeVirtualEndTag(entry.startTag, node)
+            yield makeVirtualEndTag(entry.startTag, node, virtual=self.distinguishVirtualTags)
         else:
             # Otherwise, see if it needs popping further up, which is an error.
             for tag in tags:
@@ -726,7 +727,7 @@ class TagStack:
             lastStartTag = lastEntry.startTag
             if lastStartTag.tag in tags:
                 # The tag I'm stopping at.
-                yield makeVirtualEndTag(self.popEntry().startTag, node)
+                yield makeVirtualEndTag(self.popEntry().startTag, node, virtual=self.distinguishVirtualTags)
                 return
             if isinstance(lastEntry, TagStackShorthandEntry):
                 # Can't virtual-close past a shorthand opener
@@ -736,7 +737,7 @@ class TagStack:
                 return
             # Otherwise, good to pop the tag
             entry = self.popEntry()
-            yield makeVirtualEndTag(entry.startTag, node)
+            yield makeVirtualEndTag(entry.startTag, node, virtual=self.distinguishVirtualTags)
         m.die(
             f"PROGRAMMING ERROR: Tried to auto-close a still-open element, but the specified opening tags {tags} aren't on the stack. Please report this!",
             lineNum=node.loc,
@@ -745,7 +746,7 @@ class TagStack:
     def virtualCloseShorthand(self, startTag: StartTag) -> t.Generator[EndTag, None, None]:
         # Auto-close anything that was opened inside the shorthand and left open.
         while self.tags and self.tags[-1].startTag != startTag:
-            yield makeVirtualEndTag(self.popEntry().startTag, startTag)
+            yield makeVirtualEndTag(self.popEntry().startTag, startTag, virtual=self.distinguishVirtualTags)
         # And pop the shorthand opener
         if self.tags and self.tags[-1].startTag == startTag:
             self.popEntry()
@@ -779,19 +780,32 @@ class TagStack:
                 m.die(f"Saw a <{tag}> that wasn't in a <{parentTag}>", lineNum=node.loc)
 
 
-def makeVirtualEndTag(startTag: StartTag, forcingTag: ParserNode) -> EndTag:
+def makeVirtualEndTag(startTag: StartTag, forcingTag: ParserNode, virtual: bool) -> EndTag:
     # Generate a "virtual" EndTag to match `startTag`, when another
     # tag (`forcingTag`) causes some `startTag` to be auto-closed.
     # The virtual tag masquerades as appearing immediately before
     # `forcingTag` and zero-sized, but in the same context as `startTag`.
-    return VirtualEndTag(
-        line=forcingTag.line,
-        endLine=forcingTag.line,
-        loc=forcingTag.loc,
-        endLoc=forcingTag.loc,
-        context=startTag.context,
-        tag=startTag.tag,
-    )
+    # The `virtual` arg controls whether it generates a real EndTag
+    # or a VirtualEndTag (which prints weirdly, for smuggling past the
+    # markdown parser before it hits the lxml parser).
+    if virtual:
+        return VirtualEndTag(
+            line=forcingTag.line,
+            endLine=forcingTag.line,
+            loc=forcingTag.loc,
+            endLoc=forcingTag.loc,
+            context=startTag.context,
+            tag=startTag.tag,
+        )
+    else:
+        return EndTag(
+            line=forcingTag.line,
+            endLine=forcingTag.line,
+            loc=forcingTag.loc,
+            endLoc=forcingTag.loc,
+            context=startTag.context,
+            tag=startTag.tag,
+        )
 
 
 @dataclass
