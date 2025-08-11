@@ -43,6 +43,7 @@ def initialDocumentParse(
     # * check if there are any html/head/body elements and error
 
     s = Stream(text, startLine=startLine, config=config)
+    s.openEls.distinguishVirtualTags = True
     nodes = list(nodesFromStream(s, 0))
     nodes.extend(closeOpenElements(s))
     for node in nodes:
