@@ -1893,7 +1893,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
     for badChar in ("{", "}"):
         if badChar in innerText:
             m.die(
-                f"IDL autolink ({{{{...}}}}) contained a {badChar} in its data section. If this was not meant to be an autolink, escape it; if it was, switch to the manual <a> syntax to include this character.",
+                f"IDL autolink ({{{{...}}}}) contained a {badChar} in its data section, or meant to close itself and didn't do so correctly. If this was not meant to be an autolink, escape it or close it; if it was, switch to the manual <a> syntax to include this character.",
                 lineNum=s.loc(start),
             )
             return Err(start)
