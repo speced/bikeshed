@@ -1212,9 +1212,9 @@ PROD_TYPE_RE = re.compile(
     (\S+)
     (?:\s+
         \[\s*
-        (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;))\s*
+        (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;|&\#8734;))\s*
         ,\s*
-        (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;))\s*
+        (-?(?:\d+[\w-]*|∞|[Ii]nfinity|&infin;|&\#8734;))\s*
         \]\s*
     )?$
     """,
@@ -1329,8 +1329,8 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
             if for_ is not None:
                 attrs["data-link-for"] = for_
             if rangeStart is not None:
-                formattedStart, numStart = parseRangeComponent(rangeStart)
-                formattedEnd, numEnd = parseRangeComponent(rangeEnd)
+                formattedStart, numStart = parseRangeComponent(s, textStart+match.start(3), rangeStart)
+                formattedEnd, numEnd = parseRangeComponent(s, textStart+match.start(4), rangeEnd)
                 if formattedStart is None or formattedEnd is None:
                     m.die(f"Shorthand <<{text}>> has an invalid range.", lineNum=s.loc(start))
                     failNode = SafeText.fromStream(s, start, nodeEnd)
@@ -1370,7 +1370,7 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
     return Ok([startTag, contents, endTag], nodeEnd)
 
 
-def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
+def parseRangeComponent(s: Stream, i: int, val: str) -> tuple[str | None, float | int]:
     sign = ""
     signVal = 1
     num: float | int
@@ -1382,7 +1382,8 @@ def parseRangeComponent(val: str) -> tuple[str | None, float | int]:
 
     if val.lower() == "infinity":
         val = "∞"
-    if val.lower() == "&infin;":
+    if val.lower() in ("&infin;", "&#8734;"):
+        m.warn(f"Infinite ranges should be written as 'infinity' or '∞', not an HTML entity. (Got {val})", lineNum=s.loc(i))
         val = "∞"
     if val == "∞":
         return sign + val, signVal * float("inf")
