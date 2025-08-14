@@ -778,12 +778,17 @@ class TagStack:
         for tagNames, parentTag in reqs:
             if tag in tagNames and not self.inTagContext(parentTag):
                 m.die(f"Saw a <{tag}> that wasn't in a <{parentTag}>", lineNum=node.loc)
+        # FIXME: Until I integrate the markdown parser, I can't rely on this,
+        # since there might be a *markdown* li/dt/dd between the element
+        # and the "parent" ul.
+        '''
         if len(self.tags) >= 2:
             parentTag = self.tags[-2].startTag.tag
             if parentTag in ("ol", "ul") and tag != "li":
                 m.die(f"Saw a <{tag}> that's a direct child of a <{parentTag}>", lineNum=node.loc)
             if parentTag == "dl" and tag not in ("dt", "dd", "div"):
                 m.die(f"Saw a <{tag}> that's a direct child of a <dl>", lineNum=node.loc)
+        '''
 
 
 def makeVirtualEndTag(startTag: StartTag, forcingTag: ParserNode, virtual: bool) -> EndTag:
