@@ -1329,8 +1329,8 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
             if for_ is not None:
                 attrs["data-link-for"] = for_
             if rangeStart is not None:
-                formattedStart, numStart = parseRangeComponent(s, textStart+match.start(3), rangeStart)
-                formattedEnd, numEnd = parseRangeComponent(s, textStart+match.start(4), rangeEnd)
+                formattedStart, numStart = parseRangeComponent(s, textStart + match.start(3), rangeStart)
+                formattedEnd, numEnd = parseRangeComponent(s, textStart + match.start(4), rangeEnd)
                 if formattedStart is None or formattedEnd is None:
                     m.die(f"Shorthand <<{text}>> has an invalid range.", lineNum=s.loc(start))
                     failNode = SafeText.fromStream(s, start, nodeEnd)
@@ -1383,7 +1383,9 @@ def parseRangeComponent(s: Stream, i: int, val: str) -> tuple[str | None, float 
     if val.lower() == "infinity":
         val = "∞"
     if val.lower() in ("&infin;", "&#8734;"):
-        m.warn(f"Infinite ranges should be written as 'infinity' or '∞', not an HTML entity. (Got {val})", lineNum=s.loc(i))
+        m.warn(
+            f"Infinite ranges should be written as 'infinity' or '∞', not an HTML entity. (Got {val})", lineNum=s.loc(i)
+        )
         val = "∞"
     if val == "∞":
         return sign + val, signVal * float("inf")
