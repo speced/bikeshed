@@ -297,7 +297,7 @@ class VirtualEndTag(EndTag):
     # which depends on the raw block start being the first thing
     # on the line.
     def __str__(self) -> str:
-        return constants.virtualEndTagStartChar + "</" + self.tag + ">" + constants.virtualEndTagEndChar
+        return f"</{self.tag} {constants.virtualEndTag}>"
 
 
 @dataclass
@@ -778,6 +778,12 @@ class TagStack:
         for tagNames, parentTag in reqs:
             if tag in tagNames and not self.inTagContext(parentTag):
                 m.die(f"Saw a <{tag}> that wasn't in a <{parentTag}>", lineNum=node.loc)
+        if len(self.tags) >= 2:
+            parentTag = self.tags[-2].startTag.tag
+            if parentTag in ("ol", "ul") and tag != "li":
+                m.die(f"Saw a <{tag}> that's a direct child of a <{parentTag}>", lineNum=node.loc)
+            if parentTag == "dl" and tag not in ("dt", "dd", "div"):
+                m.die(f"Saw a <{tag}> that's a direct child of a <dl>", lineNum=node.loc)
 
 
 def makeVirtualEndTag(startTag: StartTag, forcingTag: ParserNode, virtual: bool) -> EndTag:
@@ -788,6 +794,8 @@ def makeVirtualEndTag(startTag: StartTag, forcingTag: ParserNode, virtual: bool)
     # The `virtual` arg controls whether it generates a real EndTag
     # or a VirtualEndTag (which prints weirdly, for smuggling past the
     # markdown parser before it hits the lxml parser).
+    # FIXME: Now that I'm printing the virtual end tag differently,
+    # I can probably always return a VirtualEndTag()
     if virtual:
         return VirtualEndTag(
             line=forcingTag.line,
