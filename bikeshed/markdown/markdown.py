@@ -228,12 +228,10 @@ def tokenizeLines(
                 rf"(\s*(?:</\w+ {constants.virtualEndTag}>\s*)+)(.*)",
                 lineText,
             )
-            if not match:
-                m.die(
-                    "PROGRAMMING ERROR: Spotted the virtual end tag indicator, but couldn't find the tag itself.",
-                    lineNum=line.i,
-                )
-            else:
+            # Note, the if can be true while the match fails,
+            # if the virtual end tag isn't at the start of the line.
+            # That's fine; I don't care about that.
+            if match:
                 virtualPrefix = match[1]
                 lineText = match[2]
 
