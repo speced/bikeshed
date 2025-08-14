@@ -152,8 +152,22 @@ def highlightEl(doc: t.SpecT, el: t.ElementT, lang: str) -> None:
     else:
         coloredText = highlightWithPygments(text, lang, el=el)
     if coloredText is not None:
+        readdWhitespacePrefix(text, coloredText)
         mergeHighlighting(el, coloredText)
         h.addClass(doc, el, "highlight")
+
+
+def readdWhitespacePrefix(rawText: str, coloredText: t.Deque[ColoredText]) -> t.Deque[ColoredText]:
+    """
+    If the raw text starts with whitespace, Pygments auto-strips it >:(
+    So, we need to add it back in, as an uncolored chunk of text.
+    """
+    match = re.match(r"\s+", rawText)
+    if not match:
+        return coloredText
+    prefix = ColoredText(match[0], None)
+    coloredText.appendleft(prefix)
+    return coloredText
 
 
 def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
