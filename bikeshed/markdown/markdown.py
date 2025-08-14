@@ -72,12 +72,6 @@ def parse(
         blockElements=blockElements,
     )
     parsedLines = parseTokens(tokens, numSpacesForIndentation)
-    for line in parsedLines:
-        if constants.virtualEndTagStartChar in line.text:
-            line.text = line.text.replace(constants.virtualEndTagStartChar, "").replace(
-                constants.virtualEndTagEndChar,
-                "",
-            )
     if fromStrings:
         return [x.text for x in parsedLines]
     else:
@@ -163,7 +157,7 @@ def tokenizeLines(
     rawElementStartRe = re.compile(
         rf"""
         \s*
-        ((?:{constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})*)
+        ((?:</\w+ {constants.virtualEndTag}>)*)
         <({"|".join(opaqueElements)})[ >]
         """,
         re.X,
@@ -173,7 +167,6 @@ def tokenizeLines(
         # Skip lines that are entirely a censored comment.
         if line.text.strip() == constants.bsComment:
             continue
-
         # Two kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
         # 2. <script>, and <style>, which contain raw text, can't nest.
@@ -230,14 +223,14 @@ def tokenizeLines(
 
         lineText = line.text.strip()
         virtualPrefix = ""
-        if lineText.startswith(constants.virtualEndTagStartChar):
+        if constants.virtualEndTag in lineText:
             match = re.match(
-                rf"((?:{constants.virtualEndTagStartChar}</\w+>{constants.virtualEndTagEndChar})+)(.*)",
+                rf"(\s*(?:</\w+ {constants.virtualEndTag}>\s*)+)(.*)",
                 lineText,
             )
             if not match:
                 m.die(
-                    "PROGRAMMING ERROR: Spotted the start of a virtual end tag, but couldn't find the tag itself.",
+                    "PROGRAMMING ERROR: Spotted the virtual end tag indicator, but couldn't find the tag itself.",
                     lineNum=line.i,
                 )
             else:
@@ -474,7 +467,7 @@ def parseTokens(tokens: list[TokenT], numSpacesForIndentation: int) -> list[l.Li
 def lineFromStream(stream: TokenStream, text: str) -> l.Line:
     # Shortcut for when you're producing a new line from the currline in the stream,
     # with some modified text.
-    return l.Line(stream.currline().i, stream.currvirtualPrefix() + text)
+    return l.Line(stream.currline().i, text)
 
 
 # Each parser gets passed the stream
