@@ -157,7 +157,7 @@ def tokenizeLines(
     rawElementStartRe = re.compile(
         rf"""
         \s*
-        ((?:</\w+ {constants.virtualEndTag}>)*)
+        ((?:</\w+\s{constants.virtualEndTag}>)*\s*)
         <({"|".join(opaqueElements)})[ >]
         """,
         re.X,
