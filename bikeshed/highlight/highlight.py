@@ -161,11 +161,20 @@ def readdWhitespacePrefix(rawText: str, coloredText: t.Deque[ColoredText]) -> t.
     """
     If the raw text starts with whitespace, Pygments auto-strips it >:(
     So, we need to add it back in, as an uncolored chunk of text.
+    But also, it doesn't... always strip whitespace. So check for that.
     """
-    match = re.match(r"\s+", rawText)
-    if not match:
+    if not coloredText:
+        # Empty colored text, nothing to do
         return coloredText
-    prefix = ColoredText(match[0], None)
+    coloredMatch = re.match(r"\s+", coloredText[0].text)
+    if coloredMatch:
+        # whitespace was kept by the formatter, so nothing to do
+        return coloredText
+    textMatch = re.match(r"\s+", rawText)
+    if not textMatch:
+        # No whitespace on the text, nothing to do
+        return coloredText
+    prefix = ColoredText(textMatch[0], None)
     coloredText.appendleft(prefix)
     return coloredText
 
