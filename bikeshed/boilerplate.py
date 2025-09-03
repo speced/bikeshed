@@ -1205,7 +1205,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
             container,
             h.E.h3(
                 {"class": "no-num no-ref", "id": h.safeID(doc, "informative")},
-                _t("Informative References"),
+                _t("Non-Normative References"),
             ),
             h.E.dl(),
         )
