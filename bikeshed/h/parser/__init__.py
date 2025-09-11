@@ -9,6 +9,7 @@ from .main import (
     parseText,
     parseTitle,
     strFromNodes,
+    lxmlFromNodes,
 )
 from .nodes import (
     Comment,

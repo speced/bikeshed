@@ -192,6 +192,8 @@ class Spec:
         self.structuralNodes = structuralNodes
         if self.debug:
             h.debugNodes(nodes)
+        # Test the perf of going straight from nodes -> lxml
+        h.lxmlFromNodes(nodes)
         text = h.strFromNodes(nodes, withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
         return inputContent.lines
@@ -231,14 +233,14 @@ class Spec:
         self.lines = datablocks.transformDataBlocks(self, self.lines)
         if self.debug:
             print("".join(x.text for x in self.lines))  # noqa: T201
-        markdownFeatures: set[str] = {"headings"}
-        self.lines = markdown.parse(
-            self.lines,
-            self.md.indent,
-            opaqueElements=self.md.opaqueElements,
-            blockElements=self.md.blockElements,
-            features=markdownFeatures,
-        )
+        # markdownFeatures: set[str] = {"headings"}
+        # self.lines = markdown.parse(
+        #     self.lines,
+        #     self.md.indent,
+        #     opaqueElements=self.md.opaqueElements,
+        #     blockElements=self.md.blockElements,
+        #     features=markdownFeatures,
+        # )
 
         self.refs.setSpecData(self)
 

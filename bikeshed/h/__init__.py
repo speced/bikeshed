@@ -94,5 +94,6 @@ from .parser import (
     parseText,
     parseTitle,
     strFromNodes,
+    lxmlFromNodes,
 )
 from .serializer import Serializer

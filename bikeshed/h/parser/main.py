@@ -6,6 +6,8 @@ import io
 import os
 import re
 
+import lxml.sax
+
 from ... import constants, t
 from ... import messages as m
 from .nodes import (
@@ -50,6 +52,29 @@ def initialDocumentParse(
         if isinstance(node, StartTag) and node.tag in ("html", "head", "body"):
             return extractStructuralNodes(nodes)
     return nodes, []
+
+
+def lxmlFromNodes(nodes: list[ParserNode]) -> t.ElementT:
+    ns = "http://www.w3.org/1999/xhtml"
+    handler = lxml.sax.ElementTreeContentHandler()
+    handler.startDocument()
+    handler.startElement("html")
+    for node in nodes:
+        if isinstance(node, StartTag):
+            handler.startElement(node.tag, node.attrs)
+        elif isinstance(node, EndTag):
+            handler.endElement(node.tag)
+        elif isinstance(node, Text):
+            handler.characters(str(node))
+        elif isinstance(node, SelfClosedTag):
+            handler.startElement(node.tag, node.attrs)
+            handler.endElement(node.tag)
+        elif isinstance(node, RawElement):
+            handler.startElement(node.tag, node.startTag.attrs)
+            handler.characters(node.data)
+            handler.endElement(node.tag)
+    handler.endElement("html")
+    return handler.etree.getroot()
 
 
 def extractStructuralNodes(nodes: list[ParserNode]) -> tuple[list[ParserNode], list[StartTag]]:
