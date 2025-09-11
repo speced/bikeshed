@@ -60,20 +60,23 @@ def lxmlFromNodes(nodes: list[ParserNode]) -> t.ElementT:
     handler.startDocument()
     handler.startElement("html")
     for node in nodes:
-        if isinstance(node, StartTag):
-            handler.startElement(node.tag, node.attrs)
-        elif isinstance(node, EndTag):
-            handler.endElement(node.tag)
-        elif isinstance(node, Text):
-            handler.characters(str(node))
-        elif isinstance(node, SelfClosedTag):
-            handler.startElement(node.tag, node.attrs)
-            handler.endElement(node.tag)
-        elif isinstance(node, RawElement):
-            handler.startElement(node.tag, node.startTag.attrs)
-            handler.characters(node.data)
-            handler.endElement(node.tag)
-    handler.endElement("html")
+        try:
+            if isinstance(node, StartTag):
+                handler.startElement(node.tag, node.attrs)
+            elif isinstance(node, EndTag):
+                handler.endElement(node.tag)
+            elif isinstance(node, Text):
+                handler.characters(str(node))
+            elif isinstance(node, SelfClosedTag):
+                handler.startElement(node.tag, node.attrs)
+                handler.endElement(node.tag)
+            elif isinstance(node, RawElement):
+                handler.startElement(node.tag, node.startTag.attrs)
+                handler.characters(node.data)
+                handler.endElement(node.tag)
+        except:
+            # Ignore errors for now
+            pass
     return handler.etree.getroot()
 
 
