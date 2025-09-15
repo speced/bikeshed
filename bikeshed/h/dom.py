@@ -249,7 +249,7 @@ def serializeTag(el: t.ElementT, includeBs: bool = False) -> str:
 
 def tagName(el: t.ElementT | None) -> str | None:
     # Returns the tagname, or None if passed None
-    # Iow, safer version of el.tagName
+    # Iow, safer version of el.tag
     if el is None:
         return None
     return el.tag
@@ -271,6 +271,11 @@ def parseHTML(text: str) -> list[t.ElementT | str]:
 def parseElements(text: str) -> list[t.ElementT]:
     container = lxml.html.fragment_fromstring(text, create_parent="div")
     return [x for x in childNodes(container, clear=True) if isElement(x)]
+
+
+def parseInto(container: t.ElementT, text: str, allowEmpty: bool = False) -> t.ElementT:
+    appendChild(container, *parseHTML(text), allowEmpty=allowEmpty)
+    return container
 
 
 def parseDocument(
@@ -462,6 +467,9 @@ def removeNode(node: t.ElementT) -> t.ElementT:
 
 
 def replaceNode(node: t.ElementT, *replacements: t.NodesT) -> t.NodesT | None:
+    if len(replacements) == 1 and node == replacements[0]:
+        # Sometimes we replace a node.... with itself
+        return node
     insertBefore(node, *replacements)
     removeNode(node)
     if replacements:
@@ -1076,6 +1084,21 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
     if setIntermediate:
         el.set("bs-line-number", approx)
     return approx
+
+
+def parseLineNumber(el: t.ElementT) -> int | None:
+    # Gets a line number, if possible, from an element,
+    # removing the column and context cruft.
+    attr = el.get("bs-line-number")
+    if not attr:
+        return None
+    try:
+        return int(attr)
+    except ValueError:
+        try:
+            return int(attr.partition(":")[0])
+        except ValueError:
+            return None
 
 
 def circledDigits(num: int) -> str:

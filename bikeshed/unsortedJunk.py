@@ -46,10 +46,11 @@ def fixManualDefTables(doc: t.SpecT) -> None:
             type = "descriptor"
         elif h.hasClass(doc, table, "elementdef"):
             type = "element"
-        cell = h.findAll("tr:first-child > :nth-child(2)", table)[0]
-        names = [x.strip() for x in h.textContent(cell).split(",")]
-        newContents = config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", ")
-        h.replaceContents(cell, newContents)
+        cell = h.find("tr:first-child > :nth-child(2)", table)
+        if cell is not None:
+            names = [x.strip() for x in h.textContent(cell).split(",")]
+            newContents = config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", ")
+            h.replaceContents(cell, newContents)
 
 
 def canonicalizeShortcuts(el: t.ElementT) -> None:
@@ -1455,7 +1456,7 @@ def addNoteHeaders(doc: t.SpecT) -> None:
             preText = ""
         lineNum = lineNumberFromBsLineNumber(el.get("bs-line-number"))
         parseConfig = h.ParseConfig.fromSpec(doc=doc, context="heading='' attribute")
-        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum))
+        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum, context=el))
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
         h.removeAttr(el, "heading")
 

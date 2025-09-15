@@ -1,22 +1,12 @@
 # pylint: disable=unused-argument
 from __future__ import annotations
 
-import dataclasses
 import io
 import re
 from collections import OrderedDict, defaultdict
-from functools import reduce
 
 from . import biblio, config, constants, h, printjson, railroadparser, refs, t
 from . import messages as m
-from .line import Line
-
-# When writing a new transformFoo function,
-# PAY ATTENTION TO THE INDENT OF THE FIRST LINE
-# OR ELSE YOU'LL MESS UP THE MARKDOWN PARSER.
-# Generally, just spam the first-line's indent onto every line;
-# if you're outputting a raw element (<pre>/etc),
-# just spam it onto the first line.
 
 if t.TYPE_CHECKING:
     InfoTreeT: t.TypeAlias = list[defaultdict[str, list[str]]]
@@ -24,56 +14,13 @@ if t.TYPE_CHECKING:
     class TransformFuncT(t.Protocol):
         def __call__(
             self,
-            lines: list[str],
-            tagName: str,
-            firstLine: str,
-            lineNum: int | None,
+            data: str,
+            el: t.ElementT,
             doc: t.SpecT,
-        ) -> list[str]: ...
+        ) -> t.ElementT | None: ...
 
 
-def processRawElement(node: h.parser.RawElement, s: h.parser.Stream, start: int) -> h.parser.RawElement:
-    # FIXME: Move datablock transforming here (invoked from the parser)
-    # rather than doing an additional pass of my own.
-    # Doing it myself is fragile, as it's currently affecting things in
-    # <script> tags, for example.
-    return node
-
-
-if t.TYPE_CHECKING:
-
-    @t.overload
-    def transformDataBlocks(doc: t.SpecT, lines: list[Line]) -> list[Line]: ...
-
-    @t.overload
-    def transformDataBlocks(doc: t.Spec, lines: list[str]) -> list[str]: ...
-
-
-def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Line] | list[str]:
-    """
-    This function does a single pass through the doc,
-    finding all the "data blocks" and processing them.
-    A "data block" is any <pre> or <xmp> element.
-    #
-    When a data block is found, the *contents* of the block
-    are passed to the appropriate processing function as an
-    array of lines.  The function should return a new array
-    of lines to replace the *entire* block.
-    #
-    That is, we give you the insides, but replace the whole
-    thing.
-    #
-    Additionally, we pass in the tag-name used (pre or xmp)
-    and the line with the content, in case it has useful data in it.
-    """
-
-    fromStrings = False
-    if any(isinstance(x, str) for x in lines):
-        fromStrings = True
-        _lines = [Line(-1, t.cast(str, x)) for x in lines]
-    else:
-        _lines = t.cast("list[Line]", lines)
-    inBlock = False
+def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
     blockTypes: dict[str, TransformFuncT] = {
         "simpledef": transformSimpleDef,
         "propdef": transformPropdef,
@@ -91,216 +38,70 @@ def transformDataBlocks(doc: t.SpecT, lines: list[Line] | list[str]) -> list[Lin
         "include-raw": transformIncludeRaw,
         "pre": transformPre,
     }
-    blockType = ""
-    tagName = ""
-    blockLines: list[Line] = []
-    newLines: list[Line] = []
-    for line in _lines:
-        if line.text.strip() == constants.bsComment:
+    for el in h.findAll("[bs-datablock-type]", tree):
+        blockType = el.get("bs-datablock-type")
+        blockData = el.get("bs-datablock-data", "")
+        if blockType not in blockTypes:
+            m.die(f"Unknown datablock type '{blockType}'.", el=el)
             continue
-        # Look for the start of a block.
-        match = re.search(r"<(pre|xmp)[\s>].*", line.text, re.I)
-        # Note that, by design, I don't pay attention to anything on the same line as the start tag,
-        # unless it's single-line.
-        if match and not inBlock:
-            tagToEnd = match[0]
-            inBlock = True
-            tagName = match[1]
-            blockClasses = classesFromLine(tagToEnd, line.i)
-            seenClasses: list[str] = []
-            for blockType in blockTypes:
-                if blockType in blockClasses:
-                    seenClasses.append(blockType)
-            if not seenClasses:
-                blockType = "pre"
-            elif len(seenClasses) == 1:
-                blockType = seenClasses[0]
-            else:
-                m.die(
-                    "Found {} classes on the <{}>, so can't tell which to process the block as. Please use only one.".format(
-                        config.englishFromList((f"'{x}'" for x in seenClasses), "and"),
-                        tagName,
-                    ),
-                    lineNum=line.i,
-                )
-                blockType = "pre"
-        # Look for the end of a block.
-        match = re.match(r"(.*)</" + tagName + ">(.*)", line.text, re.I)
-        if match and inBlock:
-            inBlock = False
-            if len(blockLines) == 0:
-                # Single-line <pre>.
-                match = re.match(r"(\s*)(.*?)(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
-                if not match:
-                    m.die(f"Can't figure out how to parse this datablock line:\n{line.text}", lineNum=line.i)
-                    blockLines = []
-                    continue
-                indent, beforeStartTag, startTag, tagContent, afterEndTag = match.groups()
-                repl = blockTypes[blockType](
-                    lines=[tagContent],
-                    tagName=tagName,
-                    firstLine=indent + startTag,
-                    lineNum=line.i,
-                    doc=doc,
-                )
-                newLines.append(Line(line.i, beforeStartTag))
-                newLines.extend(Line(line.i, x) for x in repl)
-                newLines.append(Line(line.i, afterEndTag))
-            elif re.match(r"^\s*$", match.group(1)):
-                # End tag was the first tag on the line.
-                # Remove the tag from the line.
-                repl = blockTypes[blockType](
-                    lines=cleanPrefix([x.text for x in blockLines[1:]]),
-                    tagName=tagName,
-                    firstLine=blockLines[0].text,
-                    lineNum=blockLines[0].i,
-                    doc=doc,
-                )
-                newLines.extend(Line(blockLines[0].i, x) for x in repl)
-                line.text = match.group(2)
-                newLines.append(line)
-            else:
-                # End tag was at the end of line of useful content.
-                # Process the stuff before it, preserve the stuff after it.
-                repl = blockTypes[blockType](
-                    lines=cleanPrefix([x.text for x in blockLines[1:]] + [match.group(1)]),
-                    tagName=tagName,
-                    firstLine=blockLines[0].text,
-                    lineNum=blockLines[0].i,
-                    doc=doc,
-                )
-                newLines.extend(Line(blockLines[0].i, x) for x in repl)
-                line.text = match.group(2)
-                newLines.append(line)
-            tagName = ""
-            blockType = ""
-            blockLines = []
-            continue
-        if inBlock:
-            blockLines.append(line)
+        transformer = blockTypes[blockType]
+        blockData = blockData.replace(constants.virtualLineBreak, "\n")
+        newEl = transformer(blockData, el, doc)
+        if newEl is not None:
+            h.replaceNode(el, newEl)
         else:
-            newLines.append(line)
-
-    # for line in newLines:
-    #    print line
-
-    if fromStrings:
-        return [x.text for x in newLines]
-    return newLines
+            h.removeNode(el)
 
 
-def cleanPrefix(lines: list[str]) -> list[str]:
-    # Remove the longest common whitespace prefix from the lines.
-    # Returns a fresh array, does not mutate the passed lines.
-    if not lines:
-        return []
-    prefix = reduce(commonPrefix, map(getWsPrefix, lines))
-    prefixLen = len(prefix)
-    return [line[prefixLen:] for line in lines]
+def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    h.clearContents(el)
+    lines = data.split("\n")
+    while lines and lines[0].strip() == "":
+        lines = lines[1:]
+    # Remove smallest indent, and replace tabs with 2 spaces,
+    # since these will be displayed and 2 is the right size for display,
+    # regardless of the page's own indent.
+    lines = removeIndent(lines, 2)
+    if lines:
+        # If the parser pulled out a start/end <code> tag, put it back now.
+        lines[0] = el.get("bs-code-start-tag", "") + lines[0]
+        lines[-1] = lines[-1] + el.get("bs-code-end-tag", "")
+    return h.parseInto(el, "\n".join(lines))
 
 
-def commonPrefix(line1: str, line2: str) -> str:
-    prefixSoFar = ""
-    for i, char in enumerate(line1):
-        if i == len(line2):
-            break
-        if char == line2[i]:
-            prefixSoFar += char
-        else:
-            break
-    return prefixSoFar
-
-
-def getWsPrefix(line: str) -> str:
-    match = t.cast("re.Match", re.match(r"(\s*)", line))
-    return t.cast(str, match.group(1))
-
-
-def transformPre(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    # If the last line in the source is a </code></pre>,
-    # the generic processor will turn that into a final </code> line,
-    # which'll mess up the indent finding.
-    # Instead, specially handle this case.
-    if len(lines) == 0:
-        return [firstLine, f"</{tagName}>"]
-
-    if re.match(r"\s*</code>\s*$", lines[-1]):
-        lastLine = f"</code></{tagName}>"
-        lines = lines[:-1]
-    else:
-        lastLine = f"</{tagName}>"
-
-    if len(lines) == 0:
-        return [firstLine, lastLine]
-
-    indent = float("inf")
-    for i, line in enumerate(lines):
-        if line.strip() == "":
-            continue
-
-        # Use tabs in the source, but spaces in the output,
-        # because tabs are ginormous in HTML.
-        lines[i] = lines[i].replace("\t", "  ")
-
-        # Find the line with the shortest whitespace prefix.
-        # (It might not be the first!)
-        indent = min(indent, len(t.cast("re.Match", re.match(r" *", lines[i])).group(0)))
-
-    if indent == float("inf"):
-        indent = 0
-
-    # Strip off the whitespace prefix from each line
-    for i, line in enumerate(lines):
-        if line.strip() == "":
-            continue
-        lines[i] = lines[i][t.cast(int, indent) :]
-    # Put the first/last lines back into the results.
-    lines[0] = firstLine.rstrip() + lines[0]
-    lines.append(lastLine)
-    return lines
-
-
-def transformSimpleDef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    rows = parseDefBlock(lines, "simpledef", capitalizeKeys=False, doc=doc, lineNum=lineNum)
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    ret = [f"<table class='def'{lineNumAttr}><tbody>"]
-    # parseConfig = h.ParseConfig.fromSpec(doc, f"generated table from simpledef block (on line {lineNum})")
+def transformSimpleDef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    rows = parseDefBlock(data, "simpledef", el, doc, capitalizeKeys=False)
+    table = h.transferAttributes(el, h.E.table())
+    h.addClass(doc, table, "def")
+    tbody = h.appendChild(table, h.E.tbody())
     for key, val in rows.items():
-        ret.append(f"<tr><th>{key}<td>{val}")
-    ret.append("</table>")
+        th = h.E.th()
+        h.parseInto(th, key)
+        td = h.E.td()
+        h.parseInto(td, val)
+        h.appendChild(tbody, h.E.tr({}, th, td))
+    return table
 
-    indent = getWsPrefix(firstLine)
-    ret = [indent + x for x in ret]
 
-    return ret
-
-
-def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
+def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    parsedAttrs = parseDefBlock(data, "propdef", el, doc)
     attrs: OrderedDict[str, str | None] = OrderedDict()
-    parsedAttrs = parseDefBlock(lines, "propdef", doc=doc, lineNum=lineNum)
     # Displays entries in the order specified in attrs,
     # then if there are any unknown parsedAttrs values,
     # they're displayed afterward in the order they were specified.
     # attrs with a value of None are required to be present in parsedAttrs;
     # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
-    forHint = ""
+    table = h.transferAttributes(el, h.E.table())
+    h.addClass(doc, table, "def")
+    h.addClass(doc, table, "propdef")
+    tbody = h.appendChild(table, h.E.tbody())
+
     if "Name" in parsedAttrs:
-        forHint = " data-link-for-hint='{}'".format(parsedAttrs["Name"].split(",")[0].strip())
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    if "partial" in firstLine or "New values" in parsedAttrs:
+        table.set("data-link-for-hint", h.escapeAttr(parsedAttrs["Name"].split(",")[0].strip()))
+    if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
-        ret = [
-            "<table class='def propdef partial'{forHint}{lineNumAttr}><tbody>".format(
-                forHint=forHint,
-                lineNumAttr=lineNumAttr,
-            ),
-        ]
-    elif "shorthand" in firstLine:
+    elif h.hasClass(doc, table, "shorthand"):
         attrs["Name"] = None
         attrs["Value"] = None
         for defaultKey in [
@@ -313,9 +114,6 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         ]:
             attrs[defaultKey] = "see individual properties"
         attrs["Canonical order"] = "per grammar"
-        ret = [
-            "<table class='def propdef'{forHint}{lineNumAttr}><tbody>".format(forHint=forHint, lineNumAttr=lineNumAttr),
-        ]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -326,292 +124,253 @@ def transformPropdef(lines: list[str], tagName: str, firstLine: str, lineNum: in
         attrs["Computed value"] = "as specified"
         attrs["Canonical order"] = "per grammar"
         attrs["Animation type"] = None
-        ret = [
-            "<table class='def propdef'{forHint}{lineNumAttr}><tbody>".format(forHint=forHint, lineNumAttr=lineNumAttr),
-        ]
-    # We are in the process of migrating specs from using 'Animatable' to
-    # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
-    # drop the default 'Animation type' entry.
     if "Animatable" in parsedAttrs:
-        attrs.pop("Animation type")
-    attrsToPrint = []
-    for key, val in attrs.items():
-        if key in parsedAttrs:
-            # Key was provided
-            val = parsedAttrs[key]
-        elif val is None:
-            # Required key, not provided
-            if "Name" in parsedAttrs:
-                m.die(f"The propdef for '{parsedAttrs.get('Name', '')}' is missing a '{key}' line.", lineNum=lineNum)
-            else:
-                m.die(f"The propdef block is missing a '{key}' line.", lineNum=lineNum)
-            continue
-        else:
-            # Optional key, just use default
-            pass
-        attrsToPrint.append((key, val))
-    for key, val in parsedAttrs.items():
-        # Find any "custom" provided keys
-        if key not in attrs:
-            attrsToPrint.append((key, val))
+        parsedAttrs["Animation type"] = parsedAttrs.pop("Animatable")
 
+    attrsToPrint = canonicalizeAttrs(parsedAttrs, attrs, "propdef", el)
     for key, val in attrsToPrint:
-        tr = "<tr>"
-        th = f"<th>{key}:"
-        td = f"<td>{val}"
+        tr = h.appendChild(tbody, h.E.tr())
+        th = h.parseInto(h.E.th(), key + ":")
+        td = h.parseInto(h.E.td(), val)
+        h.appendChild(tr, th, td)
+
         if key in ("Value", "New values"):
-            tr = "<tr class=value>"
-            th = f"<th><a href='https://www.w3.org/TR/css-values/#value-defs'>{key}:</a>"
-            td = f"<td class=prod>{val}"
+            h.addClass(doc, tr, "value")
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-values/#value-defs"}))
+            h.addClass(doc, td, "prod")
         elif key == "Initial":
-            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#initial-values'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-cascade/#initial-values"}))
         elif key == "Inherited":
-            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#inherited-property'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-cascade/#inherited-property"}))
         elif key == "Percentages":
-            th = f"<th><a href='https://www.w3.org/TR/css-values/#percentages'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-values/#percentages"}))
         elif key == "Computed value":
-            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#computed'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-cascade/#computed"}))
         elif key in ("Animatable", "Animation type"):
-            th = f"<th><a href='https://www.w3.org/TR/web-animations/#animation-type'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/web-animations/#animation-type"}))
         elif key == "Canonical order":
-            th = f"<th><a href='https://www.w3.org/TR/cssom/#serializing-css-values'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/cssom/#serializing-css-values"}))
         elif key == "Applies to":
-            th = f"<th><a href='https://www.w3.org/TR/css-cascade/#applies-to'>{key}:</a>"
+            h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-cascade/#applies-to"}))
             if val and val.lower() == "all elements":
-                td = "<td><a href='https://www.w3.org/TR/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
+                h.wrapContents(
+                    td,
+                    h.E.a(
+                        {
+                            "href": "https://www.w3.org/TR/css-pseudo/#generated-content",
+                            "title": "Includes ::before and ::after pseudo-elements.",
+                        },
+                    ),
+                )
         elif key == "Logical property group":
-            th = f"<th><a href='https://drafts.csswg.org/css-logical-1/#logical-property-group'>{key}:</a>"
-            td = f"<td><a data-link-type=property data-okay-to-fail>{val}</a>"
-        ret.append(tr + th + td)
-    ret.append("</table>")
+            h.wrapContents(th, h.E.a({"href": "https://drafts.csswg.org/css-logical-1/#logical-property-group"}))
+            h.wrapContents(td, h.E.a({"data-link-type": "property", "data-okay-to-fail": ""}))
 
-    indent = getWsPrefix(firstLine)
-    ret = [indent + x for x in ret]
-
-    return ret
+    return table
 
 
 # TODO: Make these functions match transformPropdef's new structure
 
 
-def transformDescdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    vals = parseDefBlock(lines, "descdef", doc=doc, lineNum=lineNum)
-    if "partial" in firstLine or "New values" in vals:
+def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    parsedAttrs = parseDefBlock(data, "descdef", el, doc)
+    table = h.transferAttributes(el, h.E.table())
+    h.addClass(doc, table, "def")
+    h.addClass(doc, table, "descdef")
+    tbody = h.appendChild(table, h.E.tbody())
+
+    if "For" in parsedAttrs:
+        table.set("data-dfn-for", h.escapeAttr(parsedAttrs["For"]))
+    if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         requiredKeys = ["Name", "For"]
-        ret = [
-            "<table class='def descdef partial' data-dfn-for='{0}'{lineNumAttr}><tbody>".format(
-                vals.get("For", ""),
-                lineNumAttr=lineNumAttr,
-            ),
-        ]
-    if "mq" in firstLine:
+    if h.hasClass(doc, table, "mq"):
         requiredKeys = ["Name", "For", "Value"]
-        ret = [
-            "<table class='def descdef mq' data-dfn-for='{0}'{lineNumAttr}><tbody>".format(
-                vals.get("For", ""),
-                lineNumAttr=lineNumAttr,
-            ),
-        ]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
-        ret = [
-            "<table class='def descdef' data-dfn-for='{0}'{lineNumAttr}><tbody>".format(
-                vals.get("For", ""),
-                lineNumAttr=lineNumAttr,
-            ),
-        ]
+
     for key in requiredKeys:
+        tr = h.appendChild(tbody, h.E.tr())
+        th = h.parseInto(h.E.th(), key + ":")
+        td = h.parseInto(h.E.td(), parsedAttrs.get(key, f"(no {key} specified)"))
+        h.appendChild(tr, th, td)
+
         if key == "For":
-            ret.append("<tr><th>{}:<td><a at-rule>{}</a>".format(key, vals.get(key, "")))
+            h.wrapContents(td, h.E.a({"data-link-type": "at-rule"}))
         elif key == "Value":
-            ret.append("<tr><th>{}:<td class='prod'>{}".format(key, vals.get(key, "")))
-        elif key in vals:
-            ret.append("<tr><th>{}:<td>{}".format(key, vals.get(key, "")))
+            h.addClass(doc, td, "prod")
+        elif key in parsedAttrs:
+            pass
         else:
-            m.die(f"The descdef for '{vals.get('Name', '???')}' is missing a '{key}' line.", lineNum=lineNum)
-            continue
-    for key, val in vals.items():
+            name = parsedAttrs.get("Name", "(no Name specified)")
+            m.die(f"The descdef for '{name}' is missing a '{key}' line", el=el)
+    for key, val in parsedAttrs.items():
         if key in requiredKeys:
             continue
-        ret.append("<tr><th>{}:<td>{}".format(key, val))
-    ret.append("</table>")
+        tr = h.appendChild(tbody, h.E.tr())
+        th = h.parseInto(h.E.th(), key + ":")
+        td = h.parseInto(h.E.td(), val)
+        h.appendChild(tr, th, td)
 
-    indent = getWsPrefix(firstLine)
-    ret = [indent + x for x in ret]
-
-    return ret
+    return table
 
 
-def transformElementdef(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    attrs: OrderedDict[str, str | None] = OrderedDict()
-    parsedAttrs = parseDefBlock(lines, "elementdef", doc=doc, lineNum=lineNum)
+def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    parsedAttrs = parseDefBlock(data, "elementdef", el, doc)
+    table = h.transferAttributes(el, h.E.table())
+    h.addClass(doc, table, "def")
+    h.addClass(doc, table, "elementdef")
+    tbody = h.appendChild(table, h.E.tbody())
+
+    attributeList = None
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
-        html = "<ul>"
+        attributeList = h.E.ul()
         if "Attribute groups" in parsedAttrs:
             groups = [x.strip() for x in parsedAttrs["Attribute groups"].split(",")]
             for group in groups:
-                html += "<li><a dfn data-element-attr-group{lineNumAttr}>{0}</a>".format(group, lineNumAttr=lineNumAttr)
+                h.appendChild(
+                    attributeList,
+                    h.E.li(
+                        {},
+                        h.E.a({"data-link-type": "dfn", "data-element-attr-group": ""}, group),
+                    ),
+                )
             del parsedAttrs["Attribute groups"]
         if "Attributes" in parsedAttrs:
             atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
+            if "Name" in parsedAttrs:
+                dataFor = parsedAttrs.get("Name", "")
+            else:
+                dataFor = ""
             for att in atts:
-                html += "<li><a element-attr for='{1}'{lineNumAttr}>{0}</a>".format(
-                    att,
-                    parsedAttrs.get("Name", ""),
-                    lineNumAttr=lineNumAttr,
+                h.appendChild(
+                    attributeList,
+                    h.E.li(
+                        {},
+                        h.E.a({"data-link-type": "element-attr", "data-link-for": dataFor}, att),
+                    ),
                 )
-        html += "</ul>"
-        parsedAttrs["Attributes"] = html
+        # Give a dummy value to signal that it was specified
+        parsedAttrs["Attributes"] = ""
 
-    # Displays entries in the order specified in attrs,
-    # then if there are any unknown parsedAttrs values,
-    # they're displayed afterward in the order they were specified.
-    # attrs with a value of None are required to be present in parsedAttrs;
-    # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
+    attrs: OrderedDict[str, str | None] = OrderedDict()
     attrs["Name"] = None
     attrs["Categories"] = None
     attrs["Contexts"] = None
     attrs["Content model"] = None
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
-    ret = [f"<table class='def elementdef'{lineNumAttr}><tbody>"]
-    for key, val in attrs.items():
-        if key in parsedAttrs or val is not None:
-            if key in parsedAttrs:
-                val = parsedAttrs[key]
-            assert val is not None
-            if key == "Name":
-                ret.append("<tr><th>Name:<td>")
-                ret.append(
-                    ", ".join(
-                        "<dfn element{lineNumAttr}>{0}</dfn>".format(x.strip(), lineNumAttr=lineNumAttr)
-                        for x in val.split(",")
-                    ),
-                )
-            elif key == "Content model":
-                ret.append(f"<tr><th>{key}:<td>")
-                ret.extend(val.split("\n"))
-            elif key == "Categories":
-                ret.append("<tr><th>Categories:<td>")
-                ret.append(
-                    ", ".join(
-                        "<a dfn{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr) for x in val.split(",")
-                    ),
-                )
-            elif key == "Dom interfaces":
-                ret.append("<tr><th>DOM Interfaces:<td>")
-                ret.append(
-                    ", ".join(
-                        "<a interface{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr)
-                        for x in val.split(",")
-                    ),
-                )
+
+    attrsToPrint = canonicalizeAttrs(parsedAttrs, attrs, "elementdef", el)
+    for key, val in attrsToPrint:
+        tr = h.appendChild(tbody, h.E.tr())
+        th = h.parseInto(h.E.th(), key + ":")
+        if key == "Attributes":
+            if attributeList is not None:
+                td = h.E.td({}, attributeList)
             else:
-                ret.append(f"<tr><th>{key}:<td>{val}")
+                continue
         else:
-            m.die(f"The elementdef for '{parsedAttrs.get('Name', '???')}' is missing a '{key}' line.", lineNum=lineNum)
-            continue
-    for key, val in parsedAttrs.items():
-        if key in attrs:
-            continue
-        ret.append(f"<tr><th>{key}:<td>{val}")
-    ret.append("</table>")
+            td = h.parseInto(h.E.td(), val, allowEmpty=True)
+        h.appendChild(tr, th, td)
 
-    indent = getWsPrefix(firstLine)
-    ret = [indent + x for x in ret]
+        if key == "Name":
+            h.replaceContents(td, wrapCommaList(val, "dfn", "element"))
+        elif key == "Categories":
+            h.replaceContents(td, wrapCommaList(val, "a", "dfn"))
+        elif key == "Dom interfaces":
+            h.replaceContents(th, "DOM Interfaces:")
+            h.replaceContents(td, wrapCommaList(val, "a", "interface"))
 
-    return ret
+    return table
 
 
-def transformArgumentdef(
-    lines: list[str],
-    tagName: str,
-    firstLine: str,
-    lineNum: int | None,
-    doc: t.SpecT,
-) -> list[str]:
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    attrs = parseDefBlock(lines, "argumentdef", doc=doc, capitalizeKeys=False, lineNum=lineNum)
-    for param, desc in list(attrs.items()):
-        # fix var params, since they're not caught by the parser
-        if param.startswith("|") and param.endswith("|"):
-            del attrs[param]
-            attrs["<var>" + param[1:-1] + "</var>"] = desc
-    el = h.parseElements(firstLine + "</pre>")[0]
-    if h.hasAttr(el, "for"):
-        forValue = t.cast(str, el.get("for"))
-        el.set("data-dfn-for", forValue)
-        if "/" in forValue:
-            interface, method = forValue.split("/")
-        else:
-            m.die(f"Argumentdef for='' values need to specify interface/method(). Got '{forValue}'.", lineNum=lineNum)
-            return []
-        h.removeAttr(el, "for")
+def transformArgumentdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    parsedAttrs = parseDefBlock(data, "argumentdef", el, doc, capitalizeKeys=False)
+    table = h.transferAttributes(el, h.E.table())
+    h.addClass(doc, table, "data")
+    h.addClass(doc, table, "argumentdef")
+    if h.hasAttr(table, "for"):
+        h.renameAttr(table, "for", "data-dfn-for")
+    if h.hasAttr(table, "data-dfn-for"):
+        forValue = table.get("data-dfn-for", "")
+        interface, _, method = forValue.partition("/")
+        interface = interface.strip()
+        method = method.strip()
+        if not interface or not method:
+            m.die(f"Argumentdef for='' values need to specify 'interface/method()'. Got '{forValue}'.", el=el)
+            return None
     else:
-        m.die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
-        return []
-    h.addClass(doc, el, "data")
-    rootAttrs = " ".join(f"{k!s}='{h.escapeAttr(str(v))}'" for k, v in el.attrib.items())
-    text = (
-        f"""
-<table {rootAttrs}{lineNumAttr}>
-<caption>Arguments for the <a idl lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
-<thead>
-<tr>
-<th>Parameter
-<th>Type
-<th style="text-align:center">Nullable
-<th style="text-align:center">Optional
-<th>Description
-<tbody>"""
-        + "\n".join(
-            [
-                f"""
-<tr>
-<td><dfn argument{lineNumAttr}>{param}</dfn>
-<td>
-<td style="text-align:center">
-<td style="text-align:center">
-<td>{desc}"""
-                for param, desc in attrs.items()
-            ],
-        )
-        + """
-</table>"""
+        m.die("Argumentdef blocks need a for='interface/method()' attribute.", el=el)
+        return None
+
+    h.appendChild(
+        table,
+        h.E.caption(
+            {},
+            "Arguments for the ",
+            h.E.a(
+                {"data-link-type": "method", "data-lt": method, "data-link-for": interface},
+                f"{interface}.{method}",
+            ),
+            " method.",
+        ),
+        h.E.thead(
+            {},
+            h.E.tr(
+                {},
+                h.E.th({}, "Parameter"),
+                h.E.th({}, "Type"),
+                h.E.th({"style": "text-align:center"}, "Nullable"),
+                h.E.th({"style": "text-align:center"}, "Optional"),
+                h.E.th("Description"),
+            ),
+        ),
     )
+    tbody = h.appendChild(table, h.E.tbody())
 
-    indent = getWsPrefix(firstLine)
-    lines = [indent + line for line in text.split("\n")]
-
-    return lines
+    for param, desc in parsedAttrs.items():
+        tr = h.appendChild(tbody, h.E.tr())
+        h.appendChild(
+            tr,
+            h.E.td({}, h.parseInto(h.E.dfn({"data-dfn-type": "argument"}), param)),
+            h.E.td(),
+            h.E.td({"style": "text-align:center"}),
+            h.E.td({"style": "text-align:center"}),
+            h.parseInto(h.E.td(), desc, allowEmpty=True),
+        )
+    return table
 
 
 def parseDefBlock(
-    lines: list[str],
+    data: str,
     type: str,
+    el: t.ElementT,
     doc: t.SpecT,
     capitalizeKeys: bool = True,
-    lineNum: int | None = None,
 ) -> OrderedDict[str, str]:
+    # Parses a 'def block' (lines of key:val pairs)
+    # Returns a dict of the (bs-parsed) key and value.
+    # Concatenates values (with a newline) from lines with the same key
     vals: OrderedDict[str, tuple[int, str]] = OrderedDict()
-    if lineNum is None:
-        lineNum = 0
+    startLine = h.parseLineNumber(el)
+    if startLine is None:
+        startLine = 1
+    lines = data.split("\n")
+    if lines[0].strip() == "":
+        lines = lines[1:]
+        startLine += 1
+    if lines and lines[-1].strip() == "":
+        lines = lines[:-1]
+    if not lines:
+        return OrderedDict()
     lastKey = None
-    for li, line in enumerate(lines, lineNum + 1):
+    for lineNum, line in enumerate(lines, startLine):
         if "<!--" in line:
             commentMatch = re.match(r"(.*)<!--.*?-->(.*)", line)
             if not commentMatch:
                 m.die(
                     f"Detected the start of a comment on a line, but couldn't find the end. Please remove the comment, or keep it on a single line:\n{line}",
-                    lineNum=li,
+                    lineNum=lineNum,
                 )
                 continue
             # Just pull the comment out, and continue
@@ -625,7 +384,7 @@ def parseDefBlock(
                 key = lastKey
                 val = line.strip()
             else:
-                m.die(f"Incorrectly formatted {type} line for '{vals.get('Name', '???')}':\n{line}", lineNum=li)
+                m.die(f"Incorrectly formatted {type} line for '{vals.get('Name', '???')}':\n{line}", lineNum=lineNum)
                 continue
         else:
             key = match.group(1).strip()
@@ -638,57 +397,105 @@ def parseDefBlock(
         else:
             vals[key] = (lineNum, val)
     retVals: OrderedDict[str, str] = OrderedDict()
-    for key, (li, val) in vals.items():
-        context = f"'{key}' key in (line {lineNum}) {type}"
-        pConfig = h.ParseConfig.fromSpec(doc, context=context)
+    for key, (lineNum, val) in vals.items():
+        keyConfig = h.ParseConfig.fromSpec(doc, "the line's key (before the colon)")
+        valConfig = h.ParseConfig.fromSpec(doc, "lineNum line's value (after the colon)")
+        key = h.parseText(key, keyConfig, startLine=lineNum, closeElements=True, context=el)
         if type in ("propdef", "descdef") and key == "Name":
             newVal = ""
-            for node in h.nodesFromHtml(val, pConfig, startLine=1):
+            for node in h.nodesFromHtml(val, valConfig, startLine=1, closeElements=True, context=el):
                 if isinstance(node, h.parser.Text):
                     newVal += str(node)
                 else:
                     m.die(
                         f"'Name' key should contain just the property/descriptor name, or a comma-separated list. Found markup:\n  {val}",
-                        lineNum=li,
+                        lineNum=lineNum,
                     )
             retVals[key] = newVal
         else:
-            retVals[key] = h.parseText(val, pConfig, startLine=1)
+            retVals[key] = h.parseText(val, valConfig, startLine=lineNum, closeElements=True, context=el)
     return retVals
 
 
-def transformRailroad(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    ret = ["<div class='railroad'>"]
-    doc.extraJC.addRailroad()
-    code = "".join(lines)
-    diagram = railroadparser.parse(code)
+def wrapCommaList(text: str, tagName: str, type: str) -> list[t.NodeT]:
+    # Takes a comma-separated list of terms,
+    # and wraps each term in a dfn or link of the specified type.
+    ret: list[t.NodeT] = []
+    for term in [x.strip() for x in text.split(",")]:
+        typeAttr = "data-dfn-type" if tagName == "dfn" else "data-link-type"
+        ret.append(h.createElement(tagName, {typeAttr: type}, term))
+        ret.append(", ")
+    # Drop the trailing comma
+    return ret[:-1]
+
+
+def canonicalizeAttrs(
+    parsedAttrs: OrderedDict[str, str],
+    attrs: OrderedDict[str, str | None],
+    type: str,
+    el: t.ElementT,
+) -> list[tuple[str, str]]:
+    # Processes and re-orders parsedAttrs.
+    # attrs specifies the keys that are required (with a value of None)
+    # and optional (with a non-None default value).
+    # The order of attrs keys is also respected,
+    # with any additional keys in parsedAttrs put at the end.
+    # Returns a list of (key, value) tuples, in the desired order.
+    attrsToPrint = []
+    for key, defaultVal in attrs.items():
+        if key in parsedAttrs:
+            # Key was provided
+            attrsToPrint.append((key, parsedAttrs[key]))
+            continue
+        elif defaultVal is None:
+            # Required key, not provided
+            if "Name" in parsedAttrs:
+                m.die(f"The {type} block for '{parsedAttrs.get('Name')}' is missing a '{key}' line.", el=el)
+            else:
+                m.die(f"The {type} block is missing a '{key}' line.", el=el)
+            continue
+        else:
+            # Optional key, just use default
+            attrsToPrint.append((key, defaultVal))
+    for key, val in parsedAttrs.items():
+        # Find any "custom" provided keys
+        if key not in attrs:
+            attrsToPrint.append((key, val))
+    return attrsToPrint
+
+
+def transformRailroad(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    ret = h.transferAttributes(el, h.E.div())
+    h.addClass(doc, ret, "railroad")
+    lines = data.split("\n")
+    if lines[0].strip() == "":
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "":
+        lines = lines[:-1]
+    data = "\n".join(lines)
+    diagram = railroadparser.parse(data)
     if diagram:
+        doc.extraJC.addRailroad()
         temp = io.StringIO()
         diagram.writeSvg(temp.write)
-        ret.append(temp.getvalue())
-        temp.close()
-        ret.append("</div>")
-
-        indent = getWsPrefix(firstLine)
-        ret = [indent + x for x in ret]
-
-        return ret
-    return []
+        return h.parseInto(ret, temp.getvalue())
+    return None
 
 
-def transformBiblio(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
+def transformBiblio(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     storage: t.BiblioStorageT = defaultdict(list)
-    biblio.processSpecrefBiblioFile("".join(lines), storage, order=1)
+    biblio.processSpecrefBiblioFile(data, storage, order=1)
     for k, vs in storage.items():
         doc.refs.biblioKeys.add(k)
         doc.refs.biblios[k].extend(vs)
-    return []
+    return None
 
 
-def transformAnchors(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    anchors = parseInfoTree(lines, doc.md.indent, lineNum)
+def transformAnchors(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    lineNum = h.parseLineNumber(el)
+    anchors = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
     processAnchors(anchors, doc, lineNum)
-    return []
+    return None
 
 
 def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> None:
@@ -789,16 +596,11 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
             doc.refs.anchorBlockRefs.addMethodVariants(anchor["text"][0], anchor.get("for", []), doc.md.shortname)
 
 
-def transformLinkDefaults(
-    lines: list[str],
-    tagName: str,
-    firstLine: str,
-    lineNum: int | None,
-    doc: t.SpecT,
-) -> list[str]:
-    lds = parseInfoTree(lines, doc.md.indent, lineNum)
+def transformLinkDefaults(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    lineNum = h.parseLineNumber(el)
+    lds = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
     processLinkDefaults(lds, doc, lineNum)
-    return []
+    return None
 
 
 def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> None:
@@ -832,16 +634,10 @@ def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None
             doc.md.linkDefaults[text].append((spec, type, status, None))
 
 
-def transformIgnoredSpecs(
-    lines: list[str],
-    tagName: str,
-    firstLine: str,
-    lineNum: int | None,
-    doc: t.SpecT,
-) -> list[str]:
-    specs = parseInfoTree(lines, doc.md.indent, lineNum)
-    processIgnoredSpecs(specs, doc, lineNum)
-    return []
+def transformIgnoredSpecs(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    specs = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
+    processIgnoredSpecs(specs, doc, h.parseLineNumber(el))
+    return None
 
 
 def processIgnoredSpecs(specs: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> None:
@@ -867,13 +663,13 @@ def processIgnoredSpecs(specs: InfoTreeT, doc: t.SpecT, lineNum: int | None = No
                 doc.refs.ignoredSpecs.add(specName)
 
 
-def transformInfo(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
+def transformInfo(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
-    infos = parseInfoTree(lines, doc.md.indent, lineNum)
-    processInfo(infos, doc, lineNum)
-    return []
+    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
+    processInfo(infos, doc, h.parseLineNumber(el))
+    return None
 
 
 def processInfo(infos: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> None:
@@ -899,11 +695,8 @@ def processInfo(infos: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> N
         knownInfoTypes[infoType](infoItem, doc, lineNum=0)
 
 
-def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+def transformInclude(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
     path = None
     macros = {}
     for info in infos:
@@ -911,8 +704,8 @@ def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: in
             if path is None:
                 path = info["path"][0]
             else:
-                m.die("Include blocks must only contain a single 'path'.", lineNum=lineNum)
-                return []
+                m.die("Include blocks must only contain a single 'path'.", el=el)
+                return None
         if "macros" in info:
             for k, v in info.items():
                 if k == "macros":
@@ -922,31 +715,23 @@ def transformInclude(lines: list[str], tagName: str, firstLine: str, lineNum: in
                 else:
                     m.die(
                         f"Include block defines the '{k}' local macro more than once.",
-                        lineNum=lineNum,
+                        el=el,
                     )
-                    return []
-    if path:
-        el = "<pre class=include path='{}'".format(h.escapeAttr(path))
-        for i, (macroName, macroVal) in enumerate(macros.items()):
-            el += " macro-{}='{} {}'".format(i, macroName, h.escapeAttr(macroVal))
-        el += f"{lineNumAttr}></pre>"
+                    return None
+    if not path:
+        m.die("Include blocks must contain a 'path' info.", el=el)
+        return None
 
-        indent = getWsPrefix(firstLine)
-        return [indent + el]
-    return []
+    ret = h.transferAttributes(el, h.E.pre())
+    h.addClass(doc, ret, "include")
+    ret.set("path", path)
+    for i, (macroName, macroVal) in enumerate(macros.items()):
+        ret.set(f"macro-{i}", f"{macroName} {macroVal}")
+    return ret
 
 
-def transformIncludeCode(
-    lines: list[str],
-    tagName: str,
-    firstLine: str,
-    lineNum: int | None,
-    doc: t.SpecT,
-) -> list[str]:
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+def transformIncludeCode(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
     path = None
     highlight = None
     lineStart = None
@@ -960,7 +745,7 @@ def transformIncludeCode(
             else:
                 m.die(
                     "Include-code blocks must only contain a single 'path'.",
-                    lineNum=lineNum,
+                    el=el,
                 )
         if "highlight" in info:
             if highlight is None:
@@ -968,7 +753,7 @@ def transformIncludeCode(
             else:
                 m.die(
                     "Include-code blocks must only contain a single 'highlight'.",
-                    lineNum=lineNum,
+                    el=el,
                 )
         if "line-start" in info:
             if lineStart is None:
@@ -976,7 +761,7 @@ def transformIncludeCode(
             else:
                 m.die(
                     "Include-code blocks must only contain a single 'line-start'.",
-                    lineNum=lineNum,
+                    el=el,
                 )
         if "show" in info:
             show.extend(info["show"])
@@ -987,48 +772,44 @@ def transformIncludeCode(
         if "no-line-numbers" in info:
             lineNumbers = False
 
-    if path:
-        attrs = lineNumAttr
-        attrs += " path='{}'".format(h.escapeAttr(path))
-        if highlight:
-            attrs += " highlight='{}'".format(h.escapeAttr(highlight))
-        if lineStart:
-            attrs += " line-start='{}'".format(h.escapeAttr(lineStart))
-        if show:
-            attrs += " data-code-show='{}'".format(h.escapeAttr(",".join(show)))
-        if lineHighlight:
-            attrs += " line-highlight='{}'".format(h.escapeAttr(",".join(lineHighlight)))
-        if lineNumbers:
-            attrs += " line-numbers"
-        el = f"<pre class=include-code{attrs}></pre>"
-        indent = getWsPrefix(firstLine)
-        return [indent + el]
-    return []
+    if not path:
+        m.die("Include-code blocks must contain a 'path' info.", el=el)
+        return None
+
+    ret = h.transferAttributes(el, h.E.pre())
+    h.addClass(doc, ret, "include-code")
+    ret.set("path", path)
+    if highlight:
+        ret.set("highlight", highlight)
+    if lineStart:
+        ret.set("line-start", lineStart)
+    if show:
+        ret.set("data-code-show", ",".join(show))
+    if lineHighlight:
+        ret.set("line-highlight", ",".join(lineHighlight))
+    if lineNumbers:
+        ret.set("line-numbers", "")
+    return ret
 
 
-def transformIncludeRaw(lines: list[str], tagName: str, firstLine: str, lineNum: int | None, doc: t.SpecT) -> list[str]:
-    lineNumAttr = ""
-    if lineNum is not None:
-        lineNumAttr = f" bs-line-number={lineNum}"
-    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+def transformIncludeRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
     path = None
     for info in infos:
         if "path" in info:
             if path is None:
                 path = info["path"][0]
             else:
-                m.die(
-                    "Include-raw blocks must only contain a single 'path'.",
-                    lineNum=lineNum,
-                )
+                m.die("Include blocks must only contain a single 'path'.", el=el)
+                return None
+    if not path:
+        m.die("Include-raw blocks must contain a 'path' info.", el=el)
+        return None
 
-    if path:
-        attrs = lineNumAttr
-        attrs += " path='{}'".format(h.escapeAttr(path))
-        el = f"<pre class=include-raw{attrs}></pre>"
-        indent = getWsPrefix(firstLine)
-        return [indent + el]
-    return []
+    ret = h.transferAttributes(el, h.E.pre())
+    h.addClass(doc, ret, "include-raw")
+    ret.set("path", path)
+    return ret
 
 
 def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) -> InfoTreeT:
@@ -1049,6 +830,9 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
     # key1: val1; key2a: val2a
     # Starting a line with # will comment it out.
 
+    lines = removeCommentLines(lines)
+    lines = removeIndent(lines, indent)
+
     def extendData(datas: InfoTreeT, infoLevels: InfoTreeT) -> None:
         if not infoLevels:
             return
@@ -1065,7 +849,7 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
     indentSpace = " " * indent
     for i, line in enumerate(lines):
         if lineNum is not None:
-            thisLine = int(lineNum) + i + 1
+            thisLine = int(lineNum) + i
         else:
             thisLine = None
         if line.strip() == "":
@@ -1117,187 +901,47 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
     return datas
 
 
-def classesFromLine(line: str, i: int) -> set[str]:
-    tag = parseTag(line.strip(), lineNumber=i)
-    if tag is None:
-        return set()
-    if "class" not in tag.attrs:
-        return set()
-    return set(tag.attrs["class"].strip().split())
+def removeCommentLines(lines: list[str]) -> list[str]:
+    # removes comments from a line
+    for i, line in enumerate(lines):
+        while match := re.search(r"(.*)(<!--.*?-->)(.*)", line):
+            lines[i] = match[1] + match[3]
+    return lines
 
 
-@dataclasses.dataclass
-class StartTag:
-    tag: str
-    attrs: dict[str, str] = dataclasses.field(default_factory=dict)
-
-
-def parseTag(text: str, lineNumber: int | None) -> StartTag | None:
-    """
-    Parses a tag from a string,
-    conformant to the HTML parsing algorithm.
-    The text must start with the opening < character.
-    """
-
-    def parseerror(index: int, state: str) -> None:
-        m.die(
-            f"Tried to parse a start tag from '{text}', but failed at character {index} '{text[index]}' and parse-state '{state}'.",
-            lineNum=lineNumber,
-        )
-
-    def eof(i: int, text: str) -> bool:
-        return i >= len(text)
-
-    i = 0
-    state = "data"
-    while True:
-        if eof(i, text):
-            parseerror(i, state)
-            return None
-        if state == "data":
-            if text[i] == "<":
-                state = "tag-open"
-                i += 1
-                continue
-            parseerror(i, state)
-            return None
-        if state == "tag-open":
-            if text[i].isalpha():
-                state = "tag-name"
-                continue
-            parseerror(i, state)
-            return None
-        if state == "tag-name":
-            tagname = ""
-            while not eof(i, text) and re.match(r"[^\s/>]", text[i]):
-                tagname += text[i].lower()
-                i += 1
-            tag = StartTag(tagname)
-            if text[i] == ">":
-                return tag
-            if text[i] == "/":
-                state = "self-closing-start-tag"
-                i += 1
-                continue
-            if text[i].isspace():
-                state = "before-attribute-name"
-                i += 1
-                continue
-            parseerror(i, state)
-            return None
-        if state == "self-closing-start-tag":
-            if text[i] == ">":
-                return tag
-            parseerror(i, state)
-            return None
-        if state == "before-attribute-name":
-            if text[i].isspace():
-                i += 1
-                continue
-            if text[i] == "/" or text[i] == ">":
-                state = "after-attribute-name"
-                continue
-            if text[i] == "=":
-                parseerror(i, state)
-                return None
-            state = "attribute-name"
+def removeBlankLines(lines: list[str]) -> list[str]:
+    # removes lines that are blank (save for possibly whitespace)
+    ret = []
+    for line in lines:
+        if line.strip() == "":
             continue
-        if state == "attribute-name":
-            attrName = ""
-            while not eof(i, text) and re.match(r"[^\s/>=\"'<]", text[i]):
-                attrName += text[i]
-                i += 1
-            tag.attrs[attrName] = ""
-            if text[i].isspace() or text[i] == "/" or text[i] == ">":
-                state = "after-attribute-name"
-                continue
-            if text[i] == "=":
-                state = "before-attribute-value"
-                i += 1
-                continue
-            parseerror(i, state)
-            return None
-        if state == "after-attribute-name":
-            if text[i].isspace():
-                i += 1
-                continue
-            if text[i] == "/":
-                state = "self-closing-start-tag"
-                i += 1
-                continue
-            if text[i] == "=":
-                state = "before-attribute-value"
-                i += 1
-                continue
-            if text[i] == ">":
-                return tag
-            state = "attribute-name"
+        ret.append(line)
+    return ret
+
+
+def removeIndent(lines: list[str], tabSize: int) -> list[str]:
+    # Finds the smallest indent from non-WS lines,
+    # and removes it from all lines.
+    minIndentSize = 1000
+    for i, line in enumerate(lines):
+        if line.strip() == "":
+            lines[i] = ""
             continue
-        if state == "before-attribute-value":
-            if text[i].isspace():
-                i += 1
-                continue
-            if text[i] == '"':
-                state = "attribute-value-double-quoted"
-                i += 1
-                continue
-            if text[i] == "'":
-                state = "attribute-value-single-quoted"
-                i += 1
-                continue
-            if text[i] == "=":
-                parseerror(i, state)
-                return None
-            state = "attribute-value-unquoted"
+        match = re.match(r"([ \t]+)(.*)", line)
+        if not match:
+            minIndentSize = 0
             continue
-        if state == "attribute-value-double-quoted":
-            attrValue = ""
-            while not eof(i, text) and text[i] != '"':
-                attrValue += text[i]
-                i += 1
-            tag.attrs[attrName] = attrValue
-            if text[i] == '"':
-                state = "after-attribute-value-quoted"
-                i += 1
-                continue
-            parseerror(i, state)
-            return None
-        if state == "attribute-value-single-quoted":
-            attrValue = ""
-            while not eof(i, text) and text[i] != "'":
-                attrValue += text[i]
-                i += 1
-            tag.attrs[attrName] = attrValue
-            if text[i] == "'":
-                state = "after-attribute-value-quoted"
-                i += 1
-                continue
-            parseerror(i, state)
-            return None
-        if state == "attribute-value-unquoted":
-            attrValue = ""
-            while not eof(i, text) and re.match(r"[^\s<>'\"=`]", text[i]):
-                attrValue += text[i]
-                i += 1
-            tag.attrs[attrName] = attrValue
-            if text[i].isspace():
-                state = "before-attribute-name"
-                i += 1
-                continue
-            if text[i] == ">":
-                return tag
-            parseerror(i, state)
-            return None
-        if state == "after-attribute-value-quoted":
-            if text[i].isspace():
-                state = "before-attribute-name"
-                i += 1
-                continue
-            if text[i] == "/":
-                state = "self-closing-start-tag"
-                i += 1
-                continue
-            if text[i] == ">":
-                return tag
-            parseerror(i, state)
-            return None
+        indent = match[1]
+        if "\t" in indent:
+            indent = indent.replace("\t", " " * tabSize)
+            lines[i] = indent + match[2]
+        indentSize = len(indent)
+        minIndentSize = min(minIndentSize, indentSize)
+    if minIndentSize in (0, 1000):
+        # nothing to remove
+        return lines
+    minIndent = " " * minIndentSize
+    for i, line in enumerate(lines):
+        if line.startswith(minIndent):
+            lines[i] = line[minIndentSize:]
+    return lines

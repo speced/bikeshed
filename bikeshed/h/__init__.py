@@ -58,6 +58,8 @@ from .dom import (
     parseDocument,
     parseElements,
     parseHTML,
+    parseInto,
+    parseLineNumber,
     prependChild,
     previousElements,
     printNodeTree,

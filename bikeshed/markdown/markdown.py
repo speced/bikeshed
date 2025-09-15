@@ -14,7 +14,6 @@ if t.TYPE_CHECKING:
         prefixlen: int | float
         line: l.Line
         text: str
-        virtualPrefix: str
 
     class HeadingTokenT(TokenT, total=False):
         level: t.Required[int]
@@ -28,7 +27,6 @@ if t.TYPE_CHECKING:
         tag: t.Required[str]
         nest: t.Required[bool]
         prefixLen: int | float
-        virtualPrefix: str
         start: int
 
 
@@ -153,87 +151,12 @@ def tokenizeLines(
         return "-" in tagname and tagname not in blockElements
 
     tokens: list[TokenT] = []
-    rawStack: list[RawTokenT] = []
-    rawElementStartRe = re.compile(
-        rf"""
-        \s*
-        ((?:</\w+\s{constants.virtualEndTag}>)*\s*)
-        <({"|".join(opaqueElements)})[ >]
-        """,
-        re.X,
-    )
 
     for i, line in enumerate(lines):
-        # Skip lines that are entirely a censored comment.
-        if line.text.strip() == constants.bsComment:
-            continue
-        # Two kinds of "raw" elements, which prevent markdown processing inside of them.
-        # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
-        # 2. <script>, and <style>, which contain raw text, can't nest.
-        #
-        # The rawStack holds tokens like
-        # {"type":"element", "tag":"</script>`", "nest":False}
-
-        # TODO: when i pop the last rawstack, collect all the raw tokens in sequence and remove their indentation. gonna need to track the index explicitly, since a raw might end on one line and start on the next again, so i can't just walk backwards.
-        if rawStack:
-            # Inside at least one raw element that turns off markdown.
-            # First see if this line will *end* the raw element.
-            endTag = rawStack[-1]
-            if lineEndsRawBlock(line, endTag):
-                rawStack.pop()
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix": ""})
-                continue
-            elif not endTag["nest"]:
-                # Just an internal line, but for the no-nesting elements,
-                # so guaranteed no more work needs to be done.
-                tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix": ""})
-                continue
-
-        # We're either in a nesting raw element or not in a raw element at all,
-        # so check if the line starts a new element.
-        match = re.match(rawElementStartRe, line.text)
-        if match:
-            virtualPrefix = match[1]
-            tagName = match[2]
-            tokens.append(
-                {
-                    "type": "raw",
-                    "prefixlen": prefixCount(line.text, numSpacesForIndentation),
-                    "line": line,
-                    "virtualPrefix": virtualPrefix,
-                },
-            )
-            if re.search(rf"</({tagName})>", line.text):
-                # Element started and ended on same line, cool, don't need to do anything.
-                pass
-            else:
-                nest = match.group(1) not in ["xmp", "script", "style"]
-                rawStack.append(
-                    {
-                        "type": "element",
-                        "tag": "</{}>".format(tagName),
-                        "nest": nest,
-                        "virtualPrefix": virtualPrefix,
-                    },
-                )
-            continue
-        if rawStack:
-            tokens.append({"type": "raw", "prefixlen": float("inf"), "line": line, "virtualPrefix": ""})
-            continue
-
         lineText = line.text.strip()
-        virtualPrefix = ""
-        if constants.virtualEndTag in lineText:
-            match = re.match(
-                rf"(\s*(?:</\w+ {constants.virtualEndTag}>\s*)+)(.*)",
-                lineText,
-            )
-            # Note, the if can be true while the match fails,
-            # if the virtual end tag isn't at the start of the line.
-            # That's fine; I don't care about that.
-            if match:
-                virtualPrefix = match[1]
-                lineText = match[2]
+        # Skip lines that are entirely a censored comment.
+        if lineText == constants.bsComment:
+            continue
 
         token: TokenT
 
@@ -307,7 +230,6 @@ def tokenizeLines(
         else:
             token["prefixlen"] = prefixCount(line.text, numSpacesForIndentation)
         token["line"] = line
-        token["virtualPrefix"] = virtualPrefix
         tokens.append(token)
 
     if False:  # pylint: disable=using-constant-test

@@ -19,7 +19,7 @@ if t.TYPE_CHECKING:
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> t.NodesT:
-    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context))
+    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context), context=context)
     bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
@@ -123,9 +123,9 @@ def addHeaderFooter(doc: t.SpecT) -> None:
 
     doc.html = "\n".join(
         [
-            h.parseText(header, h.ParseConfig.fromSpec(doc, context="header.include")),
+            h.parseText(header, h.ParseConfig.fromSpec(doc, context="header.include"), context=None),
             doc.html,
-            h.parseText(footer, h.ParseConfig.fromSpec(doc, context="footer.include")),
+            h.parseText(footer, h.ParseConfig.fromSpec(doc, context="footer.include"), context=None),
         ],
     )
 
@@ -207,7 +207,11 @@ def addAtRisk(doc: t.SpecT) -> None:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>" + h.parseText(feature, h.ParseConfig.fromSpec(doc, context="At Risk metadata"))
+        html += "<li>" + h.parseText(
+            feature,
+            h.ParseConfig.fromSpec(doc, context="At Risk metadata"),
+            context="At Risk metadata",
+        )
     html += (
         "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
         + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
@@ -1073,7 +1077,11 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             if isinstance(v, str):
                 if v == "":
                     continue
-                htmlText = h.parseText(v, h.ParseConfig.fromSpec(doc, context=f"!{k} metadata"))
+                htmlText = h.parseText(
+                    v,
+                    h.ParseConfig.fromSpec(doc, context=f"!{k} metadata"),
+                    context=f"!{k} metadata",
+                )
                 parsed.append(h.parseHTML(htmlText))
             else:
                 parsed.append(v)

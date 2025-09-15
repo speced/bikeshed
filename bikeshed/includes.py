@@ -75,17 +75,18 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
             h.removeNode(el)
             return
-        parseConfig = h.ParseConfig.fromSpec(doc)
+        parseConfig = h.ParseConfig.fromSpec(doc, context=f"Include block for '{path}'")
         parseConfig.macros = {**parseConfig.macros, **macros}
-        lines = h.parseLines(lines, parseConfig)
-        lines = datablocks.transformDataBlocks(doc, lines)
+        lines = h.parseLines(lines, parseConfig, context=el)
         lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
         text = "".join(lines)
-        subtree = h.parseHTML(text)
-        for childInclude in h.findAll("pre.include", h.E.div({}, *subtree)):
+        subtree = h.parseInto(h.E.div(), text)
+        datablocks.transformDataBlocks(doc, subtree)
+        for childInclude in h.findAll("pre.include", subtree):
             childInclude.set("hash", hash)
             childInclude.set("depth", str(depth + 1))
-        h.replaceNode(el, *subtree)
+        h.replaceNode(el, subtree)
+        h.replaceWithContents(subtree)
     else:
         m.die(
             "Whoops, an include block didn't get parsed correctly, so I can't include anything.",

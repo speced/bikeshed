@@ -61,7 +61,7 @@ def allowedPath(filePath: str, filters: TestFilter) -> bool:
         return False
 
     if filters.folders:
-        if not any(folder in pathSegs for folder in filters.folders):
+        if not any(folder in filePath for folder in filters.folders):
             return False
 
     if filters.files:

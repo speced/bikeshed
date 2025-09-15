@@ -211,6 +211,11 @@ class Spec:
     def assembleDocument(self) -> Spec:
         self.initMetadata(self.inputContent)
         self.recordDependencies(self.inputSource)
+
+        if "mixed-indents" in self.md.complainAbout:
+            if self.md.indentInfo and self.md.indentInfo.char:
+                checkForMixedIndents(self.inputContent.lines, self.md.indentInfo)
+
         self.lines = self.earlyParse(self.inputContent)
 
         # Remove the metadata
@@ -223,13 +228,9 @@ class Spec:
         self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio(doc=self)
 
-        if "mixed-indents" in self.md.complainAbout:
-            if self.md.indentInfo and self.md.indentInfo.char:
-                checkForMixedIndents(self.lines, self.md.indentInfo)
-
-        # Deal with further <pre> blocks, and markdown
-        self.lines = datablocks.transformDataBlocks(self, self.lines)
+        # Deal with markdown
         if self.debug:
+            print("======= Pre-markdown text =======")  # noqa: T201
             print("".join(x.text for x in self.lines))  # noqa: T201
         if "markdown-block" in self.md.markupShorthands:
             markdownFeatures: set[str] = {"headings"}
@@ -249,6 +250,7 @@ class Spec:
 
         # Build the document
         self.document, self.head, self.body = h.parseDocument(self.html, self.structuralNodes)
+        datablocks.transformDataBlocks(self, self.body)
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)

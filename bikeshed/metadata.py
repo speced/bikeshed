@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, h, markdown, repository, t
+from . import config, constants, h, markdown, repository, t
 from . import messages as m
 from .translate import _t
 
@@ -278,11 +278,23 @@ class MetadataManager:
     def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
-            macros["title"] = h.parseTitle(self.title, h.ParseConfig.fromSpec(doc, context="Title metadata"))
+            macros["title"] = h.parseTitle(
+                self.title,
+                h.ParseConfig.fromSpec(doc, context="Title metadata"),
+                context="Title metadata",
+            )
         if self.h1:
-            macros["spectitle"] = h.parseText(self.h1, h.ParseConfig.fromSpec(doc, context="H1 metadata"))
+            macros["spectitle"] = h.parseText(
+                self.h1,
+                h.ParseConfig.fromSpec(doc, context="H1 metadata"),
+                context="H1 metadata",
+            )
         elif self.title:
-            macros["spectitle"] = h.parseText(self.title, h.ParseConfig.fromSpec(doc, context="Title metadata"))
+            macros["spectitle"] = h.parseText(
+                self.title,
+                h.ParseConfig.fromSpec(doc, context="Title metadata"),
+                context="Title metadata",
+            )
         if self.displayShortname:
             macros["shortname"] = self.displayShortname
         if self.statusText:
@@ -413,6 +425,7 @@ class MetadataManager:
             macros["customwarningtitle"] = h.parseText(
                 self.customWarningTitle,
                 h.ParseConfig.fromSpec(doc, context="Custom Warning Title metadata"),
+                context="Custom Warning Title metadata",
             )
         # Custom macros
         for name, text in self.customTextMacros:
@@ -423,8 +436,7 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context:
     if len(lines) == 0:
         return ""
     lines = [line.rstrip() + "\n" for line in lines]
-    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context))
-    lines = datablocks.transformDataBlocks(doc, lines)
+    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context), context=context)
     lines = markdown.parse(lines, indent)
     return "".join(lines)
 

@@ -24,6 +24,9 @@ from .nodes import (
     StartTag,
     Text,
 )
+from .parser import (
+    closeOpenElements,
+)
 from .stream import (
     ParseConfig,
     Stream,

@@ -21,13 +21,23 @@ from .nodes import (
     Text,
     VirtualEndTag,
 )
-from .parser import POSSIBLE_NODE_START_CHARS, nodesFromStream
+from .parser import POSSIBLE_NODE_START_CHARS, closeOpenElements, nodesFromStream
 from .stream import ParseConfig, Stream
 
 
-def nodesFromHtml(data: str, config: ParseConfig, startLine: int = 1) -> t.Generator[ParserNode, None, None]:
+def nodesFromHtml(
+    data: str,
+    config: ParseConfig,
+    startLine: int = 1,
+    closeElements: bool = False,
+    context: str | StartTag | t.ElementT | None = None,
+) -> t.Generator[ParserNode, None, None]:
     s = Stream(data, startLine=startLine, config=config)
     yield from nodesFromStream(s, 0)
+    if closeElements:
+        # FIXME: This start= value isn't accurate, but nodesFromStream
+        # doesn't give stream offsets...
+        yield from closeOpenElements(s, start=None, context=context)
 
 
 def initialDocumentParse(
@@ -45,7 +55,7 @@ def initialDocumentParse(
     s = Stream(text, startLine=startLine, config=config)
     s.openEls.distinguishVirtualTags = True
     nodes = list(nodesFromStream(s, 0))
-    nodes.extend(closeOpenElements(s))
+    nodes.extend(closeOpenElements(s, start=None, context=None))
     for node in nodes:
         if isinstance(node, StartTag) and node.tag in ("html", "head", "body"):
             return extractStructuralNodes(nodes)
@@ -67,28 +77,6 @@ def extractStructuralNodes(nodes: list[ParserNode]) -> tuple[list[ParserNode], l
         else:
             normalNodes.append(node)
     return normalNodes, structuralNodes
-
-
-def closeOpenElements(s: Stream) -> list[EndTag]:
-    nodes = []
-    i = s._len
-    if s.openEls.tags and s.openEls.tags[-1].startTag.tag == "p":
-        # A final open <p> is fine, it's meant to auto-close itself
-        entry = s.openEls.popEntry()
-        nodes.append(EndTag.fromStream(s, i, i, entry.startTag))
-    # If there's still stuff open, tho, that's a problem
-    if s.openEls.tags:
-        if len(s.openEls.tags) == 1:
-            entry = s.openEls.tags[0]
-            msg = f"<{entry.startTag.tag}> element was still open at the end of your document."
-            m.die(msg, lineNum=entry.startTag.loc)
-        else:
-            msg = f"{len(s.openEls.tags)} elements were still open at the end of your document.\nOpen tags: {', '.join(s.openEls.printOpenTags())}"
-            m.die(msg)
-        while s.openEls.tags:
-            entry = s.openEls.popEntry()
-            nodes.append(EndTag.fromStream(s, i, i, entry.startTag))
-    return nodes
 
 
 def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
@@ -127,7 +115,13 @@ def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     return nodes
 
 
-def parseLines(textLines: list[str], config: ParseConfig, startLine: int = 1) -> list[str]:
+def parseLines(
+    textLines: list[str],
+    config: ParseConfig,
+    context: str | StartTag | t.ElementT | None,
+    startLine: int = 1,
+    closeElements: bool = False,
+) -> list[str]:
     # Runs a list of lines thru the parser,
     # returning another list of lines.
 
@@ -138,20 +132,37 @@ def parseLines(textLines: list[str], config: ParseConfig, startLine: int = 1) ->
         text = "".join(textLines)
     else:
         text = "\n".join(textLines)
-    parsedLines = strFromNodes(nodesFromHtml(text, config, startLine=startLine)).split("\n")
+    parsedLines = strFromNodes(
+        nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context),
+    ).split(
+        "\n",
+    )
     if endingWithNewline:
         parsedLines = [x + "\n" for x in parsedLines]
 
     return parsedLines
 
 
-def parseText(text: str, config: ParseConfig, startLine: int = 1) -> str:
+def parseText(
+    text: str,
+    config: ParseConfig,
+    context: str | StartTag | t.ElementT | None,
+    startLine: int = 1,
+    closeElements: bool = False,
+) -> str:
     # Just runs the text thru the parser.
-    return strFromNodes(nodesFromHtml(text, config, startLine=startLine))
+    return strFromNodes(
+        nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context),
+    )
 
 
-def parseTitle(text: str, config: ParseConfig, startLine: int = 1) -> str:
+def parseTitle(
+    text: str,
+    config: ParseConfig,
+    startLine: int = 1,
+    context: str | StartTag | t.ElementT | None = None,
+) -> str:
     # Parses the text, but removes any tags from the content,
     # as they'll just show up as literal text in <title>.
-    nodes = nodesFromHtml(text, config, startLine=startLine)
+    nodes = nodesFromHtml(text, config, startLine=startLine, context=context)
     return strFromNodes(n for n in nodes if isinstance(n, Text))

@@ -134,8 +134,9 @@ class ReferenceManager:
 
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory():
-            ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
-            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
+            ldData = self.dataFile.fetch("link-defaults.infotree").read()
+            dummyEl = h.E.pre()
+            datablocks.transformInfo(ldData, dummyEl, doc=doc)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
@@ -152,14 +153,8 @@ class ReferenceManager:
                     anchorFile = doc.inputSource.relative("anchors.bsdata")
                     if not anchorFile:
                         raise OSError
-                    anchorLines = anchorFile.read().rawLines
-                    datablocks.transformAnchors(
-                        lines=anchorLines,
-                        doc=doc,
-                        firstLine=anchorLines[0],
-                        tagName="pre",
-                        lineNum=None,
-                    )
+                    anchorData = anchorFile.read().content
+                    datablocks.transformAnchors(anchorData, dummyEl, doc=doc)
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -178,14 +173,8 @@ class ReferenceManager:
                     ldFile = doc.inputSource.relative("link-defaults.infotree")
                     if not ldFile:
                         raise OSError
-                    ldLines = ldFile.read().rawLines
-                    datablocks.transformInfo(
-                        lines=ldLines,
-                        doc=doc,
-                        firstLine=ldLines[0],
-                        tagName="pre",
-                        lineNum=None,
-                    )
+                    ldData = ldFile.read().content
+                    datablocks.transformInfo(ldData, dummyEl, doc=doc)
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
