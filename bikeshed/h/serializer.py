@@ -171,7 +171,11 @@ class Serializer:
         return tag in self.rawEls
 
     def isOpaqueElement(self, tag: str) -> bool:
-        return tag in self.opaqueEls
+        if tag in ("pre", "xmp", "script", "style"):
+            return True
+        if tag in self.opaqueEls:
+            return True
+        return False
 
     def isInlineElement(self, tag: str) -> bool:
         return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
@@ -185,7 +189,7 @@ class Serializer:
         if el.tag in ["dt", "dd"]:
             if nextEl is None:
                 return False
-            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:  # noqa: SIM103
+            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:
                 return False
             return True
         return False

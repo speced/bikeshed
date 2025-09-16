@@ -237,7 +237,6 @@ class Spec:
             self.lines = markdown.parse(
                 self.lines,
                 self.md.indent,
-                opaqueElements=self.md.opaqueElements,
                 blockElements=self.md.blockElements,
                 features=markdownFeatures,
             )
@@ -493,9 +492,11 @@ class Spec:
         m.say(unexportMsg)
 
     def isOpaqueElement(self, el: t.ElementT) -> bool:
+        if el.tag in ("pre", "xmp", "script", "style"):
+            return True
         if el.tag in self.md.opaqueElements:
             return True
-        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:  # noqa: SIM103
+        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:
             return True
         return False
 

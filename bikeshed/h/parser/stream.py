@@ -30,7 +30,7 @@ class ParseConfig:
     repositoryLinks: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
-    opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
+    opaqueElements: set[str] = field(default_factory=set)
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:

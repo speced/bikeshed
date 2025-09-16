@@ -37,7 +37,6 @@ if t.TYPE_CHECKING:
         lines: list[str],
         numSpacesForIndentation: int,
         features: set[str] | None = None,
-        opaqueElements: list[str] | None = None,
         blockElements: list[str] | None = None,
     ) -> list[str]: ...
 
@@ -46,7 +45,6 @@ if t.TYPE_CHECKING:
         lines: list[l.Line],
         numSpacesForIndentation: int,
         features: set[str] | None = None,
-        opaqueElements: list[str] | None = None,
         blockElements: list[str] | None = None,
     ) -> list[l.Line]: ...
 
@@ -55,7 +53,6 @@ def parse(
     lines: list[str] | list[l.Line],
     numSpacesForIndentation: int,
     features: set[str] | None = None,
-    opaqueElements: list[str] | None = None,
     blockElements: list[str] | None = None,
 ) -> list[str] | list[l.Line]:
     fromStrings = False
@@ -66,7 +63,6 @@ def parse(
         lines,
         numSpacesForIndentation,
         features,
-        opaqueElements=opaqueElements,
         blockElements=blockElements,
     )
     parsedLines = parseTokens(tokens, numSpacesForIndentation)
@@ -80,7 +76,6 @@ def tokenizeLines(
     lines: list[l.Line],
     numSpacesForIndentation: int,
     features: set[str] | None = None,
-    opaqueElements: list[str] | None = None,
     blockElements: list[str] | None = None,
 ) -> list[TokenT]:
     # Turns lines of text into block tokens,
@@ -91,10 +86,6 @@ def tokenizeLines(
         features = {"headings"}
 
     featureHeadings = "headings" in features
-
-    if opaqueElements is None:
-        opaqueElements = []
-    opaqueElements += ["pre", "xmp", "script", "style"]
 
     if blockElements is None:
         blockElements = []

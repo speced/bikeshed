@@ -672,7 +672,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             else:
                 # Just a normal pre
                 # Parse it as normal nodes, then re-serialize and smuggle it
-                text, i, _ = parsePreToEnd(s, i, startTag)
+                text, i, _ = parseOpaqueToEnd(s, i, startTag, start)
                 if text is None:
                     # Only hit when I never found the end tag, so just
                     # call it a normal start tag.
@@ -680,7 +680,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 el = RawElement.fromStream(s, start, i, startTag, "")
                 smuggleDatablock(el, text, "pre")
                 return Ok(el, i)
-        if startTag.tag == "script":
+        elif startTag.tag == "script":
             text, i, _ = parseScriptToEnd(s, i)
             if text is None:
                 return Err(start)
@@ -716,6 +716,15 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 smuggleDatablock(el, text, blockType)
             else:
                 smuggleDatablock(el, escapeHTML(text), "pre")
+            return Ok(el, i)
+        elif startTag.tag in s.config.opaqueElements:
+            text, i, _ = parseOpaqueToEnd(s, i, startTag, start)
+            if text is None:
+                # Only hit when I never found the end tag, so just
+                # call it a normal start tag.
+                return Ok(startTag, i)
+            el = RawElement.fromStream(s, start, i, startTag, "")
+            smuggleDatablock(el, text, "pre")
             return Ok(el, i)
         else:
             return Ok(startTag, i)
@@ -1311,27 +1320,27 @@ def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
     return Ok(val, i + 6)
 
 
-def parsePreToEnd(s: Stream, start: int, preStart: StartTag) -> ResultT[str]:
+def parseOpaqueToEnd(s: Stream, dataStart: int, startTag: StartTag, start: int) -> ResultT[str]:
     # Does *normal* parsing on a <pre> until it sees the end tag,
     # but then serializes all the contents back to a string,
     # so it can be handled/smuggled like a datablock.
-    # This does assume the </pre> comes in a Result of its own,
-    # not in a list mixed other ParserNodes,
-    # but that's a safe assumption for now
-    # (and I expect for the future).
     nodes = []
     endTag = None
-    s.observeNode(preStart)
-    for values, i, _ in generateResults(s, start):
+    tagName = startTag.tag
+    s.observeNode(startTag)
+    for values, i, _ in generateResults(s, dataStart):
         if not isinstance(values, list):
             values = [values]
         for vi, value in enumerate(values):
-            if isinstance(value, EndTag) and value.tag == "pre":
+            if isinstance(value, EndTag) and value.tag == tagName:
                 endTag = value
                 if vi < len(values) - 1:
-                    # Leftover nodes after the </pre>...
+                    # Leftover nodes after the end tag...
                     remainingNodes = "\n".join(repr(x) for x in values[vi:])
-                    m.die(f"PROGRAMMING ERROR: Leftover nodes after the </pre>:{remainingNodes}", lineNum=s.loc(i))
+                    m.die(
+                        f"PROGRAMMING ERROR: Leftover nodes after the </{tagName}>:{remainingNodes}",
+                        lineNum=s.loc(i),
+                    )
                 break
             else:
                 nodes.append(value)
@@ -1339,12 +1348,14 @@ def parsePreToEnd(s: Stream, start: int, preStart: StartTag) -> ResultT[str]:
             break
     else:
         # I hit EOF without finding the end tag
-        return Err(start)
+        m.die(f"Tried to parse a <{tagName}>, but can't find the </{tagName}>.", lineNum=s.loc(start))
+        s.openEls.undo(startTag)
+        return Err(dataStart)
 
-    # If the first node is a <code>, remove and stash it separately,
+    # If the element is a <pre> and first node is a <code>, remove and stash it separately,
     # as it'll mess up the indent finding otherwise.
-    if nodes and isinstance(nodes[0], StartTag) and nodes[0].tag == "code":
-        preStart.attrs["bs-code-start-tag"] = escapeAttr(str(nodes[0]))
+    if startTag == "pre" and nodes and isinstance(nodes[0], StartTag) and nodes[0].tag == "code":
+        startTag.attrs["bs-code-start-tag"] = escapeAttr(str(nodes[0]))
         nodes = nodes[1:]
         # Similarly, if there's a </code> at the end, kill it
         # (plus any preceding whitespace, just for ease).
@@ -1354,7 +1365,7 @@ def parsePreToEnd(s: Stream, start: int, preStart: StartTag) -> ResultT[str]:
                 nodes.pop()
             elif isinstance(nodes[-1], EndTag) and nodes[-1].tag == "code":
                 endTag = nodes.pop()
-                preStart.attrs["bs-code-end-tag"] = escapeAttr(str(endTag))
+                startTag.attrs["bs-code-end-tag"] = escapeAttr(str(endTag))
             else:
                 break
 

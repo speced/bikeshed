@@ -429,6 +429,16 @@ class TagStack:
         self._tagCounts[entry.startTag.tag] -= 1
         return entry
 
+    def undo(self, startTag: StartTag) -> None:
+        # If a tag was added experimentally, reverse back to undo any stack changes
+        while entry := self.popEntry():
+            if entry.startTag == startTag:
+                return
+        m.die(
+            f"PROGRAMMING ERROR: Tried to pop an experimental <{startTag.tag}> from the tag stack, but instead popped the entire stack away.",
+            lineNum=startTag.loc,
+        )
+
     def update(self, node: ParserNode) -> t.Generator[EndTag, None, None]:
         # Updates the stack based on the passed node.
         # Start tags add to the stack, close tags pop from it.
@@ -828,7 +838,12 @@ class TagStackEntry:
     isOpaque: bool = field(init=False)
 
     def __post_init__(self, opaqueTags: set[str]) -> None:
-        if self.startTag.tag in opaqueTags or "bs-opaque" in self.startTag.attrs:
+        if (
+            self.startTag.tag in opaqueTags
+            or self.startTag.tag in ("pre", "xmp", "script", "style")
+            or "bs-opaque" in self.startTag.attrs
+            or "data-opaque" in self.startTag.attrs
+        ):
             self.isOpaque = True
         else:
             self.isOpaque = False

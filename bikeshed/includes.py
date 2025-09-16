@@ -78,7 +78,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         parseConfig = h.ParseConfig.fromSpec(doc, context=f"Include block for '{path}'")
         parseConfig.macros = {**parseConfig.macros, **macros}
         lines = h.parseLines(lines, parseConfig, context=el)
-        lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
+        lines = markdown.parse(lines, doc.md.indent)
         text = "".join(lines)
         subtree = h.parseInto(h.E.div(), text)
         datablocks.transformDataBlocks(doc, subtree)

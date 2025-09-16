@@ -128,7 +128,7 @@ class MetadataManager:
         self.noAbstract: bool = False
         self.noEditor: bool = False
         self.noteClass: str = "note"
-        self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
+        self.opaqueElements: list[str] = []
         self.prepTR: bool = False
         self.previousEditors: list[dict[str, str | None]] = []
         self.previousVersions: list[dict[str, str]] = []
