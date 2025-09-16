@@ -140,6 +140,9 @@ class Serializer:
                 continue
             if attrVal == "":
                 strs.append(" " + self.unfuckName(str(attrName)))
+            elif attrName == "class" and " " in attrVal:
+                sortedClasses = " ".join(sorted([x for x in attrVal.split(r" ") if x]))
+                strs.append(f' class="{sortedClasses}"')
             else:
                 strs.append(" " + self.unfuckName(str(attrName)) + '="' + dom.escapeAttr(str(attrVal)) + '"')
         strs.append(">")
