@@ -1354,7 +1354,7 @@ def parseOpaqueToEnd(s: Stream, dataStart: int, startTag: StartTag, start: int) 
 
     # If the element is a <pre> and first node is a <code>, remove and stash it separately,
     # as it'll mess up the indent finding otherwise.
-    if startTag == "pre" and nodes and isinstance(nodes[0], StartTag) and nodes[0].tag == "code":
+    if tagName == "pre" and nodes and isinstance(nodes[0], StartTag) and nodes[0].tag == "code":
         startTag.attrs["bs-code-start-tag"] = escapeAttr(str(nodes[0]))
         nodes = nodes[1:]
         # Similarly, if there's a </code> at the end, kill it
