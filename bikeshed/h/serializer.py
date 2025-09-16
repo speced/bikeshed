@@ -136,6 +136,8 @@ class Serializer:
         strs = []
         strs.append("<" + tag)
         for attrName, attrVal in sorted(el.items()):
+            attrName = self.unfuckName(str(attrName))
+            attrVal = str(attrVal)
             if str(attrName).startswith("bs-"):
                 # Skip bs- prefixed attributes, as they're used
                 # for Bikeshed-internal purposes.
@@ -143,12 +145,12 @@ class Serializer:
             if attrName == "viewbox":
                 attrName = "viewBox"
             if attrVal == "":
-                strs.append(" " + self.unfuckName(str(attrName)))
+                strs.append(" " + attrName)
             elif attrName == "class" and " " in attrVal:
-                sortedClasses = " ".join(sorted([x for x in str(attrVal).split(r" ") if x]))
-                strs.append(f' class="{sortedClasses}"')
+                sortedClasses = " ".join(sorted([x for x in attrVal.split(r" ") if x]))
+                strs.append(f' class="{dom.escapeAttr(sortedClasses)}"')
             else:
-                strs.append(" " + self.unfuckName(str(attrName)) + '="' + dom.escapeAttr(str(attrVal)) + '"')
+                strs.append(f' {attrName}="{dom.escapeAttr(attrVal)}"')
         strs.append(">")
         write("".join(strs))
 
