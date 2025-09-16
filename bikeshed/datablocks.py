@@ -37,6 +37,7 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
         "include-code": transformIncludeCode,
         "include-raw": transformIncludeRaw,
         "pre": transformPre,
+        "raw": transformRaw,
     }
     for el in h.findAll("[bs-datablock-type]", tree):
         blockType = el.get("bs-datablock-type")
@@ -67,6 +68,12 @@ def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
         lines[0] = el.get("bs-code-start-tag", "") + lines[0]
         lines[-1] = lines[-1] + el.get("bs-code-end-tag", "")
     return h.parseInto(el, "\n".join(lines))
+
+
+def transformRaw(data: str, el:t.ElementT, doc:t.SpecT) -> t.ElementT | None:
+    h.clearContents(el)
+    h.appendChild(el, data)
+    return el
 
 
 def transformSimpleDef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:

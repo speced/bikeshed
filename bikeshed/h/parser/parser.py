@@ -689,6 +689,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             el = RawElement.fromStream(s, start, i, startTag, text)
             if blockType := isDatablock(el.startTag, s.loc(i)):
                 smuggleDatablock(el, text, blockType)
+            else:
+                smuggleDatablock(el, text, "raw")
             return Ok(el, i)
         elif startTag.tag == "style":
             text, i, _ = parseStyleToEnd(s, i)
@@ -699,6 +701,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             el = RawElement.fromStream(s, start, i, startTag, text)
             if blockType := isDatablock(startTag, s.loc(i)):
                 smuggleDatablock(el, text, blockType)
+            else:
+                smuggleDatablock(el, text, "raw")
             return Ok(el, i)
         elif startTag.tag == "xmp":
             startTag.tag = "pre"
