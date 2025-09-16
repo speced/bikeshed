@@ -658,7 +658,9 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
         if isMetadataBlock(startTag):
             el, endI, _ = parseMetadataBlockToEnd(s, start, startTag, i)
             if el is not None:
-                return Ok(el, endI)
+                # Just remove it from the doc.
+                rawText = RawText.fromStream(s, start, endI, "")
+                return Ok(rawText, endI)
         if startTag.tag == "pre":
             if blockType := isDatablock(startTag, s.loc(i)):
                 text, i, _ = parseDatablockPreToEnd(s, i)

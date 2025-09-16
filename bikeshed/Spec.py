@@ -218,10 +218,6 @@ class Spec:
 
         self.lines = self.earlyParse(self.inputContent)
 
-        # Remove the metadata
-        # FIXME: This should be done the first time I parse metadata.
-        # It's just a little awkward due to the data structures I'm working with.
-        self.lines, _ = metadata.parse(lines=self.lines)
         extensions.load(self)
 
         # Initialize things
