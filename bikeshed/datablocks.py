@@ -81,11 +81,9 @@ def transformOpaque(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | Non
 
 
 def transformRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    # Just removes indent, and doesn't even parse the contents.
+    # Elements like <script> and <style>, do literally nothing.
     h.clearContents(el)
-    lines = data.split("\n")
-    lines = removeIndent(lines, 2)
-    h.appendChild(el, "\n".join(lines))
+    h.appendChild(el, data)
     return el
 
 
