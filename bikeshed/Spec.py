@@ -242,8 +242,6 @@ class Spec:
                 features=markdownFeatures,
             )
 
-        self.refs.setSpecData(self)
-
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
@@ -251,6 +249,7 @@ class Spec:
         # Build the document
         self.document, self.head, self.body = h.parseDocument(self.html, self.structuralNodes)
         datablocks.transformDataBlocks(self, self.body)
+        self.refs.setSpecData(self)
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
