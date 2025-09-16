@@ -233,13 +233,7 @@ class Spec:
             print("======= Pre-markdown text =======")  # noqa: T201
             print("".join(x.text for x in self.lines))  # noqa: T201
         if "markdown-block" in self.md.markupShorthands:
-            markdownFeatures: set[str] = {"headings"}
-            self.lines = markdown.parse(
-                self.lines,
-                self.md.indent,
-                blockElements=self.md.blockElements,
-                features=markdownFeatures,
-            )
+            self.lines = markdown.parse(self.lines, markdown.MarkdownConfig.fromSpec(self))
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)

@@ -437,7 +437,7 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context:
         return ""
     lines = [line.rstrip() + "\n" for line in lines]
     lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context), context=context)
-    lines = markdown.parse(lines, indent)
+    lines = markdown.parse(lines, markdown.MarkdownConfig.fromSpec(doc))
     return "".join(lines)
 
 
