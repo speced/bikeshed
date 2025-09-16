@@ -903,8 +903,8 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
 
 def removeCommentLines(lines: list[str]) -> list[str]:
     # removes comments from a line
-    for i, line in enumerate(lines):
-        while match := re.search(r"(.*)(<!--.*?-->)(.*)", line):
+    for i in range(len(lines)):
+        while match := re.search(r"(.*)(<!--.*?-->)(.*)", lines[i]):
             lines[i] = match[1] + match[3]
     return lines
 
