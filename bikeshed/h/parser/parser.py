@@ -724,7 +724,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 # call it a normal start tag.
                 return Ok(startTag, i)
             el = RawElement.fromStream(s, start, i, startTag, "")
-            smuggleDatablock(el, text, "pre")
+            smuggleDatablock(el, text, "opaque")
             return Ok(el, i)
         else:
             return Ok(startTag, i)

@@ -38,6 +38,7 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
         "include-raw": transformIncludeRaw,
         "pre": transformPre,
         "raw": transformRaw,
+        "opaque": transformOpaque,
     }
     for el in h.findAll("[bs-datablock-type]", tree):
         blockType = el.get("bs-datablock-type")
@@ -55,6 +56,7 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
 
 
 def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    # Removes empty initial lines, removes shared indent, and possibly re-adds a <code> wrapper.
     h.clearContents(el)
     lines = data.split("\n")
     while lines and lines[0].strip() == "":
@@ -70,9 +72,20 @@ def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     return h.parseInto(el, "\n".join(lines))
 
 
-def transformRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+def transformOpaque(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    # Just removes indent, nothing else.
     h.clearContents(el)
-    h.appendChild(el, data)
+    lines = data.split("\n")
+    lines = removeIndent(lines, 2)
+    return h.parseInto(el, "\n".join(lines))
+
+
+def transformRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+    # Just removes indent, and doesn't even parse the contents.
+    h.clearContents(el)
+    lines = data.split("\n")
+    lines = removeIndent(lines, 2)
+    h.appendChild(el, "\n".join(lines))
     return el
 
 
