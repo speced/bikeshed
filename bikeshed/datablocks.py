@@ -70,7 +70,7 @@ def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     return h.parseInto(el, "\n".join(lines))
 
 
-def transformRaw(data: str, el:t.ElementT, doc:t.SpecT) -> t.ElementT | None:
+def transformRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     h.clearContents(el)
     h.appendChild(el, data)
     return el
