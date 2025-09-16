@@ -282,6 +282,7 @@ def parseNode(
             return Ok(node, i)
 
     el: ParserNode | None
+    els: list[ParserNode]
     if first1 in ("`", "~"):
         # This isn't quite correct to handle here,
         # but it'll have to wait until I munge
@@ -289,10 +290,10 @@ def parseNode(
         el, i, _ = parseFencedCodeBlock(s, start)
         if el is not None:
             if blockType := isDatablock(el.startTag, s.loc(i)):
-                smuggleDatablock(el, el.data, blockType)
+                els = smuggleDatablock(el, el.data, blockType)
             else:
-                smuggleDatablock(el, escapeHTML(el.data), "pre")
-            return Ok(el, i)
+                els = smuggleDatablock(el, escapeHTML(el.data), "pre")
+            return Ok(els, i)
     if s.config.markdownInline:
         if first2 == r"\`":
             node = RawText.fromStream(s, start, start + 2, "`")
@@ -667,8 +668,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 if "bs-macros" in startTag.attrs:
                     text = replaceMacrosInText(text, s.config.macros, s, start, context="<pre> contents")
                 el = RawElement.fromStream(s, start, i, startTag, "")
-                smuggleDatablock(el, text, blockType)
-                return Ok(el, i)
+                els = smuggleDatablock(el, text, blockType)
+                return Ok(els, i)
             else:
                 # Just a normal pre
                 # Parse it as normal nodes, then re-serialize and smuggle it
@@ -678,8 +679,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                     # call it a normal start tag.
                     return Ok(startTag, i)
                 el = RawElement.fromStream(s, start, i, startTag, "")
-                smuggleDatablock(el, text, "pre")
-                return Ok(el, i)
+                els = smuggleDatablock(el, text, "pre")
+                return Ok(els, i)
         elif startTag.tag == "script":
             text, i, _ = parseScriptToEnd(s, i)
             if text is None:
@@ -688,10 +689,10 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<script> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             if blockType := isDatablock(el.startTag, s.loc(i)):
-                smuggleDatablock(el, text, blockType)
+                els = smuggleDatablock(el, text, blockType)
             else:
-                smuggleDatablock(el, text, "raw")
-            return Ok(el, i)
+                els = smuggleDatablock(el, text, "raw")
+            return Ok(els, i)
         elif startTag.tag == "style":
             text, i, _ = parseStyleToEnd(s, i)
             if text is None:
@@ -700,10 +701,10 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<style> contents")
             el = RawElement.fromStream(s, start, i, startTag, text)
             if blockType := isDatablock(startTag, s.loc(i)):
-                smuggleDatablock(el, text, blockType)
+                els = smuggleDatablock(el, text, blockType)
             else:
-                smuggleDatablock(el, text, "raw")
-            return Ok(el, i)
+                els = smuggleDatablock(el, text, "raw")
+            return Ok(els, i)
         elif startTag.tag == "xmp":
             startTag.tag = "pre"
             text, i, _ = parseXmpToEnd(s, i)
@@ -713,10 +714,10 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
             el = RawElement.fromStream(s, start, i, startTag, "")
             if blockType := isDatablock(startTag, s.loc(i)):
-                smuggleDatablock(el, text, blockType)
+                els = smuggleDatablock(el, text, blockType)
             else:
-                smuggleDatablock(el, escapeHTML(text), "pre")
-            return Ok(el, i)
+                els = smuggleDatablock(el, escapeHTML(text), "pre")
+            return Ok(els, i)
         elif startTag.tag in s.config.opaqueElements:
             text, i, _ = parseOpaqueToEnd(s, i, startTag, start)
             if text is None:
@@ -724,8 +725,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 # call it a normal start tag.
                 return Ok(startTag, i)
             el = RawElement.fromStream(s, start, i, startTag, "")
-            smuggleDatablock(el, text, "opaque")
-            return Ok(el, i)
+            els = smuggleDatablock(el, text, "opaque")
+            return Ok(els, i)
         else:
             return Ok(startTag, i)
 
@@ -783,20 +784,29 @@ def isDatablockClass(text: str) -> bool:
     return text in datablockClasses
 
 
-def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) -> RawElement | SafeElement:
+def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) -> list[ParserNode]:
     # Prepare a datablock, which might have content that'll confuse the markdown parser,
     # by instead shoving the contents into an attribute, after linebreaks are removed.
-    # Also replace those contents in the element itself with blank lines,
-    # to keep line counts steady.
+    # Then add blank lines back, to keep the line counts correct.
 
-    # Generate a blank variant to keep lines constant
-    blankText = "\n".join("" for x in text.split("\n"))
-    el.data = blankText
-    # Make the text single-line, again to keep lines constant
+    # Make the element single-line,
+    el.data = ""
+    el.endLine = el.line
+    el.endLoc = el.startTag.endLoc
     singleLineText = text.replace("\n", constants.virtualLineBreak)
     el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
     el.startTag.attrs["bs-datablock-data"] = escapeAttr(singleLineText)
-    return el
+    # Generate a blank variant to keep lines constant
+    blankText = "\n".join("" for x in text.split("\n"))
+    textNode = RawText(
+        line=el.line,
+        endLine = el.endLine,
+        loc=str(el.line),
+        endLoc=str(el.endLine),
+        context=None,
+        text=blankText,
+    )
+    return [el, textNode]
 
 
 def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | list[ParserNode]]:
