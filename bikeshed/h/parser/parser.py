@@ -6,7 +6,7 @@ from enum import Enum
 
 from ... import config, constants, t
 from ... import messages as m
-from . import preds
+from . import preds_wrapper as preds
 from .nodes import (
     Comment,
     Doctype,
