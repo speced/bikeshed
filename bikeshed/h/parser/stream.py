@@ -23,7 +23,8 @@ class ParseConfig:
     header: bool = False
     idl: bool = False
     macrosInAutolinks: bool = False
-    markdown: bool = False
+    markdownBlock: bool = False
+    markdownInline: bool = False
     markdownEscapes: bool = False
     markup: bool = False
     repositoryLinks: bool = False
@@ -42,7 +43,8 @@ class ParseConfig:
             header="http" in doc.md.markupShorthands,
             idl="idl" in doc.md.markupShorthands,
             macrosInAutolinks="macros-in-autolinks" in doc.md.markupShorthands,
-            markdown="markdown" in doc.md.markupShorthands,
+            markdownBlock="markdown-block" in doc.md.markupShorthands,
+            markdownInline="markdown-inline" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
             repositoryLinks="repository-links" in doc.md.markupShorthands,

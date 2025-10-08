@@ -228,14 +228,16 @@ class Spec:
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
 
-        markdownFeatures: set[str] = {"headings"}
-        self.lines = markdown.parse(
-            self.lines,
-            self.md.indent,
-            opaqueElements=self.md.opaqueElements,
-            blockElements=self.md.blockElements,
-            features=markdownFeatures,
-        )
+        parseConfig = h.ParseConfig.fromSpec(self)
+        if parseConfig.markdownBlock:
+            markdownFeatures: set[str] = {"headings"}
+            self.lines = markdown.parse(
+                self.lines,
+                self.md.indent,
+                opaqueElements=self.md.opaqueElements,
+                blockElements=self.md.blockElements,
+                features=markdownFeatures,
+            )
 
         self.refs.setSpecData(self)
 
