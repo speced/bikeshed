@@ -70,8 +70,9 @@ class MessagesState:
     seenMessages: set[str | tuple[str, str]] = dataclasses.field(default_factory=set)
     categoryCounts: Counter[str] = dataclasses.field(default_factory=Counter)
 
-    def __post_init__(self):
-        self.fh.reconfigure(encoding="utf-8")
+    def __post_init__(self) -> None:
+        if isinstance(self.fh, io.TextIOWrapper):
+            self.fh.reconfigure(encoding="utf-8")
 
     def record(self, category: str, message: str | tuple[str, str]) -> None:
         self.categoryCounts[category] += 1
