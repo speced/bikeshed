@@ -109,7 +109,7 @@ class MessagesState:
 state = MessagesState()
 
 
-def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None) -> None:
+def p(msg: str | tuple[str, str]) -> None:
     if isinstance(msg, tuple):
         msg, ascii = msg
     else:
@@ -117,10 +117,10 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
     if state.asciiOnly:
         msg = ascii
     try:
-        print(msg, sep=sep, end=end, file=state.fh)
+        print(msg, file=state.fh)
     except UnicodeEncodeError:
         if ascii is not None:
-            print(ascii, sep=sep, end=end, file=state.fh)
+            print(ascii, file=state.fh)
         else:
             warning = formatMessage(
                 "warning",
@@ -129,7 +129,7 @@ def p(msg: str | tuple[str, str], sep: str | None = None, end: str | None = None
             if warning not in state.seenMessages:
                 print(warning, file=state.fh)
                 state.record("warning", warning)
-            print(msg.encode("ascii", "xmlcharrefreplace"), sep=sep, end=end, file=state.fh)
+            print(msg.encode("ascii", "xmlcharrefreplace"), file=state.fh)
 
 
 def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | int | None:
