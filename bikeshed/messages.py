@@ -69,6 +69,7 @@ class MessagesState:
     fh: t.TextIO = sys.stdout
     seenMessages: set[str | tuple[str, str]] = dataclasses.field(default_factory=set)
     categoryCounts: Counter[str] = dataclasses.field(default_factory=Counter)
+    closed: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.fh, io.TextIOWrapper):
@@ -110,6 +111,10 @@ class MessagesState:
 state = MessagesState()
 
 
+def wrappedOutput() -> bool:
+    return state.printMode in ("json", "markup")
+
+
 def p(msg: str | tuple[str, str]) -> None:
     if isinstance(msg, tuple):
         msg, ascii = msg
@@ -147,6 +152,36 @@ def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | N
             s += " of " + context
         return s
     return None
+
+
+def printOpener() -> None:
+    if state.printMode == "json":
+        p("[")
+    elif state.printMode == "markup":
+        p("<bikeshed-output>")
+    else:
+        pass
+
+
+def printCloser() -> None:
+    if state.closed:
+        return
+    state.closed = True
+
+    if state.categoryCounts["success"] == 0 and state.categoryCounts["failure"] == 0:
+        # If something closes without actually going through success()/failure() first,
+        # insert a dummy success message.
+        # (Partially just to record *something*, but also to make sure that, say, JSON
+        #  formats properly wrt commas.)
+        if state.printMode in ("json", "markup") and state.shouldPrint("success"):
+            p(formatMessage("success", "Success"))
+
+    if state.printMode == "json":
+        p("]")
+    elif state.printMode == "markup":
+        p("</bikeshed-output>")
+    else:
+        pass
 
 
 def die(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
@@ -213,12 +248,16 @@ def say(msg: str) -> None:
 
 def success(msg: str) -> None:
     if state.shouldPrint("success"):
-        p(formatMessage("success", msg))
+        formattedMsg = formatMessage("success", msg)
+        p(formattedMsg)
+        state.record("success", formattedMsg)
 
 
 def failure(msg: str) -> None:
     if state.shouldPrint("failure"):
-        p(formatMessage("failure", msg))
+        formattedMsg = formatMessage("failure", msg)
+        p(formattedMsg)
+        state.record("failure", formattedMsg)
 
 
 def retroactivelyCheckErrorLevel(level: str | None = None, timing: str = "early") -> bool:
@@ -273,29 +312,23 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
     if state.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
-            return f"<fatal>{text}</fatal>"
+            return f"  <fatal>{text}</fatal>"
         if type == "link":
-            return f"<linkerror>{text}</linkerror>"
+            return f"  <linkerror>{text}</linkerror>"
         if type == "lint":
-            return f"<lint>{text}</lint>"
+            return f"  <lint>{text}</lint>"
         if type == "warning":
-            return f"<warning>{text}</warning>"
+            return f"  <warning>{text}</warning>"
         if type == "message":
-            return f"<message>{text}</message>"
+            return f"  <message>{text}</message>"
         if type == "success":
-            return f"<final-success>{text}</final-success>"
+            return f"  <final-success>{text}</final-success>"
         if type == "failure":
-            return f"<final-failure>{text}</final-failure>"
+            return f"  <final-failure>{text}</final-failure>"
     elif state.printMode == "json":
-        if not state.seenMessages:
-            jsonText = "[\n"
-        else:
-            jsonText = ""
         msg = {"lineNum": lineNum, "messageType": type, "text": text}
-        jsonText += "  " + json.dumps(msg)
-        if type in ("success", "failure"):
-            jsonText += "\n]"
-        else:
+        jsonText = "  " + json.dumps(msg)
+        if type not in ("success", "failure"):
             jsonText += ", "
         return jsonText
 

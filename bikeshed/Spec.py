@@ -417,6 +417,10 @@ class Spec:
             return
 
     def watch(self, outputFilename: str | None, port: int | None = None, localhost: bool = False) -> None:
+        if m.wrappedOutput():
+            m.die(f"Watch mode only supports console output; you've set --print={m.state.printMode}")
+            return
+
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
             m.die(f"Watch mode doesn't support {self.inputSource}")
@@ -459,7 +463,7 @@ class Spec:
                     # somehow gets older.
                     if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
                         m.state = m.state.replace()
-                        m.p("\nSource file modified. Rebuilding...")
+                        m.say("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
@@ -468,23 +472,26 @@ class Spec:
                         printDone()
                     time.sleep(1)
             except KeyboardInterrupt:
-                m.p("Exiting~")
+                m.say("Exiting~")
                 if server:
                     server.shutdown()
                     thread.join()
+                m.printCloser()
                 sys.exit(0)
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
     def printTargets(self) -> None:
-        m.p("Exported terms:")
+        exportMsg = "Exported terms:\n"
         for el in h.findAll("[data-export]", self):
             for term in h.linkTextsFromElement(el):
-                m.p("  " + term)
-        m.p("Unexported terms:")
+                exportMsg += "  " + term + "\n"
+        m.say(exportMsg)
+        unexportMsg = "Unexported terms:\n"
         for el in h.findAll("[data-noexport]", self):
             for term in h.linkTextsFromElement(el):
-                m.p("  " + term)
+                unexportMsg += "  " + term + "\n"
+        m.say(unexportMsg)
 
     def isOpaqueElement(self, el: t.ElementT) -> bool:
         if el.tag in self.md.opaqueElements:

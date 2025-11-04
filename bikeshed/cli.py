@@ -471,6 +471,8 @@ def main() -> None:
     constants.chroot = not options.allowNonlocalFiles
     constants.executeCode = options.allowExecute
 
+    m.printOpener()
+
     if options.subparserName in ("spec", "echnida", "watch", "serve", "refs"):
         updateMode = update.UpdateMode.NONE if options.skipUpdate else update.UpdateMode.BOTH
         update.fixupDataFiles(updateMode=updateMode)
@@ -502,6 +504,8 @@ def main() -> None:
         handleTemplate(options)
     elif options.subparserName == "wpt":
         handleWpt(options)
+
+    m.printCloser()
 
 
 def handleUpdate(options: argparse.Namespace) -> None:
@@ -667,9 +671,13 @@ def handleRefs(options: argparse.Namespace, extras: list[str]) -> None:
         exact=options.exact,
     )
     if m.state.printMode == "json":
-        m.p(json.dumps(refs, indent=2, default=printjson.getjson))
+        dumped = json.dumps(refs, indent=2, default=printjson.getjson)
+        dumped = dumped[1:]  # Remove the opening [ since that's printed by printOpener()
+        m.p(dumped)  # Go straight to m.p() so no formatting happens.
+        sys.exit(0)  # Exit early so printCloser() doesn't run
     else:
-        m.p(printjson.printjson(refs))
+        m.state.printOn = "everything"
+        m.say(printjson.printjson(refs))
 
 
 def handleIssuesList(options: argparse.Namespace) -> None:
@@ -732,8 +740,11 @@ def handleProfile(options: argparse.Namespace) -> None:
 
 
 def handleTemplate(options: argparse.Namespace) -> None:
+    if m.wrappedOutput():
+        m.die(f"`bikeshed template` only supports printing to console. You set --print={m.state.printMode}")
+        return
     if options.variant == "base":
-        m.p(
+        m.say(
             """<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
@@ -755,7 +766,7 @@ Introduction here.
 """,
         )
     elif options.variant == "minimal":
-        m.p(
+        m.say(
             """<pre class='metadata'>
 Title: Test
 Editor: test
@@ -769,7 +780,7 @@ Markup Shorthands: markdown on
 """,
         )
     elif options.variant == "test":
-        m.p(
+        m.say(
             """<pre class=metadata>
 Group: test
 Shortname: foo
@@ -786,8 +797,11 @@ Abstract: Test Description
 
 
 def handleWpt(options: argparse.Namespace) -> None:
+    if m.wrappedOutput():
+        m.die(f"`bikeshed wpt` only supports printing to console. You set --print={m.state.printMode}")
+        return
     if options.template:
-        m.p(
+        m.say(
             """<!DOCTYPE html>
 <meta charset=utf-8>
 <title>window.offscreenBuffering</title>
