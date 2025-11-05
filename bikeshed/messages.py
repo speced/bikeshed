@@ -251,6 +251,7 @@ def success(msg: str) -> None:
         formattedMsg = formatMessage("success", msg)
         p(formattedMsg)
         state.record("success", formattedMsg)
+        printCloser()
 
 
 def failure(msg: str) -> None:
@@ -258,6 +259,7 @@ def failure(msg: str) -> None:
         formattedMsg = formatMessage("failure", msg)
         p(formattedMsg)
         state.record("failure", formattedMsg)
+        printCloser()
 
 
 def retroactivelyCheckErrorLevel(level: str | None = None, timing: str = "early") -> bool:
