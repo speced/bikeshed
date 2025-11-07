@@ -19,9 +19,8 @@ from .nodes import (
     SelfClosedTag,
     StartTag,
     Text,
-    VirtualEndTag,
 )
-from .parser import POSSIBLE_NODE_START_CHARS, closeOpenElements, nodesFromStream
+from .parser import POSSIBLE_NODE_START_CHARS, closeOpenElements, debugNode, nodesFromStream
 from .stream import ParseConfig, Stream
 
 
@@ -44,7 +43,7 @@ def initialDocumentParse(
     text: str,
     config: ParseConfig,
     startLine: int = 1,
-) -> tuple[list[ParserNode], list[StartTag]]:
+) -> list[ParserNode]:
     # Just do a document parse.
     # * adds `bs-line-number` and `bs-parse-context` attributes, for error messages
     # * converts any inline Bikeshed-isms into HTML (autolinks, markdown, etc)
@@ -53,30 +52,9 @@ def initialDocumentParse(
     # * check if there are any html/head/body elements and error
 
     s = Stream(text, startLine=startLine, config=config)
-    s.openEls.distinguishVirtualTags = True
     nodes = list(nodesFromStream(s, 0))
     nodes.extend(closeOpenElements(s, start=None, context=None))
-    for node in nodes:
-        if isinstance(node, StartTag) and node.tag in ("html", "head", "body"):
-            return extractStructuralNodes(nodes)
-    return nodes, []
-
-
-def extractStructuralNodes(nodes: list[ParserNode]) -> tuple[list[ParserNode], list[StartTag]]:
-    # The html5lib parser properly merged html/head/body elements together,
-    # but lxml parser doesn't. So I need to instead yank those tags out of
-    # the document, so they can be manually merged in later and won't screw
-    # with parsing otherwise.
-    normalNodes: list[ParserNode] = []
-    structuralNodes: list[StartTag] = []
-    for node in nodes:
-        if isinstance(node, StartTag) and node.tag in ("html", "head", "body"):
-            structuralNodes.append(node)
-        elif isinstance(node, EndTag) and node.tag in ("html", "head", "body"):
-            pass
-        else:
-            normalNodes.append(node)
-    return normalNodes, structuralNodes
+    return nodes
 
 
 def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
@@ -108,10 +86,9 @@ def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
 
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     nodes = list(nodes)
+    print("=" * 50)  # noqa: T201
     for node in nodes:
-        print("------")  # noqa: T201
-        print(repr(node))  # noqa: T201
-        print(repr(strFromNodes([node], withIlcc=True)))  # noqa: T201
+        print(debugNode(node))  # noqa: T201
     return nodes
 
 

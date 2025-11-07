@@ -27,6 +27,9 @@ from .nodes import (
 from .parser import (
     closeOpenElements,
 )
+from .simpleparser import (
+    parseDocument,
+)
 from .stream import (
     ParseConfig,
     Stream,

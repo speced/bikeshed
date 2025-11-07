@@ -167,8 +167,12 @@ class Serializer:
     def isVoidElement(self, tag: str) -> bool:
         return tag in self.voidEls
 
-    def isRawElement(self, tag: str) -> bool:
-        return tag in self.rawEls
+    def isRawElement(self, tag: str, el: t.ElementT) -> bool:
+        if tag in self.rawEls:
+            return True
+        if tag == "title" and el.get("bs-title-contents"):
+            return True
+        return False
 
     def isOpaqueElement(self, tag: str) -> bool:
         if tag in ("pre", "xmp", "script", "style"):
@@ -208,6 +212,15 @@ class Serializer:
             # A *linking* script, doesn't need to be treated specially.
             write(" " * indent)
             self.startTag(tag, el, write)
+            self.endTag(tag, write)
+            return
+
+        if tag == "title":
+            # During earlyParse() I stashed the <title> contents into an attribute,
+            # so it wouldn't confuse lxml.
+            write(" " * indent)
+            self.startTag(tag, el, write)
+            write(el.get("bs-title-contents", ""))
             self.endTag(tag, write)
             return
 
@@ -330,7 +343,7 @@ class Serializer:
         if self.isVoidElement(tag):
             assert self.isElement(el)
             self._writeVoidElement(tag, el, write, indent)
-        elif self.isRawElement(tag):
+        elif self.isRawElement(tag, t.cast("t.ElementT", el)):
             assert self.isElement(el)
             self._writeRawElement(tag, el, write, indent)
         elif pre or self.isOpaqueElement(tag):

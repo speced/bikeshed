@@ -161,9 +161,9 @@ def debugNode(node: ParserNode | list[ParserNode]) -> str:
     if isinstance(node, EndTag):
         return f"</{node.tag} {node.loc}>"
     if isinstance(node, (RawText, SafeText)):
-        return f'<{type(node).__name__} "{node}" {node.loc}>'
+        return f"<{type(node).__name__} {node.loc} {node.text!r}>"
     if isinstance(node, RawElement):
-        return f"<{node.tag} {node.loc}>...</>"
+        return f"<{node.tag} {node.loc}>[omitted raw content]</>"
     if isinstance(node, SelfClosedTag):
         return f"<{node.tag} {node.loc} />"
     return repr(node)
@@ -222,7 +222,7 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
         if isOk(res):
             val, i, err = res
             if not experimental:
-                val = s.observeResult(res)
+                s.observeResult(res)
             return (val, i, err)
     i = start + 1
     end = len(s)
@@ -411,7 +411,7 @@ def parseNode(
                 return cddlRes
     if s.config.markup and not inOpaque:
         if first3 == "\\<{":
-            node = RawText.fromStream(s, start, start + 3, "<{")
+            node = SafeText.fromStream(s, start, start + 3, "<{")
             return Ok(node, start + 3)
         if s.config.idl and first3 == "<{{":
             # Catch things like `{{Promise}}<{{Foo}}>` from being parsed as element links
@@ -472,6 +472,9 @@ def parseNode(
             # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
             node = RawText.fromStream(s, start, i, "—\u200b")
             return Ok(node, i)
+
+    if first1 in ("<", "&"):
+        return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
 
     return Err(start)
 
@@ -644,6 +647,11 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             return commentRes
         return Err(start)
 
+    if s[i] == "?":
+        # XML PI, definitely invalid.
+        m.die("XML Processing Instructions are invalid in HTML.", lineNum=s.loc(start))
+        return Err(start)
+
     startTag, i, _ = parseStartTag(s, start)
     if startTag is not None:
         if isinstance(startTag, (SelfClosedTag, list)):
@@ -655,13 +663,24 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             else:
                 startTag.tag = "span"
         el: ParserNode | None
-        if isMetadataBlock(startTag):
+        if startTag.tag == "title" and not s.openEls.inTagContext("svg"):
+            text, endI, _ = parseTitleToEnd(s, i)
+            if text is not None:
+                startTag.attrs["bs-title-contents"] = text
+                el = RawElement.fromStream(s, start, endI, startTag, "")
+                return Ok(el, endI)
+            else:
+                # <title> was never closed. Go ahead and close it empty.
+                # parseTitleToEnd() already emitted an error message.
+                els = [startTag, EndTag.fromStream(s, i, i, startTag)]
+                return Ok(els, i)
+        elif isMetadataBlock(startTag):
             el, endI, _ = parseMetadataBlockToEnd(s, start, startTag, i)
             if el is not None:
                 # Just remove it from the doc.
                 rawText = RawText.fromStream(s, start, endI, "")
                 return Ok(rawText, endI)
-        if startTag.tag == "pre":
+        elif startTag.tag == "pre":
             if blockType := isDatablock(startTag, s.loc(i)):
                 text, i, _ = parseDatablockPreToEnd(s, i)
                 if text is None:
@@ -880,7 +899,7 @@ def parseTagName(s: Stream, start: int) -> ResultT[str]:
     end = start + 1
     while preds.isTagnameChar(s[end]):
         end += 1
-    return Ok(s.slice(start, end), end)
+    return Ok(s.slice(start, end).lower(), end)
 
 
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
@@ -995,7 +1014,7 @@ def parseQuotedAttrValue(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
             startSeg = i
             continue
         i += 1
@@ -1022,7 +1041,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
             startSeg = i
             continue
         i += 1
@@ -1033,7 +1052,7 @@ def parseUnquotedAttrValue(s: Stream, start: int) -> ResultT[str]:
     return Ok(val, i)
 
 
-def printChAsHexRef(ch: str | SafeText) -> str:
+def printChAsCharRef(ch: str | SafeText) -> str:
     """
     * If passed a str (which should have been the value of a char ref),
         prints it back into char refs for normalization purposes.
@@ -1237,7 +1256,6 @@ def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
         return Err(start)
     if s.slice(start + 9, start + 15).lower() != " html>":
         m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
-        return Err(start)
     node = Doctype.fromStream(s, start, start + 15, s.slice(start, start + 15))
     return Ok(node, start + 15)
 
@@ -1292,6 +1310,42 @@ def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
     assert False
 
 
+def parseTitleToEnd(s: Stream, start: int) -> ResultT[str]:
+    # <title> contents are raw strings, except HTML escapes are allowed,
+    # and BS macros are allowed.
+    i = start
+    val = ""
+    startSeg = i
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while the document's <title> was still open.", lineNum=s.loc(start))
+            return Err(start)
+        elif s.slice(i, i + 8) == "</title>":
+            val += s.slice(startSeg, i)
+            break
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.NonAttr)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
+            startSeg = i
+            continue
+        elif s[i] == "[":
+            startMacro = i
+            text, i, _ = parseMacroToText(s, i)
+            if text is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startMacro) + text
+            startSeg = i
+            continue
+        else:
+            i += 1
+    return Ok(val, i + 8)
+
+
 def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
     # Identical to parseScriptToEnd, except I need to
     # convert named HTML entities to numeric ones,
@@ -1313,7 +1367,7 @@ def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
             startSeg = i
             continue
         else:
@@ -1761,7 +1815,7 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
     else:
         startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(text))
         s.observeNodes(nodes)
-    virtualEndTags = s.observeShorthandClose(s.loc(textEnd), startTag, ("''", "''"))
+    virtualEndTags = s.observeShorthandClose(s, textEnd, startTag, ("''", "''"))
     endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
     return Ok([startTag, *nodes, *virtualEndTags, endTag], nodeEnd)
 
@@ -2416,11 +2470,11 @@ def parseLinkText(
                 f"{startingSigil}...{endingSigil} autolink opened at {startTag.loc} wasn't closed within 3 lines. You might have forgotten to close it; if not, switch to the HTML syntax to spread your link across that many lines.",
                 lineNum=startTag.loc,
             )
-            s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
+            s.observeShorthandClose(s, i, startTag, (startingSigil, endingSigil))
             return Err(start)
         if s.slice(i, i + endingLength) == endingSigil:
             endTag = EndTag.fromStream(s, i, i + endingLength, startTag)
-            virtualEndTags = s.observeShorthandClose(s.loc(i), startTag, (startingSigil, endingSigil))
+            virtualEndTags = s.observeShorthandClose(s, i, startTag, (startingSigil, endingSigil))
             content.extend(virtualEndTags)
             content.append(endTag)
             return Ok(content, i + endingLength)
@@ -2927,7 +2981,7 @@ def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
     # Now that we've seen the ](, we're committed.
     s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
     s.observeNodes(nodes)
-    virtualEndTags = s.observeShorthandClose(s.loc(linkTextEnd), startTag, (startingSigil, endingSigil))
+    virtualEndTags = s.observeShorthandClose(s, linkTextEnd, startTag, (startingSigil, endingSigil))
 
     # I'm not doing bracket-checking in the link text,
     # as CommonMark requires, because I've already lost
@@ -3039,7 +3093,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
             startSeg = i
             continue
         elif s[i] == "&":
@@ -3048,7 +3102,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
             startSeg = i
             continue
         elif s[i] == ">":
@@ -3085,7 +3139,7 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
             startSeg = i
             continue
         elif s[i] == "&":
@@ -3094,7 +3148,7 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
             startSeg = i
             continue
         elif isControl(s[i]):
@@ -3144,7 +3198,7 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
             startSeg = i
             continue
         elif s[i] == "&":
@@ -3153,7 +3207,7 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsHexRef(ch)
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
             startSeg = i
             continue
         elif s[i] == endChar:

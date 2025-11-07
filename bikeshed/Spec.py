@@ -190,9 +190,8 @@ class Spec:
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
         text = FIXMEreplaceMarkdownBlockquotes(inputContent.content)
-        nodes, structuralNodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
-        self.structuralNodes = structuralNodes
-        if self.debug:
+        nodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
+        if self.debugPrint == "early-parse":
             h.debugNodes(nodes)
         text = h.strFromNodes(nodes, withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
@@ -227,19 +226,24 @@ class Spec:
         self.refs.initializeBiblio(doc=self)
 
         # Deal with markdown
-        if self.debug:
-            print("======= Pre-markdown text =======")  # noqa: T201
+        if self.debugPrint == "pre-md":
             print("".join(x.text for x in self.lines))  # noqa: T201
         if "markdown-block" in self.md.markupShorthands:
             self.lines = markdown.parse(self.lines, markdown.MarkdownConfig.fromSpec(self))
+        if self.debugPrint == "post-md":
+            print("".join(x.text for x in self.lines))  # noqa: T201
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
 
         # Build the document
-        self.document, self.head, self.body = h.parseDocument(self.html, self.structuralNodes)
-        datablocks.transformDataBlocks(self, self.body)
+        self.document, self.head, self.body = h.parseDocument(self.html)
+        if self.debugPrint == "boilerplate":
+            print(h.printNodeTree(self.document))  # noqa: T201
+        datablocks.transformDataBlocks(self, self.document)
+        if self.debugPrint == "datablocks":
+            print(h.printNodeTree(self.document))  # noqa: T201
         self.refs.setSpecData(self)
         u.correctFrontMatter(self)
         includes.processInclusions(self)
