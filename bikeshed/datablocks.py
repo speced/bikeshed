@@ -41,6 +41,8 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
         "opaque": transformOpaque,
     }
     for el in h.findAll("[bs-datablock-type]", tree):
+        if el == tree:
+            continue
         blockType = el.get("bs-datablock-type")
         blockData = el.get("bs-datablock-data", "")
         if blockType not in blockTypes:
@@ -51,6 +53,7 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
         newEl = transformer(blockData, el, doc)
         if newEl is not None:
             h.replaceNode(el, newEl)
+            transformDataBlocks(doc, newEl)
         else:
             h.removeNode(el)
 
