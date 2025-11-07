@@ -525,7 +525,7 @@ def parseBulleted(stream: TokenStream) -> list[l.Line]:
     for li_lines, i in getItems(stream):
         lines.append(l.Line(i, startTag("li", i, {"data-md": ""})))
         lines.extend(parse(li_lines, stream.config))
-        #lines.append(l.Line(-1, "</li>"))
+        # lines.append(l.Line(-1, "</li>"))
     lines.append(l.Line(-1, "</ul>"))
     return lines
 
