@@ -54,6 +54,7 @@ class Spec:
         self,
         inputFilename: str,
         debug: bool = False,
+        debugPrint: str | None = None,
         token: str | None = None,
         lineNumbers: bool = False,
         fileRequester: retrieve.DataFileRequester | None = None,
@@ -75,6 +76,7 @@ class Spec:
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
         self.transitiveDependencies: set[InputSource.InputSource] = set()
         self.debug: bool = debug
+        self.debugPrint: str | None = debugPrint
         self.token: str | None = token
         self.testing: bool = testing
         self.dataFile: retrieve.DataFileRequester
@@ -322,6 +324,9 @@ class Spec:
         lint.missingExposed(self)
         lint.requiredIDs(self)
         lint.unusedInternalDfns(self)
+
+        if self.debugPrint == "final":
+            print(h.printNodeTree(self.document))  # noqa: T201
 
         # Any final HTML cleanups
         u.cleanupHTML(self)

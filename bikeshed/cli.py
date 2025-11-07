@@ -122,6 +122,13 @@ def main() -> None:
         help="Switches on some debugging tools. Don't use for production!",
     )
     specParser.add_argument(
+        "--debug-print",
+        dest="debugPrint",
+        choices=["none", "early-parse", "pre-md", "post-md", "boilerplate", "datablocks", "final"],
+        nargs="?",
+        help="Debug tool to print various views of the document at different stages.",
+    )
+    specParser.add_argument(
         "--gh-token",
         dest="ghToken",
         nargs="?",
@@ -531,6 +538,7 @@ def handleSpec(options: argparse.Namespace, extras: list[str]) -> None:
     doc = Spec(
         inputFilename=options.infile,
         debug=options.debug,
+        debugPrint=options.debugPrint,
         token=options.ghToken,
         lineNumbers=options.lineNumbers,
     )

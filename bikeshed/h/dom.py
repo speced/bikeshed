@@ -159,26 +159,38 @@ def printNodeTree(node: t.NodeT | str, maxDepth: int | None = None, depth: int =
         return "#text: " + content
     if isOddNode(node):
         return outerHTML(node)
+    subLines: list[list[str]] = []
     if isinstance(node, list):
         s = "[]"
     else:
-        s = f"{serializeTag(node, includeBs=True)}"
+        s = f"{serializeTag(node, includeBs=True, shortenAttrs=True)}"
+    if len(s) > 60:
+        s = f"<{node.tag} [...]>"
+        subLines.append([])
+        for k, v in node.attrib.items():
+            if len(v) < 80:
+                subLines[0].append(f'# {k!s}="{escapeAttr(str(v))}"')
+            else:
+                subLines[0].append(f'# {k!s}="{escapeAttr(str(v[0:40]))}[...]"')
     if not maxDepth or depth < maxDepth:
-        linesPerChild = [
+        subLines.extend(
             printNodeTree(child, maxDepth, depth + 1).split("\n") for child in childNodes(node, skipOddNodes=False)
-        ]
-        if linesPerChild:
-            for childLines in linesPerChild[:-1]:
-                childLines[0] = " ├" + childLines[0]
-                childLines[1:] = [" │" + line for line in childLines[1:]]
-                s += "\n" + "\n".join(childLines)
-            childLines = linesPerChild[-1]
-            childLines[0] = " ╰" + childLines[0]
-            childLines[1:] = ["  " + line for line in childLines[1:]]
-            s += "\n" + "\n".join(childLines)
+        )
     else:
-        if len(node) > 0:
-            s += f" ({len(node)} children)"
+        childCount = f"({len(node)} children)"
+        if not subLines and len(s) < 40:
+            s += " " + childCount
+        else:
+            subLines.append([childCount])
+    if subLines:
+        for childLines in subLines[:-1]:
+            childLines[0] = " ├" + childLines[0]
+            childLines[1:] = [" │" + line for line in childLines[1:]]
+            s += "\n" + "\n".join(childLines)
+        childLines = subLines[-1]
+        childLines[0] = " ╰" + childLines[0]
+        childLines[1:] = ["  " + line for line in childLines[1:]]
+        s += "\n" + "\n".join(childLines)
     return s
 
 
@@ -231,7 +243,7 @@ def firstLinkTextFromElement(el: t.ElementT) -> str | None:
     return texts[0] if len(texts) > 0 else None
 
 
-def serializeTag(el: t.ElementT, includeBs: bool = False) -> str:
+def serializeTag(el: t.ElementT, includeBs: bool = False, shortenAttrs: bool = False) -> str:
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
@@ -242,7 +254,9 @@ def serializeTag(el: t.ElementT, includeBs: bool = False) -> str:
         # print them.
         if not includeBs and t.cast(str, n).startswith("bs-"):
             continue
-        tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
+        if shortenAttrs and len(v) > 40:
+            v = str(v[0:30]) + "[...]" + str(v[-5:])
+        tag += f' {n!s}="{escapeAttr(str(v))}"'
     tag += ">"
     return tag
 
