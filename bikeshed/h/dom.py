@@ -1140,6 +1140,7 @@ def collectSyntaxHighlightables(el: t.ElementT, els: list[t.ElementT] | None = N
         els = []
     if tagName(el) in ("xmp", "pre", "code"):
         els.append(el)
+        return els
     for child in childElements(el):
         collectSyntaxHighlightables(child, els)
     return els
