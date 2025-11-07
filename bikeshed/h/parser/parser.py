@@ -2784,7 +2784,7 @@ def parseMacro(
                 t.assert_never(context)
     macroDisplay = s.slice(start, i)
     macroText = s.config.macros[macroName]
-    streamContext = f"macro {macroDisplay}"
+    streamContext = f"macro {macroDisplay} (line {s.loc(start)})"
     try:
         newStream = s.subStream(context=streamContext, chars=macroText)
     except RecursionError:
