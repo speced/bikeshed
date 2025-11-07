@@ -4,7 +4,7 @@ import functools
 import re
 from dataclasses import dataclass, field
 
-from .. import constants, t
+from .. import constants, h, t
 from .. import line as l
 from .. import messages as m
 
@@ -374,7 +374,22 @@ def parseTokens(tokens: list[TokenT], config: MarkdownConfig) -> list[l.Line]:
 def lineFromStream(stream: TokenStream, text: str) -> l.Line:
     # Shortcut for when you're producing a new line from the currline in the stream,
     # with some modified text.
+    if not text.endswith("\n"):
+        text += "\n"
     return l.Line(stream.currline().i, text)
+
+
+def startTag(tagName: str, lineNumber: int, attrs: dict[str, str] | None = None) -> str:
+    s = f'<{tagName} bs-line-number="{lineNumber!s}"'
+    if attrs:
+        for k, v in attrs.items():
+            s += f' {k}="{h.escapeAttr(v)}"'
+    s += ">"
+    return s
+
+
+def endTag(tagName: str) -> str:
+    return f"</{tagName}>"
 
 
 # Each parser gets passed the stream
@@ -384,19 +399,12 @@ def lineFromStream(stream: TokenStream, text: str) -> l.Line:
 
 
 def parseSingleLineHeading(stream: TokenStream) -> list[l.Line]:
+    attrs = {}
     if "id" in stream.curr():
-        idattr = f" id='{stream.currid()}'"
-    else:
-        idattr = ""
+        attrs["id"] = stream.currid()
+    tagName = "h" + str(stream.currlevel())
     lines = [
-        lineFromStream(
-            stream,
-            "<h{level}{idattr} bs-line-number={i}>{text}</h{level}>\n".format(
-                idattr=idattr,
-                i=stream.currline().i,
-                **stream.curr(),
-            ),
-        ),
+        lineFromStream(stream, startTag(tagName, stream.currline().i, attrs) + stream.currtext() + endTag(tagName)),
     ]
     stream.advance()
     return lines
@@ -404,9 +412,9 @@ def parseSingleLineHeading(stream: TokenStream) -> list[l.Line]:
 
 def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
     if stream.nexttype() == "equals-line":
-        level = 2
+        tagName = "h2"
     elif stream.nexttype() == "dash-line":
-        level = 3
+        tagName = "h3"
     else:
         m.die(
             "Markdown parser error: tried to parse a multiline heading from:\n"
@@ -414,26 +422,15 @@ def parseMultiLineHeading(stream: TokenStream) -> list[l.Line]:
             + stream.currraw()
             + stream.nextraw(),
         )
-        level = 2
+        tagName = "h2"
+    attrs = {}
     match = re.search(r"(.*?)\s*\{\s*#([^ }]+)\s*\}\s*$", stream.currtext())
     if match:
-        text = match.group(1)
-        idattr = "id='{}'".format(match.group(2))
+        text = match[1]
+        attrs["id"] = match[2]
     else:
         text = stream.currtext()
-        idattr = ""
-    lines = [
-        lineFromStream(
-            stream,
-            "<h{level} {idattr} bs-line-number={i}>{htext}</h{level}>\n".format(
-                idattr=idattr,
-                level=level,
-                htext=text,
-                i=stream.currline().i,
-                **stream.curr(),
-            ),
-        ),
-    ]
+    lines = [lineFromStream(stream, startTag(tagName, stream.currline().i, attrs) + text + endTag(tagName))]
     stream.advance(2)
     return lines
 
@@ -448,36 +445,38 @@ def parseParagraph(stream: TokenStream) -> list[l.Line]:
     line = stream.currtext()
     i = stream.currline().i
     initialPrefixLen = stream.currprefixlen()
-    endTag = "</p>"
+    end = "</p>"
     if re.match(r"note[:,]\s*", line, re.I):
-        p = f"<p bs-line-number={i} class='replace-with-note-class'>"
+        p = startTag("p", i, {"class": "replace-with-note-class"})
         matchNote = re.match(r"(note[:,])(\s*)(.*)", line, re.I)
         if matchNote:
-            line = matchNote.group(3)
-            p += "<span class=marker>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
+            line = matchNote[3]
+            p += startTag("span", i, {"class": "marker"}) + matchNote[1] + endTag("span") + matchNote[2]
     elif line.lower().startswith("issue:"):
         line = line[6:]
-        p = f"<p bs-line-number={i} class='replace-with-issue-class'>"
+        p = startTag("p", i, {"class": "replace-with-issue-class"})
     elif line.lower().startswith("assert:"):
-        p = f"<p bs-line-number={i} class='replace-with-assertion-class'>"
+        p = startTag("p", i, {"class": "replace-with-assertion-class"})
     elif line.lower().startswith("advisement:"):
         line = line[11:]
-        p = f"<p bs-line-number={i}><strong class='replace-with-advisement-class'>"
-        endTag = "</strong></p>"
+        p = startTag("p", i) + startTag("strong", i, {"class": "replace-with-advisement-class"})
+        end = "</strong></p>"
     else:
         match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
         if match:
             line = match.group(2)
-            p = f"<p bs-line-number={i} data-remote-issue-id='{match.group(1)}' class='replace-with-issue-class'>"
+            p = startTag("p", i, {"data-remote-issue-id": match[1], "class": "replace-with-issue-class"})
         else:
-            p = f"<p bs-line-number={i}>"
+            p = startTag("p", i)
     lines = [lineFromStream(stream, f"{p}{line}\n")]
     while True:
         stream.advance()
         if stream.currtype() not in ["text"] or stream.currprefixlen() < initialPrefixLen:
-            lines[-1].text = lines[-1].text.rstrip() + endTag + "\n"
-            return lines
+            break
         lines.append(stream.currline())
+
+    lines[-1].text = lines[-1].text.rstrip() + end + "\n"
+    return lines
 
 
 def parseBulleted(stream: TokenStream) -> list[l.Line]:
@@ -522,11 +521,11 @@ def parseBulleted(stream: TokenStream) -> list[l.Line]:
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [l.Line(-1, f"<ul data-md bs-line-number={ul_i}>")]
+    lines = [l.Line(ul_i, startTag("ul", ul_i, {"data-md": ""}))]
     for li_lines, i in getItems(stream):
-        lines.append(l.Line(-1, f"<li data-md bs-line-number={i}>"))
+        lines.append(l.Line(i, startTag("li", i, {"data-md": ""})))
         lines.extend(parse(li_lines, stream.config))
-        lines.append(l.Line(-1, "</li>"))
+        #lines.append(l.Line(-1, "</li>"))
     lines.append(l.Line(-1, "</ul>"))
     return lines
 
@@ -574,11 +573,11 @@ def parseNumbered(stream: TokenStream, start: int = 1) -> list[l.Line]:
             yield parseItem(stream)
 
     if start == 1:
-        lines = [l.Line(-1, f"<ol data-md bs-line-number={ol_i}>")]
+        lines = [l.Line(ol_i, startTag("ol", ol_i, {"data-md": ""}))]
     else:
-        lines = [l.Line(-1, f"<ol data-md start='{start}' bs-line-number={ol_i}>")]
+        lines = [l.Line(ol_i, startTag("ol", ol_i, {"data-md": "", "start": str(start)}))]
     for li_lines, i in getItems(stream):
-        lines.append(l.Line(-1, f"<li data-md bs-line-number={i}>"))
+        lines.append(l.Line(i, startTag("li", i, {"data-md": ""})))
         lines.extend(parse(li_lines, stream.config))
         lines.append(l.Line(-1, "</li>"))
     lines.append(l.Line(-1, "</ol>"))
@@ -635,11 +634,11 @@ def parseDl(stream: TokenStream) -> list[l.Line]:
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [l.Line(-1, f"<dl data-md bs-line-number={dl_i}>")]
+    lines = [l.Line(dl_i, startTag("dl", dl_i, {"data-md": ""}))]
     for type, di_lines, i in getItems(stream):
-        lines.append(l.Line(-1, f"<{type} data-md bs-line-number={i}>"))
+        lines.append(l.Line(i, startTag(type, i, {"data-md": ""})))
         lines.extend(parse(di_lines, stream.config))
-        lines.append(l.Line(-1, f"</{type}>"))
+        lines.append(l.Line(-1, endTag(type)))
     lines.append(l.Line(-1, "</dl>"))
     return lines
 
@@ -656,11 +655,7 @@ def parseBlockquote(stream: TokenStream) -> list[l.Line]:
             lines.append(lineFromStream(stream, stream.currtext() + "\n"))
         else:
             break
-    return (
-        [l.Line(-1, f"<blockquote bs-line-number={i}>\n")]
-        + parse(lines, stream.config)
-        + [l.Line(-1, "</blockquote>\n")]
-    )
+    return [l.Line(i, startTag("blockquote", i))] + parse(lines, stream.config) + [l.Line(-1, "</blockquote>\n")]
 
 
 class TokenStream:
