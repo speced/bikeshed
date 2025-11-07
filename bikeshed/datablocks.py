@@ -327,7 +327,7 @@ def transformArgumentdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT 
             {},
             "Arguments for the ",
             h.E.a(
-                {"data-link-type": "method", "data-lt": method, "data-link-for": interface},
+                {"data-link-type": "idl", "data-lt": method, "data-link-for": interface},
                 f"{interface}.{method}",
             ),
             " method.",
