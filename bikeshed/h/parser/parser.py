@@ -1343,6 +1343,9 @@ def parseOpaqueToEnd(s: Stream, dataStart: int, startTag: StartTag, start: int) 
                         lineNum=s.loc(i),
                     )
                 break
+            elif isinstance(value, Comment):
+                # Drop comments eagerly
+                pass
             else:
                 nodes.append(value)
         if endTag:
