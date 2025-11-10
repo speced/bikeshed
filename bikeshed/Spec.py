@@ -228,8 +228,7 @@ class Spec:
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
 
-        parseConfig = h.ParseConfig.fromSpec(self)
-        if parseConfig.markdownBlock:
+        if "markdown-block" in self.md.markupShorthands:
             markdownFeatures: set[str] = {"headings"}
             self.lines = markdown.parse(
                 self.lines,
