@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import json
 import os
 import re
 import subprocess
@@ -18,19 +19,24 @@ if t.TYPE_CHECKING:
     MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
 
 
-def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> t.NodesT:
+def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> list[t.NodeT]:
     htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context))
     bp = h.E.div({}, h.parseHTML(htmlString))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
 
 
-def loadBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> None:
+def addBoilerplate(doc: t.SpecT, filename: str, bpname: str | None = None) -> None:
     if bpname is None:
         bpname = filename
+    nodes = loadBoilerplateFile(doc, filename)
+    fillWith(bpname, nodes, doc=doc)
+
+
+def loadBoilerplateFile(doc: t.SpecT, filename: str) -> list[t.NodeT]:
     html = retrieve.retrieveBoilerplateFile(doc, filename)
-    el = boilerplateFromHtml(doc, html, context=f"{filename} boilerplate")
-    fillWith(bpname, el, doc=doc)
+    nodes = boilerplateFromHtml(doc, html, context=f"{filename} boilerplate")
+    return nodes
 
 
 def addBikeshedVersion(doc: t.SpecT) -> None:
@@ -153,6 +159,7 @@ def getFillContainer(tag: str, doc: t.SpecT, default: bool = False) -> t.Element
 
     # If a fill-with is found, fill that
     if doc.fillContainers[tag]:
+
         return doc.fillContainers[tag][0]
 
     # Otherwise, append to the end of the document,
@@ -165,16 +172,16 @@ def getFillContainer(tag: str, doc: t.SpecT, default: bool = False) -> t.Element
 
 
 def addLogo(doc: t.SpecT) -> None:
-    loadBoilerplate(doc, "logo")
+    addBoilerplate(doc, "logo")
 
 
 def addCopyright(doc: t.SpecT) -> None:
-    loadBoilerplate(doc, "copyright")
+    addBoilerplate(doc, "copyright")
 
 
 def addAbstract(doc: t.SpecT) -> None:
     if not doc.md.noAbstract:
-        loadBoilerplate(doc, "abstract")
+        addBoilerplate(doc, "abstract")
     else:
         container = getFillContainer("abstract", doc, default=False)
         if container is not None:
@@ -182,7 +189,49 @@ def addAbstract(doc: t.SpecT) -> None:
 
 
 def addStatusSection(doc: t.SpecT) -> None:
-    loadBoilerplate(doc, "status")
+    if doc.md.cgTransitionPlan:
+        nodes = loadBoilerplateFile(doc, "status")
+        tplanNodes = buildTransitionPlanNote(doc)
+        nodes.extend(tplanNodes)
+        fillWith("status", nodes, doc=doc)
+    else:
+        addBoilerplate(doc, "status")
+
+
+def buildTransitionPlanNote(doc: t.SpecT) -> t.NodesT:
+    try:
+        path = config.docPath(doc, "cg-monitor.json")
+        if not path:
+            m.warn(
+                "You have 'CG Transition Plan: yes', but your spec source wasn't loaded from a file location, so I can't find your 'cg-monitor.json' file.",
+            )
+            return []
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except FileNotFoundError:
+        m.die(
+            "You have 'CG Transition Plan: yes', but there's no 'cg-monitor.json' file in the same folder as the spec source.",
+        )
+        return []
+    requiredKeys = ["transition_status", "intended_organization", "intended_group"]
+    failedKeys = False
+    for k in requiredKeys:
+        if k not in data:
+            m.die(f"Your 'cg-monitor.json' file lacks a '{k}' value.")
+            failedKeys = True
+    if failedKeys:
+        return []
+    node = h.E.div(
+        {"class": doc.md.noteClass},
+        h.E.p({}, "Transition status: " + data.get("transition_status", "")),
+        h.E.p(
+            {},
+            f"Target organization: ({data.get('intended_organization', '')}) / group: ({data.get('intended_group', '')})",
+        ),
+    )
+    for note in data.get("notes", []):
+        h.appendChild(node, h.E.p({}, h.parseHTML(note)))
+    return node
 
 
 def addExpiryNotice(doc: t.SpecT) -> None:
@@ -193,13 +242,13 @@ def addExpiryNotice(doc: t.SpecT) -> None:
     else:
         boilerplate = "warning-expires"
         doc.extraJC.addExpires()
-    loadBoilerplate(doc, boilerplate, "warning")
+    addBoilerplate(doc, boilerplate, "warning")
     h.addClass(doc, doc.body, boilerplate)
 
 
 def addObsoletionNotice(doc: t.SpecT) -> None:
     if doc.md.warning:
-        loadBoilerplate(doc, doc.md.warning[0], "warning")
+        addBoilerplate(doc, doc.md.warning[0], "warning")
 
 
 def addAtRisk(doc: t.SpecT) -> None:
