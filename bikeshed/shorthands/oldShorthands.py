@@ -10,7 +10,7 @@ def transformMarkdownIB(doc: t.SpecT) -> None:
 
     addedNodes = []
 
-    if "markdown" not in doc.md.markupShorthands:
+    if "markdown-inline" not in doc.md.markupShorthands:
         return
 
     def transformElement(parentEl: t.ElementT) -> None:
@@ -29,7 +29,7 @@ def transformMarkdownIB(doc: t.SpecT) -> None:
 
     def transformText(text: str) -> list[t.NodeT]:
         nodes: list[t.NodeT] = [text]
-        if "markdown" in doc.md.markupShorthands:
+        if "markdown-inline" in doc.md.markupShorthands:
             nodes = config.processTextNodes(nodes, strongRe, strongReplacer)
             nodes = config.processTextNodes(nodes, emRe, emReplacer)
             nodes = config.processTextNodes(nodes, escapedRe, escapedReplacer)

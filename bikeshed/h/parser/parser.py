@@ -225,7 +225,7 @@ def parseNode(
         el, i, _ = parseFencedCodeBlock(s, start)
         if el is not None:
             return Ok(el, i)
-    if s.config.markdown:
+    if s.config.markdownInline:
         if first2 == r"\`":
             node = RawText.fromStream(s, start, start + 2, "`")
             return Ok(node, start + 2)
@@ -378,7 +378,7 @@ def parseNode(
             biblioRes = parseAutolinkBiblioSection(s, start)
             if isOk(biblioRes):
                 return biblioRes
-    if s.config.markdown and not inOpaque:
+    if s.config.markdownInline and not inOpaque:
         if first2 == "\\[":
             node = RawText.fromStream(s, start, start + 2, "[")
             return Ok(node, start + 2)

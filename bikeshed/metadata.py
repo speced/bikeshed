@@ -109,7 +109,18 @@ class MetadataManager:
         self.mailingList: str | None = None
         self.mailingListArchives: str | None = None
         self.markupShorthands: config.BoolSet = config.BoolSet(
-            ["css", "dfn", "biblio", "markup", "http", "idl", "cddl", "algorithm", "repository-links"],
+            [
+                "css",
+                "dfn",
+                "biblio",
+                "markdown-block",
+                "markup",
+                "http",
+                "idl",
+                "cddl",
+                "algorithm",
+                "repository-links",
+            ],
         )
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
@@ -760,7 +771,7 @@ def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> list[tuple
 def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a boolset of the shorthand categories.
-    # TODO: Just call parseBoolistList instead
+    # TODO: Just call parseBoolishList instead
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
     validCategories = frozenset(
@@ -773,7 +784,8 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             "http",
             "idl",
             "macros-in-autolinks",
-            "markdown",
+            "markdown-block",
+            "markdown-inline",
             "markdown-escapes",
             "markup",
             "repository-links",
@@ -788,7 +800,13 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             )
             continue
         name, boolstring = pieces
-        if name not in validCategories:
+        # markdown is an alias for markdown-inline.
+        # TODO: convert all specs to use markdown-inline, and then turn markdown
+        # into a shorthand for markdown-*.
+        if name == "markdown":
+            name = "markdown-inline"
+            assert name in validCategories
+        elif name not in validCategories:
             m.die(f"Unknown Markup Shorthand category '{name}'.", lineNum=lineNum)
             continue
         onoff = boolish(boolstring)
