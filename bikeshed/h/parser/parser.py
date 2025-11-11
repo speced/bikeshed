@@ -602,7 +602,7 @@ def parseRepositoryLink(
     else:
         text = f"issue #{num}"
         issueID = f"#{num}"
-    startTag = StartTag.fromStream(s, start, start + 1, "a", {"data-remote-issue-id": issueID})
+    startTag = StartTag.fromStream(s, start, start + 1, "a", {"data-remote-issue-id": escapeAttr(issueID)})
     return Ok(
         [startTag, SafeText.fromStream(s, start + 1, i - 1, text), EndTag.fromStream(s, i - 1, i, startTag)],
         i,
@@ -666,7 +666,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
         if startTag.tag == "title" and not s.openEls.inTagContext("svg"):
             text, endI, _ = parseTitleToEnd(s, i)
             if text is not None:
-                startTag.attrs["bs-title-contents"] = text
+                startTag.attrs["bs-title-contents"] = escapeAttr(text)
                 el = RawElement.fromStream(s, start, endI, startTag, "")
                 return Ok(el, endI)
             else:
@@ -846,15 +846,17 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     if attrs is None:
         return Err(start)
 
+    safeAttrs: t.SafeAttrDict = {k: escapeAttr(v) for k, v in attrs.items()}
+
     _, i, _ = parseWhitespace(s, i)
 
     el: SelfClosedTag | StartTag
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
-            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, attrs)
+            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, safeAttrs)
             return Ok(el, i + 2)
         elif s[i + 1] == ">" and preds.isXMLishTagname(tagname):
-            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, attrs)
+            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, safeAttrs)
             return Ok(el, i + 2)
         elif tagname in VOID_ELEMENTS:
             m.die(f"Void element (<{tagname}>) with a spurious trailing /.", lineNum=s.loc(start))
@@ -870,9 +872,9 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
 
     if s[i] == ">":
         if tagname in VOID_ELEMENTS:
-            el = SelfClosedTag.fromStream(s, start, i + 1, tagname, attrs)
+            el = SelfClosedTag.fromStream(s, start, i + 1, tagname, safeAttrs)
         else:
-            el = StartTag.fromStream(s, start, i + 1, tagname, attrs)
+            el = StartTag.fromStream(s, start, i + 1, tagname, safeAttrs)
         return Ok(el, i + 1)
 
     if s.eof(i):
@@ -1498,9 +1500,9 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
             return Ok(failNode, start + 2)
     nodeEnd = textEnd + 2
 
-    attrs: dict[str, str] = {
-        "bs-autolink-syntax": s.slice(start, nodeEnd),
-        "class": "production",
+    attrs: t.SafeAttrDict = {
+        "bs-autolink-syntax": escapeAttr(s.slice(start, nodeEnd)),
+        "class": t.SafeAttrStr("production"),
         "bs-opaque": "",
     }
     for _ in [1]:
@@ -1523,38 +1525,38 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
                 )
                 failNode = SafeText.fromStream(s, start, nodeEnd)
                 return Ok(failNode, nodeEnd)
-            attrs["data-link-type"] = linkType
-            attrs["data-lt"] = lt
+            attrs["data-link-type"] = escapeAttr(linkType)
+            attrs["data-lt"] = escapeAttr(lt)
             if linkFor is not None:
-                attrs["data-link-for"] = linkFor
+                attrs["data-link-for"] = escapeAttr(linkFor)
             text = f"<'{lt}'>"
             break
 
         match = PROD_FUNC_RE.match(text)
         if match:
-            attrs["data-link-type"] = "function"
-            attrs["data-lt"] = match[2]
+            attrs["data-link-type"] = t.SafeAttrStr("function")
+            attrs["data-lt"] = escapeAttr(match[2])
             if match[1] is not None:
-                attrs["data-link-for"] = match[1]
+                attrs["data-link-for"] = escapeAttr(match[1])
             text = f"<{match[2]}>"
             break
 
         match = PROD_ATRULE_RE.match(text)
         if match:
-            attrs["data-link-type"] = "at-rule"
-            attrs["data-lt"] = match[2]
+            attrs["data-link-type"] = t.SafeAttrStr("at-rule")
+            attrs["data-lt"] = escapeAttr(match[2])
             if match[1] is not None:
-                attrs["data-link-for"] = match[1]
+                attrs["data-link-for"] = escapeAttr(match[1])
             text = f"<{match[2]}>"
             break
 
         match = PROD_TYPE_RE.match(text)
         if match:
             for_, term, rangeStart, rangeEnd = match.groups()
-            attrs["data-link-type"] = "type"
-            attrs["data-lt"] = f"<{term}>"
+            attrs["data-link-type"] = t.SafeAttrStr("type")
+            attrs["data-lt"] = escapeAttr(f"<{term}>")
             if for_ is not None:
-                attrs["data-link-for"] = for_
+                attrs["data-link-for"] = escapeAttr(for_)
             if rangeStart is not None:
                 formattedStart, numStart = parseRangeComponent(s, textStart + match.start(3), rangeStart)
                 formattedEnd, numEnd = parseRangeComponent(s, textStart + match.start(4), rangeEnd)
@@ -1577,10 +1579,10 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
         match = TYPEWITHARGS_RE.match(text)
         if match:
             for_, term, arg = match.groups()
-            attrs["data-lt"] = f"<{term}>"
-            attrs["data-link-type"] = "type"
+            attrs["data-lt"] = escapeAttr(f"<{term}>")
+            attrs["data-link-type"] = t.SafeAttrStr("type")
             if for_ is not None:
-                attrs["data-link-for"] = for_
+                attrs["data-link-for"] = escapeAttr(for_)
             if "<<" in arg:
                 arg = arg.replace("<<", "<").replace(">>", ">")
             text = f"<{term}[{arg}]>"
@@ -1686,14 +1688,14 @@ def parseMaybeDecl(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
         "a",
         {
             "bs-autolink-syntax": escapeAttr(autolinkSyntax),
-            "class": "css",
-            "data-link-type": "propdesc",
+            "class": t.SafeAttrStr("css"),
+            "data-link-type": t.SafeAttrStr("propdesc"),
             "data-lt": escapeAttr(propdescname),
         },
     )
     if for_:
         startTag.attrs["data-link-for"] = escapeAttr(for_)
-        startTag.attrs["data-link-type"] = "descriptor"
+        startTag.attrs["data-link-type"] = t.SafeAttrStr("descriptor")
     startTag.finalize()
 
     declStart = RawText.fromStream(s, textStart, colonEnd, propdescname + ":")
@@ -1785,9 +1787,9 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
         textStart,
         "bs-link",
         {
-            "class": "css",
+            "class": t.SafeAttrStr("css"),
             "bs-autolink-syntax": escapeAttr(s.slice(start, nodeEnd)),
-            "data-link-type": linkType,
+            "data-link-type": escapeAttr(linkType),
             "data-lt": escapeAttr(valueName),
         },
     )
@@ -1926,8 +1928,8 @@ def parseCSSPropdesc(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
             start + 1,
             "a",
             {
-                "class": "property",
-                "data-link-type": linkType,
+                "class": t.SafeAttrStr("property"),
+                "data-link-type": escapeAttr(linkType),
                 "data-lt": escapeAttr(lt),
                 "bs-autolink-syntax": escapeAttr("'" + innerText + "'"),
             },
@@ -1973,7 +1975,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
         start + 1,
         "a",
         {
-            "data-link-type": "dfn",
+            "data-link-type": t.SafeAttrStr("dfn"),
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[=" + innerText + "=]"),
         },
@@ -2026,7 +2028,7 @@ def parseAutolinkAbstract(s: Stream, start: int) -> ResultT[SafeText | list[Pars
         start + 1,
         "a",
         {
-            "data-link-type": "abstract-op",
+            "data-link-type": t.SafeAttrStr("abstract-op"),
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[$" + innerText + "$]"),
         },
@@ -2079,7 +2081,7 @@ def parseAutolinkHeader(s: Stream, start: int) -> ResultT[SafeText | list[Parser
         start + 2,
         "a",
         {
-            "data-link-type": "http-header",
+            "data-link-type": t.SafeAttrStr("http-header"),
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[:" + innerText + ":]"),
         },
@@ -2156,7 +2158,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
         start + 1,
         "a",
         {
-            "data-link-type": linkType,
+            "data-link-type": escapeAttr(linkType),
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s.slice(start, innerEnd + 2)),
         },
@@ -2170,7 +2172,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
         start + 1,
         start + 1,
         "code",
-        {"class": "idl", "nohighlight": ""},
+        {"class": t.SafeAttrStr("idl"), "nohighlight": ""},
     ).finalize()
 
     if s[innerEnd] == "|":
@@ -2221,7 +2223,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
         start + 1,
         "a",
         {
-            "data-link-type": linkType,
+            "data-link-type": t.SafeAttrStr(linkType),
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s.slice(start, innerEnd + 2)),
         },
@@ -2235,7 +2237,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
         start + 1,
         start + 1,
         "code",
-        {"class": "cddl", "nohighlight": ""},
+        {"class": t.SafeAttrStr("cddl"), "nohighlight": ""},
     ).finalize()
 
     if s[innerEnd] == "|":
@@ -2290,7 +2292,7 @@ def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[Par
         start + 2,
         "a",
         {
-            "data-link-type": linkType,
+            "data-link-type": t.SafeAttrStr(linkType),
             "data-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("<{" + innerText + "}>"),
         },
@@ -2580,8 +2582,8 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             "a",
             {
                 "section": "",
-                "href": section,
-                "bs-autolink-syntax": f"[[{match[0]}]]",
+                "href": escapeAttr(section),
+                "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )
     elif justPage is not None:
@@ -2592,9 +2594,9 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             innerStart,
             "span",
             {
-                "spec-section": justPage + "#",
-                "spec": spec,
-                "bs-autolink-syntax": f"[[{match[0]}]]",
+                "spec-section": escapeAttr(justPage + "#"),
+                "spec": escapeAttr(spec),
+                "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )
     else:
@@ -2605,9 +2607,9 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             innerStart,
             "span",
             {
-                "spec-section": section,
-                "spec": spec,
-                "bs-autolink-syntax": f"[[{match[0]}]]",
+                "spec-section": escapeAttr(section),
+                "spec": escapeAttr(spec),
+                "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )
     return Ok((startTag, ""), innerEnd)
@@ -2721,7 +2723,7 @@ def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[SafeElement]:
     # At this point i is past the end of the code block.
     tag = StartTag.fromStream(s, start, start, "pre")
     if infoString:
-        tag.attrs["bs-infostring"] = infoString
+        tag.attrs["bs-infostring"] = escapeAttr(infoString)
         lang = infoString.split(" ")[0]
         if isDatablockClass(lang):
             tag.classes.add(lang)
@@ -2994,10 +2996,10 @@ def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
         middleBit = RawText.fromStream(s, linkTextEnd, linkDestStart)
         return Ok([openingSquare, *nodes, middleBit], linkDestStart)
     dest, title = result
-    startTag.attrs["href"] = dest
+    startTag.attrs["href"] = escapeAttr(dest)
     startTag.attrs["bs-autolink-syntax"] = escapeAttr(s.slice(start, nodeEnd))
     if title:
-        startTag.attrs["title"] = title
+        startTag.attrs["title"] = escapeAttr(title)
     endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
     return Ok([startTag, *nodes, *virtualEndTags, endTag], nodeEnd)
 

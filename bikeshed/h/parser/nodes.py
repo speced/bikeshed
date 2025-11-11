@@ -17,6 +17,29 @@ ParserNodeT: t.TypeAlias = (
 )
 
 
+def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
+    s = f"<{tagName}"
+    if "bs-line-number" in attrs:
+        s += f' bs-line-number="{attrs["bs-line-number"]}"'
+    for k, v in sorted(attrs.items()):
+        if k in ("bs-line-number", "class"):
+            continue
+        s += f' {k}="{v}"'
+    if "class" in attrs:
+        s += f' class="{attrs["class"]}"'
+    s += ">"
+    return s
+
+
+def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
+    attrs: t.SafeAttrDict = {**node.attrs, "bs-line-number": escapeAttr(node.loc)}
+    if node.context:
+        attrs["bs-parse-context"] = escapeAttr(node.context)
+    if node.classes:
+        attrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
+    return startTagStr(node.tag, attrs)
+
+
 @dataclass
 class ParserNode(metaclass=ABCMeta):
     line: int
@@ -129,7 +152,7 @@ class Doctype(ParserNode):
 @dataclass
 class StartTag(ParserNode):
     tag: str
-    attrs: dict[str, str] = field(default_factory=dict)
+    attrs: t.SafeAttrDict = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
     endTag: EndTag | None = None
 
@@ -140,7 +163,7 @@ class StartTag(ParserNode):
         start: int,
         end: int,
         tag: str,
-        attrs: None | dict[str, str] = None,
+        attrs: None | t.SafeAttrDict = None,
     ) -> t.Self:
         if attrs is None:
             attrs = {}
@@ -155,25 +178,14 @@ class StartTag(ParserNode):
         )
 
     def __str__(self) -> str:
-        s = f'<{self.tag} bs-line-number="{escapeAttr(self.loc)}"'
-        if self.context:
-            s += f' bs-parse-context="{escapeAttr(self.context)}"'
-        for k, v in sorted(self.attrs.items()):
-            if k == "bs-line-number":
-                continue
-            v = v.replace('"', "&#34;")
-            s += f' {k}="{v}"'
-        if self.classes:
-            s += f' class="{" ".join(sorted(self.classes))}"'
-        s += ">"
-        return s
+        return startTagStrFromNode(self)
 
     def printEndTag(self) -> str:
         return f"</{self.tag}>"
 
     def finalize(self) -> StartTag:
         if "class" in self.attrs:
-            self.classes = set(self.attrs["class"].split())
+            self.classes = set(unescapeAttr(self.attrs["class"]).split())
             del self.attrs["class"]
         return self
 
@@ -184,7 +196,7 @@ class StartTag(ParserNode):
 @dataclass
 class SelfClosedTag(ParserNode):
     tag: str
-    attrs: dict[str, str] = field(default_factory=dict)
+    attrs: t.SafeAttrDict = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
 
     @classmethod
@@ -194,7 +206,7 @@ class SelfClosedTag(ParserNode):
         start: int,
         end: int,
         tag: str,
-        attrs: None | dict[str, str] = None,
+        attrs: None | t.SafeAttrDict = None,
     ) -> t.Self:
         if attrs is None:
             attrs = {}
@@ -222,16 +234,7 @@ class SelfClosedTag(ParserNode):
         )
 
     def __str__(self) -> str:
-        s = f'<{self.tag} bs-line-number="{escapeAttr(self.loc)}"'
-        if self.context:
-            s += f' bs-parse-context="{escapeAttr(self.context)}"'
-        for k, v in sorted(self.attrs.items()):
-            if k == "bs-line-number":
-                continue
-            v = v.replace('"', "&#34;")
-            s += f' {k}="{v}"'
-        if self.classes:
-            s += f' class="{" ".join(sorted(self.classes))}"'
+        s = startTagStrFromNode(self)
         if self.tag in (
             "area",
             "base",
@@ -250,14 +253,14 @@ class SelfClosedTag(ParserNode):
             "track",
             "wbr",
         ):
-            s += ">"
+            return s
         else:
-            s += f"></{self.tag}>"
+            return s + f"</{self.tag}>"
         return s
 
     def finalize(self) -> SelfClosedTag:
         if "class" in self.attrs:
-            self.classes = set(self.attrs["class"].split())
+            self.classes = set(unescapeAttr(self.attrs["class"]).split())
             del self.attrs["class"]
         return self
 
@@ -367,8 +370,12 @@ def escapeHTML(text: str) -> str:
     return text.replace("&", "&#38;").replace("<", "&#60;")
 
 
-def escapeAttr(text: str) -> str:
-    return text.replace("&", "&#38;").replace('"', "&#34;")
+def escapeAttr(text: str) -> t.SafeAttrStr:
+    return t.SafeAttrStr(text.replace("&", "&#38;").replace('"', "&#34;"))
+
+
+def unescapeAttr(text: t.SafeAttrStr | t.EmptyLiteralStr) -> str:
+    return str(text.replace("&#34;", '"').replace("&#38;", "&"))
 
 
 @dataclass
