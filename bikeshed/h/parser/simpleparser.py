@@ -174,7 +174,7 @@ def parseEscape(s: SimpleStream, start: int) -> tuple[str, int]:
         i += 1  # skip the ;
         return escape, i
     else:
-        m.die(f"Whoops, I see a different escape at {i}: {s.slice(start, start+10)}")
+        m.die(f"Whoops, I see a different escape at {i}: {s.slice(start-10, start+20)}")
         return "&", i
 
 

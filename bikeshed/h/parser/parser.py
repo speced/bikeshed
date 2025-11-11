@@ -2654,7 +2654,7 @@ def parseCodeSpan(s: Stream, start: int) -> ResultT[list[ParserNode]]:
         start,
         contentStart,
         "code",
-        {"bs-autolink-syntax": f"{ticks}{text}{ticks}", "bs-opaque": ""},
+        {"bs-autolink-syntax": escapeAttr(f"{ticks}{text}{ticks}"), "bs-opaque": ""},
     )
     content = SafeText.fromStream(s, contentStart, contentEnd, text)
     endTag = EndTag.fromStream(s, contentEnd, i, startTag)
