@@ -582,7 +582,15 @@ def addDomintroStyles(doc: Spec) -> None:
 
 def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -> None:
     badIndentChar = " " if info.char == "\t" else "\t"
+    inComment = False
     for line in lines:
+        if not inComment and line.text.startswith("<!--"):
+            inComment = True
+        if inComment and "-->" in line.text:
+            inComment = False
+            continue
+        if inComment:
+            continue
         if not line.text:
             continue
         if line.text.startswith(badIndentChar):
