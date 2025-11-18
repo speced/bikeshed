@@ -160,9 +160,10 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
         spec = canonSpecFromWebref(rawWSpec)
         currentUrl = spec["current_url"]
         assert currentUrl is not None
-        progress.text(spec["vshortname"].lower())
+        specName = spec["vshortname"].lower()
+        progress.text(specName)
 
-        specs[spec["vshortname"].lower()] = spec
+        specs[specName] = spec
         specHeadings: HeadingsT = {}
         headings[spec["vshortname"]] = specHeadings
 
@@ -323,6 +324,9 @@ def addToHeadings(
         truncatedUrl = heading["url"][len(specUrl) :]
     else:
         m.warn(f"Invalid heading - URL doesn't start with the spec's url <{specUrl}>.\n{heading}")
+        return
+    if not truncatedUrl:
+        m.warn(f"Invalid url - heading doesn't actually have an ID:\n{heading}")
         return
     if truncatedUrl[0] == "#":
         # Either single-page spec, or link on the top page of a multi-page spec
