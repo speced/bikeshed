@@ -165,16 +165,31 @@ def parseAttribute(s: SimpleStream, start: int) -> tuple[str, str, int]:
 
 def parseEscape(s: SimpleStream, start: int) -> tuple[str, int]:
     i = start + 1  # skip the &
-    if s[i] == "#":
+    if s[i] == "#" and s[i+1] == "x":
+        i += 2
+        digitStart = i
+        while s[i] != ";":
+            i += 1
+        try:
+            escape = chr(int(s.slice(digitStart, i), 16))
+        except:
+            m.die(f"Couldn't parse the HTML escape '{s.slice(start, i+1)}'.")
+            return "&", start+1
+        i += 1  # skip the ;
+        return escape, i
+    elif s[i] == "#":
         i += 1
         digitStart = i
         while s[i] != ";":
             i += 1
-        escape = chr(int(s.slice(digitStart, i)))
+        try:
+            escape = chr(int(s.slice(digitStart, i)))
+        except:
+            m.die(f"Couldn't parse the HTML escape '{s.slice(start, i+1)}'.")
+            return "&", start+1
         i += 1  # skip the ;
         return escape, i
     else:
-        m.die(f"Whoops, I see a different escape at {i}: {s.slice(start-10, start+20)}")
         return "&", i
 
 

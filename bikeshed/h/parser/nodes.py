@@ -374,6 +374,10 @@ def escapeAttr(text: str) -> t.SafeAttrStr:
     return t.SafeAttrStr(text.replace("&", "&#38;").replace('"', "&#34;"))
 
 
+def minimalEscapeAttr(text: str) -> t.SafeAttrStr:
+    return t.SafeAttrStr(text.replace('"', "&#34;"))
+
+
 def unescapeAttr(text: t.SafeAttrStr | t.EmptyLiteralStr) -> str:
     return str(text.replace("&#34;", '"').replace("&#38;", "&"))
 

@@ -20,6 +20,7 @@ from .nodes import (
     StartTag,
     Text,
     escapeAttr,
+    minimalEscapeAttr,
     escapeHTML,
 )
 from .preds import charRefs, isControl, isDigit, isWhitespace
@@ -846,7 +847,7 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     if attrs is None:
         return Err(start)
 
-    safeAttrs: t.SafeAttrDict = {k: escapeAttr(v) for k, v in attrs.items()}
+    safeAttrs: t.SafeAttrDict = {k: minimalEscapeAttr(v) for k, v in attrs.items()}
 
     _, i, _ = parseWhitespace(s, i)
 
