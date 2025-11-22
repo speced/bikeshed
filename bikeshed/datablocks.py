@@ -420,7 +420,7 @@ def parseDefBlock(
     retVals: OrderedDict[str, str] = OrderedDict()
     for key, (lineNum, val) in vals.items():
         keyConfig = h.ParseConfig.fromSpec(doc, "the line's key (before the colon)")
-        valConfig = h.ParseConfig.fromSpec(doc, "lineNum line's value (after the colon)")
+        valConfig = h.ParseConfig.fromSpec(doc, "the line's value (after the colon)")
         key = h.parseText(key, keyConfig, startLine=lineNum, closeElements=True, context=el)
         if type in ("propdef", "descdef") and key == "Name":
             newVal = ""
