@@ -248,6 +248,8 @@ class SimpleStream:
                 self._bodyAttrs.append(attrs)
             return
         self.autoCloseStart(tagName)
+        if tagName == "tr" and self._tagStack and self._tagStack[-1] == "table":
+            self.startTag("tbody", {})
         self._handler.startElement(tagName, attrs)
         self.pushEl(tagName)
 
