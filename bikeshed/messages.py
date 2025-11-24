@@ -148,7 +148,7 @@ def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | N
     elif el is not None and el.get("bs-line-number"):
         s = el.get("bs-line-number", "")
         context = el.get("bs-parse-context", None)
-        if context:
+        if context and not s.endswith(context):
             s += " of " + context
         return s
     return None
