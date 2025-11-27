@@ -75,7 +75,9 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
             h.removeNode(el)
             return
-        parseConfig = h.ParseConfig.fromSpec(doc, context=f"file '{path}' (included by a block on {h.approximateLineNumber(el)})")
+        parseConfig = h.ParseConfig.fromSpec(
+            doc, context=f"file '{path}' (included by a block on {h.approximateLineNumber(el)})"
+        )
         parseConfig.macros = {**parseConfig.macros, **macros}
         lines = h.parseLines(lines, parseConfig, context=el)
         lines = markdown.parse(lines, markdown.MarkdownConfig.fromSpec(doc))

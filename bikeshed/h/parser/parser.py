@@ -20,8 +20,8 @@ from .nodes import (
     StartTag,
     Text,
     escapeAttr,
-    minimalEscapeAttr,
     escapeHTML,
+    minimalEscapeAttr,
 )
 from .preds import charRefs, isControl, isDigit, isWhitespace
 from .result import Err, Ok, OkT, ResultT, isErr, isOk
