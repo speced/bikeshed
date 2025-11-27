@@ -831,7 +831,7 @@ def addTOCSection(doc: t.SpecT) -> None:
     previousLevel = 1
     containers: list[t.ElementT | None] = [None, None, None, None, None, None, None, None]
     containers[1] = toc
-    containers[2] = h.appendChild(toc, h.E.ol({"class": "toc", "role": "directory"}))
+    containers[2] = h.appendChild(toc, h.E.ol({"class": "toc"}))
     for header in h.findAll("h2, h3, h4, h5, h6", doc):
         level = int(header.tag[-1])
         container = containers[level]
