@@ -161,7 +161,7 @@ def getApproxLineNumber(el: t.ElementT) -> str | None:
         context = el.get("bs-parse-context", None)
         if context and not s.endswith(context):
             s += " of " + context
-        if not s.startswith("~"):
+        if s and s[0].isdigit():
             s = "~" + s
         return s
     parentEl = el.getparent()
@@ -327,7 +327,7 @@ def printColor(text: str, color: str = "white", *styles: str) -> str:
     return text
 
 
-def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str | tuple[str, str]:
+def formatMessage(type: str, text: str, lineNum: str | None = None) -> str | tuple[str, str]:
     if state.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
@@ -375,8 +375,11 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
     elif type == "warning":
         headingText = "WARNING"
         color = "light cyan"
-    if lineNum is not None:
-        headingText = f"LINE {lineNum}"
+    if lineNum:
+        if lineNum[0] == "~" or lineNum[0].isdigit():
+            headingText = f"LINE {lineNum}"
+        else:
+            headingText = f"ERROR IN {lineNum}"
     return printColor(headingText + ":", color, "bold") + " " + text  # pylint: disable=possibly-used-before-assignment
 
 
