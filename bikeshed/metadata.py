@@ -1296,8 +1296,8 @@ def getSpecRepository(doc: t.SpecT) -> repository.Repository | None:
                     encoding="utf-8",
                 )
             searches = [
-                r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
-                r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
+                r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)(?:\.git)? \(\w+\)",
+                r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)(?:\.git)? \(\w+\)",
                 r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)/? \(\w+\)",
             ]
             for search_re in searches:
