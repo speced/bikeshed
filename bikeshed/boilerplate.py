@@ -1139,7 +1139,7 @@ def htmlFromMd(md: MetadataT, otherMd: MetadataT, doc: t.SpecT) -> t.ElementT:
     # Turns canonical and "other" metadata
     # into a <dl>, per Metadata Order.
 
-    dl = h.E.dl({"bs-line-number":"[auto-generated spec-metadata block]"})
+    dl = h.E.dl({"bs-line-number": "[auto-generated spec-metadata block]"})
     for key in doc.md.metadataOrder:
         if key == "*":
             # Do all the non-explicit non-custom keys

@@ -138,7 +138,7 @@ def p(msg: str | tuple[str, str]) -> None:
             print(msg.encode("ascii", "xmlcharrefreplace"), file=state.fh)
 
 
-def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | int | None:
+def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | None:
     if isinstance(lineNum, str):
         return lineNum
     elif isinstance(lineNum, int):
@@ -154,6 +154,7 @@ def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | N
     elif el is not None:
         return getApproxLineNumber(el)
     return None
+
 
 def getApproxLineNumber(el: t.ElementT) -> str | None:
     if el.get("bs-line-number"):
@@ -229,7 +230,7 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         errorAndExit()
 
 
-def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | t.ElementT | None = None) -> None:
+def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     lineNum = getLineNum(lineNum, el)
     suffix = ""
     if el is not None:
@@ -247,8 +248,7 @@ def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | t.ElementT
 
 
 def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("bs-line-number"):
-        lineNum = el.get("bs-line-number")
+    lineNum = getLineNum(lineNum, el)
     formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
     if formattedMsg not in state.seenMessages:
         state.record("warning", formattedMsg)
