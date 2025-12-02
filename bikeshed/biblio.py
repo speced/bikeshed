@@ -152,12 +152,12 @@ class StringBiblioEntry(BiblioEntry):
     data: str
 
     def __init__(self, linkText: str, data: str, order: int = 0) -> None:
-        doc = h.parseDocument(data)
+        doc = h.E.div({}, h.parseHTML(data))
         titleEl = h.find("cite", doc)
         if titleEl is not None:
             title = h.textContent(titleEl)
         else:
-            title = h.textContent(doc.getroot())
+            title = h.textContent(doc)
         super().__init__(
             linkText=linkText,
             title=title,

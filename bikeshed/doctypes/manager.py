@@ -166,7 +166,7 @@ class Status:
         orgName, statusName = utils.splitOrg(rawStatus)
         if statusName and self.name.upper() != statusName.upper():
             return False
-        if orgName and self.org.name != orgName.upper():  # noqa: SIM103
+        if orgName and self.org.name != orgName.upper():
             return False
         return True
 

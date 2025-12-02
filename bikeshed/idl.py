@@ -422,7 +422,7 @@ def markupIDL(doc: t.SpecT) -> None:
             widl = widlparser.parser.Parser(text, ui=IDLUI.fromEl(el), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
 
-            h.replaceContents(el, h.parseHTML(str(widl.markup(marker))))
+            h.replaceContents(el, h.parseHTML(str(widl.markup(marker)).lstrip()))
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
         h.addClass(doc, el, "highlight")

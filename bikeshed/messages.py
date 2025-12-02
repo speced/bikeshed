@@ -138,7 +138,7 @@ def p(msg: str | tuple[str, str]) -> None:
             print(msg.encode("ascii", "xmlcharrefreplace"), file=state.fh)
 
 
-def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | int | None:
+def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | None = None) -> str | None:
     if isinstance(lineNum, str):
         return lineNum
     elif isinstance(lineNum, int):
@@ -148,10 +148,28 @@ def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | N
     elif el is not None and el.get("bs-line-number"):
         s = el.get("bs-line-number", "")
         context = el.get("bs-parse-context", None)
-        if context:
+        if context and not s.endswith(context):
             s += " of " + context
         return s
+    elif el is not None:
+        return getApproxLineNumber(el)
     return None
+
+
+def getApproxLineNumber(el: t.ElementT) -> str | None:
+    if el.get("bs-line-number"):
+        s = el.get("bs-line-number", "")
+        context = el.get("bs-parse-context", None)
+        if context and not s.endswith(context):
+            s += " of " + context
+        if s and s[0].isdigit():
+            s = "~" + s
+        return s
+    parentEl = el.getparent()
+    if parentEl is not None:
+        return getApproxLineNumber(parentEl)
+    else:
+        return None
 
 
 def printOpener() -> None:
@@ -212,7 +230,7 @@ def linkerror(msg: str, el: t.ElementT | None = None, lineNum: str | int | None 
         errorAndExit()
 
 
-def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | t.ElementT | None = None) -> None:
+def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
     lineNum = getLineNum(lineNum, el)
     suffix = ""
     if el is not None:
@@ -230,8 +248,7 @@ def lint(msg: str, el: t.ElementT | None = None, lineNum: str | int | t.ElementT
 
 
 def warn(msg: str, el: t.ElementT | None = None, lineNum: str | int | None = None) -> None:
-    if lineNum is None and el is not None and el.get("bs-line-number"):
-        lineNum = el.get("bs-line-number")
+    lineNum = getLineNum(lineNum, el)
     formattedMsg = formatMessage("warning", msg, lineNum=lineNum)
     if formattedMsg not in state.seenMessages:
         state.record("warning", formattedMsg)
@@ -310,7 +327,7 @@ def printColor(text: str, color: str = "white", *styles: str) -> str:
     return text
 
 
-def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str | tuple[str, str]:
+def formatMessage(type: str, text: str, lineNum: str | None = None) -> str | tuple[str, str]:
     if state.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
@@ -358,8 +375,11 @@ def formatMessage(type: str, text: str, lineNum: str | int | None = None) -> str
     elif type == "warning":
         headingText = "WARNING"
         color = "light cyan"
-    if lineNum is not None:
-        headingText = f"LINE {lineNum}"
+    if lineNum:
+        if lineNum[0] == "~" or lineNum[0].isdigit():
+            headingText = f"LINE {lineNum}"
+        else:
+            headingText = f"ERROR IN {lineNum}"
     return printColor(headingText + ":", color, "bold") + " " + text  # pylint: disable=possibly-used-before-assignment
 
 

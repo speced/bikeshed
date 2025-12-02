@@ -67,7 +67,7 @@ def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[Fals
         # on the <pre><code> child.
         parent = h.parentElement(el)
         assert parent is not None
-        if h.tagName(parent) == "pre" and h.isOnlyChild(el) and determineHighlightLang(doc, parent):
+        if h.tagName(parent) == "pre" and determineHighlightLang(doc, parent):
             return None
     if lang == "webidl" and el.tag == "code" and h.tagName(h.parentElement(el)) == "dfn":
         # No such thing as a dfn that needs to be WebIDL-highlighted.
@@ -152,8 +152,31 @@ def highlightEl(doc: t.SpecT, el: t.ElementT, lang: str) -> None:
     else:
         coloredText = highlightWithPygments(text, lang, el=el)
     if coloredText is not None:
+        readdWhitespacePrefix(text, coloredText)
         mergeHighlighting(el, coloredText)
         h.addClass(doc, el, "highlight")
+
+
+def readdWhitespacePrefix(rawText: str, coloredText: t.Deque[ColoredText]) -> t.Deque[ColoredText]:
+    """
+    If the raw text starts with whitespace, Pygments auto-strips it >:(
+    So, we need to add it back in, as an uncolored chunk of text.
+    But also, it doesn't... always strip whitespace. So check for that.
+    """
+    if not coloredText:
+        # Empty colored text, nothing to do
+        return coloredText
+    coloredMatch = re.match(r"\s+", coloredText[0].text)
+    if coloredMatch:
+        # whitespace was kept by the formatter, so nothing to do
+        return coloredText
+    textMatch = re.match(r"\s+", rawText)
+    if not textMatch:
+        # No whitespace on the text, nothing to do
+        return coloredText
+    prefix = ColoredText(textMatch[0], None)
+    coloredText.appendleft(prefix)
+    return coloredText
 
 
 def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | None:

@@ -185,7 +185,7 @@ class Script(JCResource):
             return False
         if self.data is None:
             return True
-        if self.data[1]:  # noqa: SIM103
+        if self.data[1]:
             return True
         return False
 
