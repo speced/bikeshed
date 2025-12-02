@@ -24,7 +24,10 @@ def brokenLinks(doc: t.SpecT) -> None:
     startTime = time.time()
     for el in h.findAll("a", doc):
         if time.time() - startTime > timeout.total:
-            m.lint(f"Link checking took longer than {timeout.total} seconds, skipping the rest.")
+            if not doc.testing:
+                # This is the only real non-determinism in the testsuite,
+                # and it's KILLING ME. BEGONE, FOUL TEST FAILURE
+                m.lint(f"Link checking took longer than {timeout.total} seconds, skipping the rest.")
             break
         href = el.get("href")
         if not href or href[0] == "#":
