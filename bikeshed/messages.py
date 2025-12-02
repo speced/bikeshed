@@ -151,7 +151,24 @@ def getLineNum(lineNum: str | int | t.ElementT | None = None, el: t.ElementT | N
         if context and not s.endswith(context):
             s += " of " + context
         return s
+    elif el is not None:
+        return getApproxLineNumber(el)
     return None
+
+def getApproxLineNumber(el: t.ElementT) -> str | None:
+    if el.get("bs-line-number"):
+        s = el.get("bs-line-number", "")
+        context = el.get("bs-parse-context", None)
+        if context and not s.endswith(context):
+            s += " of " + context
+        if not s.startswith("~"):
+            s = "~" + s
+        return s
+    parentEl = el.getparent()
+    if parentEl is not None:
+        return getApproxLineNumber(parentEl)
+    else:
+        return None
 
 
 def printOpener() -> None:
