@@ -922,14 +922,20 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
             remoteIssueURL = f"https://github.com/{org}/{repo}/issues/{num}"
             if doc.md.inlineGithubIssues:
                 el.set("data-inline-github", f"{org} {repo} {num}")
-        elif numberMatch and isinstance(doc.md.repository, repository.GithubRepository):
-            remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
-            num = numberMatch.group(1)
-            text = f"[Issue #{num}]"
-            if doc.md.inlineGithubIssues:
-                org = doc.md.repository.user
-                repo = doc.md.repository.repo
-                el.set("data-inline-github", f"{org} {repo} {num}")
+        elif numberMatch:
+            if isinstance(doc.md.repository, repository.GithubRepository):
+                remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
+                num = numberMatch.group(1)
+                text = f"[Issue #{num}]"
+                if doc.md.inlineGithubIssues:
+                    org = doc.md.repository.user
+                    repo = doc.md.repository.repo
+                    el.set("data-inline-github", f"{org} {repo} {num}")
+            elif doc.md.issueTrackerTemplate:
+                text = f"[Issue {remoteIssueID}]"
+                remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
+            else:
+                m.die("Saw numeric issue markup, but can't find either a GitHub repo or manual Issue Tracker Template to format it.", el=el)
         elif doc.md.issueTrackerTemplate:
             text = f"[Issue {remoteIssueID}]"
             remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
