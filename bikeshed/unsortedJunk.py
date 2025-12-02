@@ -935,7 +935,11 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                 text = f"[Issue {remoteIssueID}]"
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             else:
-                m.die("Saw numeric issue markup, but can't find either a GitHub repo or manual Issue Tracker Template to format it.", el=el)
+                m.die(
+                    "Saw numeric issue markup, but can't find either a GitHub repo or manual Issue Tracker Template to format it.",
+                    el=el,
+                )
+                continue
         elif doc.md.issueTrackerTemplate:
             text = f"[Issue {remoteIssueID}]"
             remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
