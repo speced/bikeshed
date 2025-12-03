@@ -17,7 +17,13 @@ def main() -> None:
     try:
         with open(config.scriptPath("semver.txt"), encoding="utf-8") as fh:
             semver = fh.read().strip()
-            semverText = f"Bikeshed v{semver}: "
+        try:
+            with open(config.scriptPath("semver-dev.txt"), encoding="utf-8") as fh:
+                devSegment = fh.read().strip()
+                semver += "-" + devSegment
+        except FileNotFoundError:
+            pass
+        semverText = f"Bikeshed v{semver}: "
     except FileNotFoundError:
         semver = "???"
         semverText = ""
