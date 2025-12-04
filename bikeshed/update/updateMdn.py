@@ -29,10 +29,6 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             mdnSpecLinksDir = os.path.join(path, "mdn")
             if not os.path.exists(mdnSpecLinksDir):
                 os.makedirs(mdnSpecLinksDir)
-            p = os.path.join(path, "mdn.json")
-            writtenPaths.add(p)
-            with open(p, "w", encoding="utf-8") as fh:
-                fh.write(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False))
             # SPECMAP.json format:
             # {
             #     "https://compat.spec.whatwg.org/": "compat.json",
@@ -40,17 +36,30 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             #     "https://dom.spec.whatwg.org/": "dom.json",
             #     ...
             # }
-            for specFilename in data.values():
+            for specUrl, specFilename in list(data.items()):
+                print(f"Fetching {specFilename}")
                 p = os.path.join(mdnSpecLinksDir, specFilename)
-                writtenPaths.add(p)
                 mdnSpecLinksBaseURL = "https://w3c.github.io/mdn-spec-links/"
                 try:
                     fileContents = requests.get(mdnSpecLinksBaseURL + specFilename, timeout=5).text
                 except Exception as e:
-                    m.die(f"Couldn't download the MDN Spec Links {specFilename} file.\n{e}")
-                    return None
+                    m.die(f"Couldn't download the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}")
+                    del data[specUrl]
+                    continue
+                try:
+                    specData = json.loads(fileContents)
+                except Exception as e:
+                    m.die(f"Couldn't JSON-parse the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}")
+                    del data[specUrl]
+                    continue
                 with open(p, "w", encoding="utf-8") as fh:
                     fh.write(fileContents)
+                writtenPaths.add(p)
+
+            mdnPath = os.path.join(path, "mdn.json")
+            with open(mdnPath, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False))
+            writtenPaths.add(mdnPath)
         except Exception as e:
             m.die(f"Couldn't save MDN Spec Links data to disk.\n{e}")
             return None
