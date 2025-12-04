@@ -156,12 +156,12 @@ def gatherWebrefData(specs: SpecsT, anchors: AnchorsT, headings: AllHeadingsT) -
     snapshotWebrefData = specsFromWebref("snapshot")
 
     progress = alive_it(currentWebrefData, dual_line=True)
-    for rawWSpec in t.cast("t.Generator[WebrefSpecT, None, None]", progress):
+    for rawWSpec in progress:
         spec = canonSpecFromWebref(rawWSpec)
         currentUrl = spec["current_url"]
         assert currentUrl is not None
         specName = spec["vshortname"].lower()
-        progress.text(specName)
+        progress.text(specName)  # type: ignore
 
         specs[specName] = spec
         specHeadings: HeadingsT = {}
