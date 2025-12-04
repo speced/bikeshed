@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 # The only things that should be available during runtime.
-from typing import TYPE_CHECKING, Generic, TypedDict, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Generic, NewType, TypedDict, TypeVar, cast, overload
 
 # Only available in 3.11, so stub them out for earlier versions
 if sys.version_info >= (3, 11):
@@ -13,6 +13,7 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import assert_never, assert_type
 
+SafeAttrStr = NewType("SafeAttrStr", str)
 
 if TYPE_CHECKING:
     from typing import (
@@ -33,7 +34,6 @@ if TYPE_CHECKING:
         MutableMapping,
         MutableSequence,
         NamedTuple,
-        NewType,
         Protocol,
         Sequence,
         TextIO,
@@ -52,8 +52,10 @@ if TYPE_CHECKING:
     )
 
     ElementT: TypeAlias = etree._Element
-    DocumentT: TypeAlias = etree._ElementTree
     NodeT: TypeAlias = str | ElementT
+
+    SafeAttrDict = dict[str, SafeAttrStr | Literal[""]]
+    EmptyLiteralStr = Literal[""]
 
     # In many places I treat lists as an "anonymous" element
     ElementishT: TypeAlias = ElementT | list[NodeT]

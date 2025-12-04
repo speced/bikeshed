@@ -23,13 +23,14 @@ class ParseConfig:
     header: bool = False
     idl: bool = False
     macrosInAutolinks: bool = False
-    markdown: bool = False
+    markdownBlock: bool = False
+    markdownInline: bool = False
     markdownEscapes: bool = False
     markup: bool = False
     repositoryLinks: bool = False
     macros: dict[str, str] = field(default_factory=dict)
     context: str | None = None
-    opaqueElements: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
+    opaqueElements: set[str] = field(default_factory=set)
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
@@ -42,7 +43,8 @@ class ParseConfig:
             header="http" in doc.md.markupShorthands,
             idl="idl" in doc.md.markupShorthands,
             macrosInAutolinks="macros-in-autolinks" in doc.md.markupShorthands,
-            markdown="markdown" in doc.md.markupShorthands,
+            markdownBlock="markdown-block" in doc.md.markupShorthands,
+            markdownInline="markdown-inline" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
             repositoryLinks="repository-links" in doc.md.markupShorthands,
@@ -203,30 +205,26 @@ class Stream:
         # Includes the newline, if present.
         return self.slice(start, self.nextLineStart(start))
 
-    def observeResult(self, res: ResultT[ParserNode | list[ParserNode]]) -> ResultT[ParserNode | list[ParserNode]]:
+    def observeResult(self, res: ResultT[ParserNode | list[ParserNode]]) -> None:
         if isOk(res):
             val, _, _ = res
             if isinstance(val, list):
-                for node in val:
-                    self.observeNode(node)
+                self.observeNodes(val)
             else:
                 self.observeNode(val)
-        return res
 
-    def observeNode(self, node: ParserNode) -> ParserNode:
+    def observeNode(self, node: ParserNode) -> None:
         self.openEls.update(node)
-        return node
 
-    def observeNodes(self, nodes: list[ParserNode]) -> list[ParserNode]:
+    def observeNodes(self, nodes: list[ParserNode]) -> None:
         for node in nodes:
             self.openEls.update(node)
-        return nodes
 
     def observeShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
         self.openEls.updateShorthandOpen(startTag, sigils)
 
-    def observeShorthandClose(self, loc: str, startTag: StartTag, sigils: tuple[str, str]) -> None:
-        self.openEls.updateShorthandClose(loc, startTag, sigils)
+    def observeShorthandClose(self, s: Stream, i: int, startTag: StartTag, sigils: tuple[str, str]) -> list[ParserNode]:
+        return list(self.openEls.updateShorthandClose(s, i, startTag, sigils))
 
     def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
         self.openEls.cancelShorthandOpen(startTag, sigils)

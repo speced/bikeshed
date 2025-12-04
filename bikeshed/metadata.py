@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, datablocks, h, markdown, repository, t
+from . import config, constants, h, markdown, repository, t
 from . import messages as m
 from .translate import _t
 
@@ -26,8 +26,8 @@ if t.TYPE_CHECKING:
 
 @dataclasses.dataclass
 class LinkCheckerTimeout:
-    each: int = 5
-    total: int = 10
+    each: int | float = 5
+    total: int | float = 10
 
 
 class MetadataManager:
@@ -109,7 +109,18 @@ class MetadataManager:
         self.mailingList: str | None = None
         self.mailingListArchives: str | None = None
         self.markupShorthands: config.BoolSet = config.BoolSet(
-            ["css", "dfn", "biblio", "markup", "http", "idl", "cddl", "algorithm", "repository-links"],
+            [
+                "css",
+                "dfn",
+                "biblio",
+                "markdown-block",
+                "markup",
+                "http",
+                "idl",
+                "cddl",
+                "algorithm",
+                "repository-links",
+            ],
         )
         self.maxToCDepth: int | float | None = float("inf")
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
@@ -117,7 +128,7 @@ class MetadataManager:
         self.noAbstract: bool = False
         self.noEditor: bool = False
         self.noteClass: str = "note"
-        self.opaqueElements: list[str] = ["pre", "xmp", "script", "style"]
+        self.opaqueElements: list[str] = []
         self.prepTR: bool = False
         self.previousEditors: list[dict[str, str | None]] = []
         self.previousVersions: list[dict[str, str]] = []
@@ -267,11 +278,23 @@ class MetadataManager:
     def fillTextMacros(self, macros: t.DefaultDict[str, str], doc: t.SpecT) -> None:
         # Fills up a set of text macros based on metadata.
         if self.title:
-            macros["title"] = h.parseTitle(self.title, h.ParseConfig.fromSpec(doc, context="Title metadata"))
+            macros["title"] = h.parseTitle(
+                self.title,
+                h.ParseConfig.fromSpec(doc, context="Title metadata"),
+                context="Title metadata",
+            )
         if self.h1:
-            macros["spectitle"] = h.parseText(self.h1, h.ParseConfig.fromSpec(doc, context="H1 metadata"))
+            macros["spectitle"] = h.parseText(
+                self.h1,
+                h.ParseConfig.fromSpec(doc, context="H1 metadata"),
+                context="H1 metadata",
+            )
         elif self.title:
-            macros["spectitle"] = h.parseText(self.title, h.ParseConfig.fromSpec(doc, context="Title metadata"))
+            macros["spectitle"] = h.parseText(
+                self.title,
+                h.ParseConfig.fromSpec(doc, context="Title metadata"),
+                context="Title metadata",
+            )
         if self.displayShortname:
             macros["shortname"] = self.displayShortname
         if self.statusText:
@@ -402,6 +425,7 @@ class MetadataManager:
             macros["customwarningtitle"] = h.parseText(
                 self.customWarningTitle,
                 h.ParseConfig.fromSpec(doc, context="Custom Warning Title metadata"),
+                context="Custom Warning Title metadata",
             )
         # Custom macros
         for name, text in self.customTextMacros:
@@ -412,9 +436,8 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, indent: int, context:
     if len(lines) == 0:
         return ""
     lines = [line.rstrip() + "\n" for line in lines]
-    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context))
-    lines = datablocks.transformDataBlocks(doc, lines)
-    lines = markdown.parse(lines, indent)
+    lines = h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context), context=context)
+    lines = markdown.parse(lines, markdown.MarkdownConfig.fromSpec(doc))
     return "".join(lines)
 
 
@@ -760,7 +783,7 @@ def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> list[tuple
 def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a boolset of the shorthand categories.
-    # TODO: Just call parseBoolistList instead
+    # TODO: Just call parseBoolishList instead
     vals = [v.strip() for v in val.lower().split(",")]
     ret = config.BoolSet(default=False)
     validCategories = frozenset(
@@ -773,7 +796,8 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             "http",
             "idl",
             "macros-in-autolinks",
-            "markdown",
+            "markdown-block",
+            "markdown-inline",
             "markdown-escapes",
             "markup",
             "repository-links",
@@ -788,7 +812,13 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             )
             continue
         name, boolstring = pieces
-        if name not in validCategories:
+        # markdown is an alias for markdown-inline.
+        # TODO: convert all specs to use markdown-inline, and then turn markdown
+        # into a shorthand for markdown-*.
+        if name == "markdown":
+            name = "markdown-inline"
+            assert name in validCategories
+        elif name not in validCategories:
             m.die(f"Unknown Markup Shorthand category '{name}'.", lineNum=lineNum)
             continue
         onoff = boolish(boolstring)
@@ -1056,13 +1086,13 @@ def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> list
 def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> LinkCheckerTimeout:
     vals = val.strip().split()
     if len(vals) != 2:
-        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        m.die(f"Link Checker Timeout metadata needs exactly two numbers. Got: '{val}'.", lineNum=lineNum)
         return LinkCheckerTimeout()
     try:
-        each = int(vals[0])
-        total = int(vals[1])
+        each = float(vals[0])
+        total = float(vals[1])
     except ValueError:
-        m.die(f"Link Checker Timeout metadata needs exactly two integers. Got: '{val}'.", lineNum=lineNum)
+        m.die(f"Link Checker Timeout metadata needs exactly two numbers. Got: '{val}'.", lineNum=lineNum)
         return LinkCheckerTimeout()
     return LinkCheckerTimeout(each, total)
 
@@ -1266,8 +1296,8 @@ def getSpecRepository(doc: t.SpecT) -> repository.Repository | None:
                     encoding="utf-8",
                 )
             searches = [
-                r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
-                r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
+                r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)(?:\.git)? \(\w+\)",
+                r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)(?:\.git)? \(\w+\)",
                 r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)/? \(\w+\)",
             ]
             for search_re in searches:

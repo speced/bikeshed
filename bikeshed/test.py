@@ -74,7 +74,7 @@ def allowedPath(filePath: str, filters: TestFilter) -> bool:
         return False
 
     if filters.folders:
-        if not any(folder in pathSegs for folder in filters.folders):
+        if not any(folder in filePath for folder in filters.folders):
             return False
 
     if filters.files:
@@ -118,7 +118,7 @@ def run(
     try:
         for path in pathProgress:
             testName = testNameForPath(path)
-            pathProgress.text(testName)
+            pathProgress.text(testName)  # type: ignore
             total += 1
             consoleFh = io.StringIO()
             with m.withMessageState(fh=consoleFh, printMode="plain") as _:
@@ -166,7 +166,7 @@ def rebase(
     try:
         for path in pathProgress:
             testName = testNameForPath(path)
-            pathProgress.text(testName)
+            pathProgress.text(testName)  # type: ignore
             with m.withMessageState(fh=replaceExtension(path, ".console.txt"), printMode="plain") as _:
                 doc = processTest(path, md)
             with m.messagesSilent() as _:

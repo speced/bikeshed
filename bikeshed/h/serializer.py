@@ -95,11 +95,11 @@ class Serializer:
         self.opaqueEls = frozenset(opaqueElements)
         self.blockEls = frozenset(blockElements)
 
-    def serialize(self, tree: t.DocumentT) -> str:
+    def serialize(self, root: t.ElementT) -> str:
         output = io.StringIO()
         writer = output.write
         writer("<!doctype html>")
-        self._serializeEl(tree.getroot(), writer)
+        self._serializeEl(root, writer)
         s = output.getvalue()
         output.close()
         return s
@@ -107,7 +107,9 @@ class Serializer:
     def unfuckName(self, n: str) -> str:
         # LXML does namespaces stupidly
         if n.startswith("{"):
-            return n.partition("}")[2]
+            n = n.partition("}")[2]
+        if n == "clippath":
+            n = "clipPath"
         return n
 
     def groupIntoBlocks(self, nodes: t.Iterable[t.NodeT]) -> Blocks:
@@ -134,17 +136,21 @@ class Serializer:
         strs = []
         strs.append("<" + tag)
         for attrName, attrVal in sorted(el.items()):
+            attrName = self.unfuckName(str(attrName))
+            attrVal = str(attrVal)
             if str(attrName).startswith("bs-"):
                 # Skip bs- prefixed attributes, as they're used
                 # for Bikeshed-internal purposes.
                 continue
+            if attrName == "viewbox":
+                attrName = "viewBox"
             if attrVal == "":
-                strs.append(" " + self.unfuckName(str(attrName)))
+                strs.append(" " + attrName)
             elif attrName == "class" and " " in attrVal:
-                sortedClasses = " ".join(sorted([x for x in str(attrVal).split(r" ") if x]))
-                strs.append(f' class="{sortedClasses}"')
+                sortedClasses = " ".join(sorted([x for x in attrVal.split(r" ") if x]))
+                strs.append(f' class="{dom.escapeAttr(sortedClasses)}"')
             else:
-                strs.append(" " + self.unfuckName(str(attrName)) + '="' + dom.escapeAttr(str(attrVal)) + '"')
+                strs.append(f' {attrName}="{dom.escapeAttr(attrVal)}"')
         strs.append(">")
         write("".join(strs))
 
@@ -161,11 +167,19 @@ class Serializer:
     def isVoidElement(self, tag: str) -> bool:
         return tag in self.voidEls
 
-    def isRawElement(self, tag: str) -> bool:
-        return tag in self.rawEls
+    def isRawElement(self, tag: str, el: t.ElementT) -> bool:
+        if tag in self.rawEls:
+            return True
+        if tag == "title" and el.get("bs-title-contents"):
+            return True
+        return False
 
     def isOpaqueElement(self, tag: str) -> bool:
-        return tag in self.opaqueEls
+        if tag in ("pre", "xmp", "script", "style"):
+            return True
+        if tag in self.opaqueEls:
+            return True
+        return False
 
     def isInlineElement(self, tag: str) -> bool:
         return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
@@ -179,7 +193,7 @@ class Serializer:
         if el.tag in ["dt", "dd"]:
             if nextEl is None:
                 return False
-            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:  # noqa: SIM103
+            if self.isElement(nextEl) and nextEl.tag in ["dt", "dd"]:
                 return False
             return True
         return False
@@ -198,6 +212,15 @@ class Serializer:
             # A *linking* script, doesn't need to be treated specially.
             write(" " * indent)
             self.startTag(tag, el, write)
+            self.endTag(tag, write)
+            return
+
+        if tag == "title":
+            # During earlyParse() I stashed the <title> contents into an attribute,
+            # so it wouldn't confuse lxml.
+            write(" " * indent)
+            self.startTag(tag, el, write)
+            write(el.get("bs-title-contents", ""))
             self.endTag(tag, write)
             return
 
@@ -320,7 +343,7 @@ class Serializer:
         if self.isVoidElement(tag):
             assert self.isElement(el)
             self._writeVoidElement(tag, el, write, indent)
-        elif self.isRawElement(tag):
+        elif self.isRawElement(tag, t.cast("t.ElementT", el)):
             assert self.isElement(el)
             self._writeRawElement(tag, el, write, indent)
         elif pre or self.isOpaqueElement(tag):

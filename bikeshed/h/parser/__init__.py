@@ -15,12 +15,20 @@ from .nodes import (
     Doctype,
     EndTag,
     ParserNode,
+    ParserNodeT,
     RawElement,
     RawText,
+    SafeElement,
     SafeText,
     SelfClosedTag,
     StartTag,
     Text,
+)
+from .parser import (
+    closeOpenElements,
+)
+from .simpleparser import (
+    parseDocument,
 )
 from .stream import (
     ParseConfig,

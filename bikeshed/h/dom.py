@@ -6,16 +6,16 @@ import html
 import re
 from collections import OrderedDict
 
-import html5lib
+import lxml
 from lxml import etree
 from lxml.cssselect import CSSSelector
-from lxml.html import tostring
 
 from .. import t
 from ..messages import die, warn
 
 if t.TYPE_CHECKING:
     ElementPredT: t.TypeAlias = t.Callable[[t.ElementT], bool]
+    from .parser import StartTag
 
 
 def flatten(arr: t.Iterable) -> t.Iterator:
@@ -30,8 +30,11 @@ def unescape(string: str) -> str:
     return html.unescape(string)
 
 
-def findAll(sel: str, context: t.SpecT | t.ElementT | t.DocumentT) -> list[t.ElementT]:
-    context = t.cast("t.ElementT", getattr(context, "document", context))
+def findAll(sel: str, context: t.SpecT | t.ElementT) -> list[t.ElementT]:
+    if isElement(context):
+        pass
+    else:
+        context = context.document
     try:
         return t.cast("list[t.ElementT]", CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
     except Exception as e:
@@ -39,7 +42,7 @@ def findAll(sel: str, context: t.SpecT | t.ElementT | t.DocumentT) -> list[t.Ele
         return []
 
 
-def find(sel: str, context: t.SpecT | t.ElementT | t.DocumentT) -> t.ElementT | None:
+def find(sel: str, context: t.SpecT | t.ElementT) -> t.ElementT | None:
     result = findAll(sel, context)
     if result:
         return result[0]
@@ -101,7 +104,7 @@ def validUrlUnit(char: str) -> bool:
     else:
         if 0xD800 <= c <= 0xDFFF or 0xFDD0 <= c <= 0xFDEF:
             return False
-        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:  # noqa: SIM103
+        if (c % 0xFFFF) in [0xFFFE, 0xFFFF]:
             # Last two bytes are FFFE or FFFF
             return False
         return True
@@ -114,7 +117,7 @@ def textContent(el: t.ElementT, exact: bool = False) -> str:
     if len(el) == 0:
         return el.text or ""
     if exact:
-        return t.cast(str, tostring(el, method="text", with_tail=False, encoding="unicode"))
+        return t.cast(str, lxml.html.tostring(el, method="text", with_tail=False, encoding="unicode"))
     else:
         return textContentIgnoringDecorative(el)
 
@@ -132,7 +135,7 @@ def textContentIgnoringDecorative(el: t.ElementT) -> str:
 def innerHTML(el: t.ElementT | None) -> str:
     if el is None:
         return ""
-    return (el.text or "") + "".join(tostring(x, encoding="unicode") for x in el)
+    return (el.text or "") + "".join(lxml.html.tostring(x, encoding="unicode") for x in el)
 
 
 def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = False) -> str:
@@ -144,26 +147,47 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
         return "".join(outerHTML(x) for x in el)
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax") or ""
-    return t.cast(str, tostring(el, with_tail=with_tail, encoding="unicode"))
+    return t.cast(str, lxml.html.tostring(el, with_tail=with_tail, encoding="unicode"))
 
 
-def printNodeTree(node: t.NodeT | str) -> str:
+def printNodeTree(node: t.NodeT | str, maxDepth: int | None = None, depth: int = 0) -> str:
     # Debugging tool
     if isinstance(node, str):
-        return "#text: " + repr(node)
+        content = repr(node)
+        if len(content) > 60:
+            content = content[:60] + " [...]"
+        return "#text: " + content
     if isOddNode(node):
         return outerHTML(node)
+    subLines: list[list[str]] = []
     if isinstance(node, list):
         s = "[]"
     else:
-        s = f"{serializeTag(node)}"
-    linesPerChild = [printNodeTree(child).split("\n") for child in childNodes(node, skipOddNodes=False)]
-    if linesPerChild:
-        for childLines in linesPerChild[:-1]:
+        s = f"{serializeTag(node, includeBs=True, shortenAttrs=True)}"
+    if len(s) > 60:
+        s = f"<{node.tag} [...]>"
+        subLines.append([])
+        for k, v in node.attrib.items():
+            if len(v) < 80:
+                subLines[0].append(f'# {k!s}="{escapeAttr(str(v))}"')
+            else:
+                subLines[0].append(f'# {k!s}="{escapeAttr(str(v[0:40]))}[...]"')
+    if not maxDepth or depth < maxDepth:
+        subLines.extend(
+            printNodeTree(child, maxDepth, depth + 1).split("\n") for child in childNodes(node, skipOddNodes=False)
+        )
+    else:
+        childCount = f"({len(node)} children)"
+        if not subLines and len(s) < 40:
+            s += " " + childCount
+        else:
+            subLines.append([childCount])
+    if subLines:
+        for childLines in subLines[:-1]:
             childLines[0] = " ├" + childLines[0]
             childLines[1:] = [" │" + line for line in childLines[1:]]
             s += "\n" + "\n".join(childLines)
-        childLines = linesPerChild[-1]
+        childLines = subLines[-1]
         childLines[0] = " ╰" + childLines[0]
         childLines[1:] = ["  " + line for line in childLines[1:]]
         s += "\n" + "\n".join(childLines)
@@ -219,7 +243,7 @@ def firstLinkTextFromElement(el: t.ElementT) -> str | None:
     return texts[0] if len(texts) > 0 else None
 
 
-def serializeTag(el: t.ElementT) -> str:
+def serializeTag(el: t.ElementT, includeBs: bool = False, shortenAttrs: bool = False) -> str:
     # Serialize *just* the opening tag for the element.
     # Use when you want to output the HTML,
     # but it might be a container with a lot of content.
@@ -228,16 +252,18 @@ def serializeTag(el: t.ElementT) -> str:
         # Don't output the bs-* attributes, they're added by BS
         # and don't show up in the source, so it's confusing to
         # print them.
-        if t.cast(str, n).startswith("bs-"):
+        if not includeBs and t.cast(str, n).startswith("bs-"):
             continue
-        tag += ' {n}="{v}"'.format(n=str(n), v=escapeAttr(str(v)))
+        if shortenAttrs and len(v) > 40:
+            v = str(v[0:30]) + "[...]" + str(v[-5:])
+        tag += f' {n!s}="{escapeAttr(str(v))}"'
     tag += ">"
     return tag
 
 
 def tagName(el: t.ElementT | None) -> str | None:
     # Returns the tagname, or None if passed None
-    # Iow, safer version of el.tagName
+    # Iow, safer version of el.tag
     if el is None:
         return None
     return el.tag
@@ -251,27 +277,64 @@ def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
     return sorted(el, key=lambda x: (x.get("bs-line-number", ""), textContent(x)))
 
 
-def parseHTML(text: str) -> list[t.ElementT]:
-    doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
-    head = doc.getroot()[0]
-    body = doc.getroot()[1]
-    if len(body) > 0 or body.text is not None:
-        # Body contains something, so return that.
-        contents = [body.text] if body.text is not None else []
-        contents.extend(childElements(body))
-        return contents
-    elif len(head) > 0 or head.text is not None:
-        # Okay, anything in the head?
-        contents = [head.text] if head.text is not None else []
-        contents.extend(childElements(head))
-        return contents
-    else:
-        return []
+def parseHTML(text: str) -> list[t.ElementT | str]:
+    container = lxml.html.fragment_fromstring(text, create_parent="div")
+    return list(childNodes(container, clear=True))
 
 
-def parseDocument(text: str) -> t.DocumentT:
-    doc = html5lib.parse(text, treebuilder="lxml", namespaceHTMLElements=False)
-    return t.cast("t.DocumentT", doc)
+def parseElements(text: str) -> list[t.ElementT]:
+    container = lxml.html.fragment_fromstring(text, create_parent="div")
+    return [x for x in childNodes(container, clear=True) if isElement(x)]
+
+
+def parseInto(container: t.ElementT, text: str, allowEmpty: bool = False) -> t.ElementT:
+    appendChild(container, *parseHTML(text), allowEmpty=allowEmpty)
+    return container
+
+
+def parseDocument(
+    text: str,
+    structuralNodes: list[StartTag] | None = None,
+) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
+    # Parse an html string into a complete document, using lxml's parser.
+    # The lxml parser is unreliable, so I have to ensure I get a <head> and <body>.
+    # Then, since the lxml parser doesn't merge html/head/body elements together
+    # like HTML5 requires, do that manually with the extracted tags from the
+    # document parse.
+    htmlEl = lxml.html.document_fromstring(text)
+    assert htmlEl.tag == "html", "parseDocument() always produces an <html> element"
+    headEl: t.ElementT | None = None
+    bodyEl: t.ElementT | None = None
+    for child in htmlEl:
+        if child.tag == "head":
+            if headEl is not None:
+                die("Your boilerplate contains multiple <head> elements.", el=child)
+            headEl = child
+        elif child.tag == "body":
+            if bodyEl is not None:
+                die("Your boilerplate contains multiple <body> elements.", el=child)
+            bodyEl = child
+    if headEl is None:
+        headEl = E.head()
+        prependChild(htmlEl, headEl)
+    if bodyEl is None:
+        bodyEl = E.body()
+        appendChild(htmlEl, bodyEl)
+    assert len(htmlEl) == 2, "parseDocument() always produces one <head> and one <body> element"
+    if structuralNodes:
+        for startTag in structuralNodes:
+            if startTag.tag == "html":
+                el = htmlEl
+            elif startTag.tag == "head":
+                el = headEl
+            else:
+                el = bodyEl
+            for key, val in startTag.attrs.items():
+                if key == "class" and hasAttr(el, "class"):
+                    el.set("class", el.get("class", "") + " " + val)
+                else:
+                    el.set(key, val)
+    return htmlEl, headEl, bodyEl
 
 
 def escapeHTML(text: str) -> str:
@@ -418,6 +481,9 @@ def removeNode(node: t.ElementT) -> t.ElementT:
 
 
 def replaceNode(node: t.ElementT, *replacements: t.NodesT) -> t.NodesT | None:
+    if len(replacements) == 1 and node == replacements[0]:
+        # Sometimes we replace a node.... with itself
+        return node
     insertBefore(node, *replacements)
     removeNode(node)
     if replacements:
@@ -514,7 +580,7 @@ def collectLinksWithSectionNames(
             if hasClass(doc, child, "no-ref"):
                 name = None
             else:
-                name = textContent(child)
+                name = re.sub(r"\s+", " ", textContent(child).strip())
         collectLinksWithSectionNames(doc, child, links, name)
     return links
 
@@ -781,16 +847,16 @@ def removeClass(el: t.ElementT, cls: str) -> t.ElementT:
     return el
 
 
-def isElement(node: t.Any) -> t.TypeGuard[t.ElementT]:
+def isElement(node: t.Any) -> t.TypeIs[t.ElementT]:
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, str)
 
 
-def isNode(node: t.Any) -> t.TypeGuard[t.NodeT]:
+def isNode(node: t.Any) -> t.TypeIs[t.NodeT]:
     return isElement(node) or isinstance(node, str)
 
 
-def isNodes(nodes: t.Any) -> t.TypeGuard[t.NodesT]:
+def isNodes(nodes: t.Any) -> t.TypeIs[t.NodesT]:
     if isNode(nodes):
         return True
     if not isinstance(nodes, list):
@@ -802,7 +868,7 @@ def isOddNode(node: t.Any) -> bool:
     # Something other than an element node or string.
     if isinstance(node, str):
         return False
-    if isElement(node):  # noqa: SIM103
+    if isElement(node):
         return False
     return True
 
@@ -1032,6 +1098,21 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
     if setIntermediate:
         el.set("bs-line-number", approx)
     return approx
+
+
+def parseLineNumber(el: t.ElementT) -> int | None:
+    # Gets a line number, if possible, from an element,
+    # removing the column and context cruft.
+    attr = el.get("bs-line-number")
+    if not attr:
+        return None
+    try:
+        return int(attr)
+    except ValueError:
+        try:
+            return int(attr.partition(":")[0])
+        except ValueError:
+            return None
 
 
 def circledDigits(num: int) -> str:

@@ -46,10 +46,11 @@ def fixManualDefTables(doc: t.SpecT) -> None:
             type = "descriptor"
         elif h.hasClass(doc, table, "elementdef"):
             type = "element"
-        cell = h.findAll("tr:first-child > :nth-child(2)", table)[0]
-        names = [x.strip() for x in h.textContent(cell).split(",")]
-        newContents = config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", ")
-        h.replaceContents(cell, newContents)
+        cell = h.find("tr:first-child > :nth-child(2)", table)
+        if cell is not None:
+            names = [x.strip() for x in h.textContent(cell).split(",")]
+            newContents = config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", ")
+            h.replaceContents(cell, newContents)
 
 
 def canonicalizeShortcuts(el: t.ElementT) -> None:
@@ -856,7 +857,7 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
 
     # Put an ID on every reference, so I can link to references to a term.
     if el.get("id") is None:
-        unused1, unused2, id = ref.url.partition("#")  # pylint: disable=unused-variable
+        _, _, id = ref.url.partition("#")
         if id:
             el.set("id", f"ref-for-{id}")
         else:
@@ -921,14 +922,24 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
             remoteIssueURL = f"https://github.com/{org}/{repo}/issues/{num}"
             if doc.md.inlineGithubIssues:
                 el.set("data-inline-github", f"{org} {repo} {num}")
-        elif numberMatch and isinstance(doc.md.repository, repository.GithubRepository):
-            remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
-            num = numberMatch.group(1)
-            text = f"[Issue #{num}]"
-            if doc.md.inlineGithubIssues:
-                org = doc.md.repository.user
-                repo = doc.md.repository.repo
-                el.set("data-inline-github", f"{org} {repo} {num}")
+        elif numberMatch:
+            if isinstance(doc.md.repository, repository.GithubRepository):
+                remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
+                num = numberMatch.group(1)
+                text = f"[Issue #{num}]"
+                if doc.md.inlineGithubIssues:
+                    org = doc.md.repository.user
+                    repo = doc.md.repository.repo
+                    el.set("data-inline-github", f"{org} {repo} {num}")
+            elif doc.md.issueTrackerTemplate:
+                text = f"[Issue {remoteIssueID}]"
+                remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
+            else:
+                m.die(
+                    "Saw numeric issue markup, but can't find either a GitHub repo or manual Issue Tracker Template to format it.",
+                    el=el,
+                )
+                continue
         elif doc.md.issueTrackerTemplate:
             text = f"[Issue {remoteIssueID}]"
             remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
@@ -1455,7 +1466,7 @@ def addNoteHeaders(doc: t.SpecT) -> None:
             preText = ""
         lineNum = lineNumberFromBsLineNumber(el.get("bs-line-number"))
         parseConfig = h.ParseConfig.fromSpec(doc=doc, context="heading='' attribute")
-        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum))
+        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum, context=el))
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
         h.removeAttr(el, "heading")
 

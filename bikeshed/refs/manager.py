@@ -134,8 +134,9 @@ class ReferenceManager:
 
         initFors()
         if doc and doc.inputSource and doc.inputSource.hasDirectory():
-            ldLines = self.dataFile.fetch("link-defaults.infotree").read().split("\n")
-            datablocks.transformInfo(lines=ldLines, doc=doc, firstLine=ldLines[0], tagName="pre", lineNum=None)
+            ldData = self.dataFile.fetch("link-defaults.infotree").read()
+            dummyEl = h.E.pre()
+            datablocks.transformInfo(ldData, dummyEl, doc=doc)
 
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
@@ -152,14 +153,8 @@ class ReferenceManager:
                     anchorFile = doc.inputSource.relative("anchors.bsdata")
                     if not anchorFile:
                         raise OSError
-                    anchorLines = anchorFile.read().rawLines
-                    datablocks.transformAnchors(
-                        lines=anchorLines,
-                        doc=doc,
-                        firstLine=anchorLines[0],
-                        tagName="pre",
-                        lineNum=None,
-                    )
+                    anchorData = anchorFile.read().content
+                    datablocks.transformAnchors(anchorData, dummyEl, doc=doc)
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -178,14 +173,8 @@ class ReferenceManager:
                     ldFile = doc.inputSource.relative("link-defaults.infotree")
                     if not ldFile:
                         raise OSError
-                    ldLines = ldFile.read().rawLines
-                    datablocks.transformInfo(
-                        lines=ldLines,
-                        doc=doc,
-                        firstLine=ldLines[0],
-                        tagName="pre",
-                        lineNum=None,
-                    )
+                    ldData = ldFile.read().content
+                    datablocks.transformInfo(ldData, dummyEl, doc=doc)
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 
@@ -685,7 +674,7 @@ class ReferenceManager:
         depth: int = 0,
     ) -> biblio.BiblioEntry | None:
         if depth > 100:
-            m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].")
+            m.die(f"Data error in biblio files; infinitely recursing trying to find [{text}].", el=el)
             return None
         key = text.lower()
         if status is None:
@@ -723,6 +712,7 @@ class ReferenceManager:
                 numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
                 m.die(
                     f"A biblio link references {text}, but only {config.englishFromList(numericSuffixes)} exists in SpecRef.",
+                    el=el,
                 )
             return None
 
@@ -735,7 +725,7 @@ class ReferenceManager:
             newBib = self.getBiblioRef(bib.aliasOf, status=status, el=el, quiet=True, depth=depth + 1)
             if newBib is None:
                 if not quiet:
-                    m.die(f"Biblio ref [{text}] claims to be an alias of [{bib.aliasOf}], which doesn't exist.")
+                    m.die(f"Biblio ref [{text}] claims to be an alias of [{bib.aliasOf}], which doesn't exist.", el=el)
                 return None
             else:
                 bib = newBib
@@ -755,11 +745,13 @@ class ReferenceManager:
                     if not quiet:
                         m.die(
                             f"[{bib.linkText}] claims to be obsoleted by [{bib.obsoletedBy}], which doesn't exist. Either change the reference, of use [{bib.linkText} obsolete] to ignore the obsoletion chain.",
+                            el=el,
                         )
                     return None
                 if not quiet:
                     m.linkerror(
                         f"Obsolete biblio ref: [{bib.linkText}] is replaced by [{newBib.linkText}]. Either update the reference, or use [{bib.linkText} obsolete] if this is an intentionally-obsolete reference.",
+                        el=el,
                     )
                 bib = newBib
 

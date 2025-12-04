@@ -54,6 +54,7 @@ class Spec:
         self,
         inputFilename: str,
         debug: bool = False,
+        debugPrint: str | None = None,
         token: str | None = None,
         lineNumbers: bool = False,
         fileRequester: retrieve.DataFileRequester | None = None,
@@ -75,6 +76,7 @@ class Spec:
         self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
         self.transitiveDependencies: set[InputSource.InputSource] = set()
         self.debug: bool = debug
+        self.debugPrint: str | None = debugPrint
         self.token: str | None = token
         self.testing: bool = testing
         self.dataFile: retrieve.DataFileRequester
@@ -143,7 +145,7 @@ class Spec:
         #       I should do something about that
         # TODO: Pure textual hack, no way to, say, put a block
         #       in a markdown code span or an <xmp> to show off.
-        _, self.mdDocument = metadata.parse(lines=inputContent.lines)
+        self.lines, self.mdDocument = metadata.parse(lines=inputContent.lines)
 
         # Combine the data so far, and compute the doctype
         # (the other md sources need the doctype in order to be found)
@@ -189,7 +191,7 @@ class Spec:
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
         text = FIXMEreplaceMarkdownBlockquotes(inputContent.content)
         nodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
-        if self.debug:
+        if self.debugPrint == "early-parse":
             h.debugNodes(nodes)
         text = h.strFromNodes(nodes, withIlcc=True)
         inputContent.rawLines = [x + "\n" for x in text.split("\n")]
@@ -210,47 +212,39 @@ class Spec:
     def assembleDocument(self) -> Spec:
         self.initMetadata(self.inputContent)
         self.recordDependencies(self.inputSource)
+
+        if "mixed-indents" in self.md.complainAbout:
+            if self.md.indentInfo and self.md.indentInfo.char:
+                checkForMixedIndents(self.inputContent.lines, self.md.indentInfo)
+
         self.lines = self.earlyParse(self.inputContent)
 
-        # Remove the metadata
-        # FIXME: This should be done the first time I parse metadata.
-        self.lines, _ = metadata.parse(lines=self.lines)
         extensions.load(self)
 
         # Initialize things
         self.refs.initializeRefs(doc=self, datablocks=datablocks)
         self.refs.initializeBiblio(doc=self)
 
-        if "mixed-indents" in self.md.complainAbout:
-            if self.md.indentInfo and self.md.indentInfo.char:
-                checkForMixedIndents(self.lines, self.md.indentInfo)
-
-        # Deal with further <pre> blocks, and markdown
-        self.lines = datablocks.transformDataBlocks(self, self.lines)
-
-        markdownFeatures: set[str] = {"headings"}
-        self.lines = markdown.parse(
-            self.lines,
-            self.md.indent,
-            opaqueElements=self.md.opaqueElements,
-            blockElements=self.md.blockElements,
-            features=markdownFeatures,
-        )
-
-        self.refs.setSpecData(self)
+        # Deal with markdown
+        if self.debugPrint == "pre-md":
+            print("".join(x.text for x in self.lines))  # noqa: T201
+        if "markdown-block" in self.md.markupShorthands:
+            self.lines = markdown.parse(self.lines, markdown.MarkdownConfig.fromSpec(self))
+        if self.debugPrint == "post-md":
+            print("".join(x.text for x in self.lines))  # noqa: T201
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
         boilerplate.addHeaderFooter(self)
 
         # Build the document
-        self.document = h.parseDocument(self.html)
-        headEl = h.find("head", self)
-        bodyEl = h.find("body", self)
-        assert headEl is not None
-        assert bodyEl is not None
-        self.head = headEl
-        self.body = bodyEl
+        self.document, self.head, self.body = h.parseDocument(self.html)
+        if self.debugPrint == "boilerplate":
+            print(h.printNodeTree(self.document))  # noqa: T201
+        datablocks.transformDataBlocks(self, self.document)
+        if self.debugPrint == "datablocks":
+            print(h.printNodeTree(self.document))  # noqa: T201
+        self.refs.setSpecData(self)
         u.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
@@ -335,6 +329,9 @@ class Spec:
         lint.requiredIDs(self)
         lint.unusedInternalDfns(self)
 
+        if self.debugPrint == "final":
+            print(h.printNodeTree(self.document))  # noqa: T201
+
         # Any final HTML cleanups
         u.cleanupHTML(self)
         if self.md.prepTR:
@@ -417,6 +414,10 @@ class Spec:
             return
 
     def watch(self, outputFilename: str | None, port: int | None = None, localhost: bool = False) -> None:
+        if m.wrappedOutput():
+            m.die(f"Watch mode only supports console output; you've set --print={m.state.printMode}")
+            return
+
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource.mtime() is None:
             m.die(f"Watch mode doesn't support {self.inputSource}")
@@ -459,7 +460,7 @@ class Spec:
                     # somehow gets older.
                     if any(input.mtime() != lastModified for input, lastModified in lastInputModified.items()):
                         m.state = m.state.replace()
-                        m.p("\nSource file modified. Rebuilding...")
+                        m.say("Source file modified. Rebuilding...")
                         self.initializeState()
                         self.mdCommandLine = mdCommandLine
                         self.preprocess()
@@ -468,28 +469,33 @@ class Spec:
                         printDone()
                     time.sleep(1)
             except KeyboardInterrupt:
-                m.p("Exiting~")
+                m.say("Exiting~")
                 if server:
                     server.shutdown()
                     thread.join()
+                m.printCloser()
                 sys.exit(0)
         except Exception as e:
             m.die(f"Something went wrong while watching the file:\n{e}")
 
     def printTargets(self) -> None:
-        m.p("Exported terms:")
+        exportMsg = "Exported terms:\n"
         for el in h.findAll("[data-export]", self):
             for term in h.linkTextsFromElement(el):
-                m.p("  " + term)
-        m.p("Unexported terms:")
+                exportMsg += "  " + term + "\n"
+        m.say(exportMsg)
+        unexportMsg = "Unexported terms:\n"
         for el in h.findAll("[data-noexport]", self):
             for term in h.linkTextsFromElement(el):
-                m.p("  " + term)
+                unexportMsg += "  " + term + "\n"
+        m.say(unexportMsg)
 
     def isOpaqueElement(self, el: t.ElementT) -> bool:
+        if el.tag in ("pre", "xmp", "script", "style"):
+            return True
         if el.tag in self.md.opaqueElements:
             return True
-        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:  # noqa: SIM103
+        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:
             return True
         return False
 
@@ -576,7 +582,15 @@ def addDomintroStyles(doc: Spec) -> None:
 
 def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -> None:
     badIndentChar = " " if info.char == "\t" else "\t"
+    inComment = False
     for line in lines:
+        if not inComment and line.text.startswith("<!--"):
+            inComment = True
+        if inComment and "-->" in line.text:
+            inComment = False
+            continue
+        if inComment:
+            continue
         if not line.text:
             continue
         if line.text.startswith(badIndentChar):

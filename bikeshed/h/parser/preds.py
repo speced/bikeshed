@@ -248,17 +248,23 @@ def isTagnameChar(ch: str) -> bool:
         return True
     if 0xFDF0 <= cp <= 0xFFFD:
         return True
-    if 0x10000 <= cp <= 0xEFFFF:  # noqa: SIM103
+    if 0x10000 <= cp <= 0xEFFFF:
         return True
     return False
 
 
 def isAttrNameChar(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    if isWhitespace(ch) or ch in "/<>=\"'" or ord(ch) == 0:  # noqa: SIM103
-        return False
-    return True
+    # Technically, HTML is super forgiving of attr name chars, for some reason.
+    # But since I eventually pass this into LXML, I need to abide by XML name rules,
+    # where attr names follow the same rules as tag names.
+    # For example, <foo \=val> is valid in HTML, but not in XML.
+    return isTagnameChar(ch) or ch == ":"
+    # This is the real requirements for HTML attr names:
+    # if len(ch) != 1:
+    #     return False
+    # if isWhitespace(ch) or ch in "/<>=\"'" or ord(ch) == 0:
+    #     return False
+    # return True
 
 
 def isASCII(ch: str) -> bool:
