@@ -19,7 +19,7 @@ def verify_python_version() -> None:
         )
         sys.exit(1)
 
-    if sys.version_info < (3, 9):
+    if sys.version_info < (3, 12):
         print(
             """Bikeshed now requires Python 3.9 or higher; you are on {}.
     For instructions on how to set up a pyenv with 3.9, see:
