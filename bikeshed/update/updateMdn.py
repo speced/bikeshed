@@ -43,7 +43,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
                     fileContents = requests.get(mdnSpecLinksBaseURL + specFilename, timeout=5).text
                 except Exception as e:
                     m.die(
-                        f"Couldn't download the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}"
+                        f"Couldn't download the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}",
                     )
                     del data[specUrl]
                     continue
@@ -51,7 +51,7 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
                     json.loads(fileContents)
                 except Exception as e:
                     m.die(
-                        f"Couldn't JSON-parse the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}"
+                        f"Couldn't JSON-parse the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}",
                     )
                     del data[specUrl]
                     continue
