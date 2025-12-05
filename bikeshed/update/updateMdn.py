@@ -37,19 +37,22 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
             #     ...
             # }
             for specUrl, specFilename in list(data.items()):
-                print(f"Fetching {specFilename}")
                 p = os.path.join(mdnSpecLinksDir, specFilename)
                 mdnSpecLinksBaseURL = "https://w3c.github.io/mdn-spec-links/"
                 try:
                     fileContents = requests.get(mdnSpecLinksBaseURL + specFilename, timeout=5).text
                 except Exception as e:
-                    m.die(f"Couldn't download the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}")
+                    m.die(
+                        f"Couldn't download the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}"
+                    )
                     del data[specUrl]
                     continue
                 try:
-                    specData = json.loads(fileContents)
+                    json.loads(fileContents)
                 except Exception as e:
-                    m.die(f"Couldn't JSON-parse the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}")
+                    m.die(
+                        f"Couldn't JSON-parse the MDN Spec Links {specFilename} file at {mdnSpecLinksBaseURL + specFilename}.\n{e}"
+                    )
                     del data[specUrl]
                     continue
                 with open(p, "w", encoding="utf-8") as fh:
