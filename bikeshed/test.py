@@ -15,15 +15,17 @@ from .Spec import Spec
 
 def _getTestTitle() -> str:
     try:
-        from .h.parser import preds_wrapper
+        from .h.parser import preds_wrapper  # noqa: PLC0415
+
         # Check if we're using the Rust implementation
-        if hasattr(preds_wrapper, 'isASCII'):
-            module = getattr(preds_wrapper.isASCII, '__module__', '')
-            if 'bikeshed_rust' in module:
+        if hasattr(preds_wrapper, "isASCII"):
+            module = getattr(preds_wrapper.isASCII, "__module__", "")
+            if "bikeshed_rust" in module:
                 return "Running tests [R]"
     except Exception:
         pass
     return "Running tests"
+
 
 if t.TYPE_CHECKING:
     import argparse

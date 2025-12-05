@@ -7,6 +7,7 @@ _USE_RUST = os.environ.get("BIKESHED_USE_RUST", "").lower() in ("1", "true")
 if _USE_RUST:
     try:
         import bikeshed_rust
+
         from . import preds as _preds
 
         isASCII = bikeshed_rust.is_ascii
@@ -65,7 +66,6 @@ else:
 
 __all__ = [
     "charRefs",
-    "xmlishTagnames",
     "isASCII",
     "isASCIIAlpha",
     "isASCIIAlphanum",
@@ -79,4 +79,5 @@ __all__ = [
     "isTagnameChar",
     "isWhitespace",
     "isXMLishTagname",
+    "xmlishTagnames",
 ]
