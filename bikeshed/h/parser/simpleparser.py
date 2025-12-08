@@ -265,7 +265,11 @@ class SimpleStream:
         self.autoCloseStart(tagName)
         if tagName == "tr" and self._tagStack and self._tagStack[-1] == "table":
             self.startTag("tbody", {})
-        self._handler.startElement(tagName, attrs)
+        try:
+            self._handler.startElement(tagName, attrs)
+        except ValueError:
+            self._handler.startElement(tagName)
+            m.die(f"PROGRAMMING ERROR: A <{tagName}> start tag ended up with invalid attributes. Please report this!\n  (Element was still added to the tree, but without attributes.)\n  {attrs!r}", lineNum=attrs.get("bs-line-number"))
         self.pushEl(tagName)
 
     def endTag(self, tagName: str) -> None:
