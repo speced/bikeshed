@@ -6,8 +6,8 @@ from abc import ABCMeta, abstractmethod
 from collections import Counter
 from dataclasses import InitVar, dataclass, field
 
+from ... import constants, t
 from ... import messages as m
-from ... import t
 
 if t.TYPE_CHECKING:
     from .stream import Stream  # pylint: disable=cyclic-import
@@ -19,16 +19,27 @@ ParserNodeT: t.TypeAlias = (
 
 def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
     s = f"<{tagName}"
+    lineBreakAttrs = []
+    for k, v in sortAttrs(attrs):
+        if "\n" in v:
+            lineBreakAttrs.append(k)
+            v = v.replace("\n", constants.virtualLineBreak)
+        s += f' {k}="{v}"'
+    if lineBreakAttrs:
+        s += f' bs-line-break-attrs="{" ".join(lineBreakAttrs)}"'
+    s += ">"
+    return s
+
+
+def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
     if "bs-line-number" in attrs:
-        s += f' bs-line-number="{attrs["bs-line-number"]}"'
+        yield "bs-line-number", attrs["bs-line-number"]
     for k, v in sorted(attrs.items()):
         if k in ("bs-line-number", "class"):
             continue
-        s += f' {k}="{v}"'
+        yield k, v
     if "class" in attrs:
-        s += f' class="{attrs["class"]}"'
-    s += ">"
-    return s
+        yield "class", attrs["class"]
 
 
 def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:

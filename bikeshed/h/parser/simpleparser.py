@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import lxml.sax
 
+from ... import constants, t
 from ... import messages as m
-from ... import t
 
 # This module is an *incredibly simple* HTML parser,
 # whose sole purpose is to parse HTML that's already been Bikeshed-parsed
@@ -135,7 +135,15 @@ def parseAttributeList(s: SimpleStream, start: int) -> tuple[dict[str, str], int
             break
         attrName, attrValue, i = parseAttribute(s, i)
         attrs[attrName] = attrValue
+    undoLineBreakSmuggling(attrs)
     return attrs, i
+
+
+def undoLineBreakSmuggling(attrs: dict[str, str]) -> None:
+    if "bs-line-break-attrs" not in attrs:
+        return
+    for attrName in attrs["bs-line-break-attrs"].split(" "):
+        attrs[attrName] = attrs[attrName].replace(constants.virtualLineBreak, "\n")
 
 
 def parseAttribute(s: SimpleStream, start: int) -> tuple[str, str, int]:
@@ -269,7 +277,10 @@ class SimpleStream:
             self._handler.startElement(tagName, attrs)
         except ValueError:
             self._handler.startElement(tagName)
-            m.die(f"PROGRAMMING ERROR: A <{tagName}> start tag ended up with invalid attributes. Please report this!\n  (Element was still added to the tree, but without attributes.)\n  {attrs!r}", lineNum=attrs.get("bs-line-number"))
+            m.die(
+                f"PROGRAMMING ERROR: A <{tagName}> start tag ended up with invalid attributes. Please report this!\n  (Element was still added to the tree, but without attributes.)\n  {attrs!r}",
+                lineNum=attrs.get("bs-line-number"),
+            )
         self.pushEl(tagName)
 
     def endTag(self, tagName: str) -> None:
