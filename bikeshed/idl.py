@@ -16,19 +16,9 @@ class IDLUI:
 
     @staticmethod
     def fromEl(el: t.ElementT) -> IDLUI:
-        lineNum = el.get("bs-line-number", None)
-        try:
-            if lineNum is None:
-                num = None
-            elif ":" in lineNum:
-                lineNum, _, _ = lineNum.partition(":")
-                num = int(lineNum)
-            else:
-                num = int(lineNum)
-        except ValueError:
-            lineNum = None
+        lineNum = h.parseLineNumber(el)
         context = el.get("bs-parse-context", None)
-        return IDLUI(lineStart=num, parseContext=context)
+        return IDLUI(lineStart=lineNum, parseContext=context)
 
     def formatLineNum(self, localNum: int) -> str:
         ret = str((self.lineStart or 0) + localNum)
@@ -72,38 +62,38 @@ class DebugMarker(widlparser.protocols.Marker):
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
         return (
-            "<construct-" + construct.idl_type + ">",
-            "</construct-" + construct.idl_type + ">",
+            startTag("construct-" + construct.idl_type),
+            endTag("construct-" + construct.idl_type),
         )
 
     def markup_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
-            '<TYPE for="' + construct.idl_type + '" idlType="' + text + '">',
-            "</TYPE>",
+            startTag("TYPE", {"for": construct.idl_type, "idlType": text}),
+            endTag("TYPE"),
         )
 
     def markup_primitive_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
-            '<PRIMITIVE for="' + construct.idl_type + '" idlType="' + text + '">',
-            "</PRIMITIVE>",
+            startTag("PRIMITIVE", {"for": construct.idl_type, "idlType": text}),
+            endTag("PRIMITIVE"),
         )
 
     def markup_buffer_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
-            '<BUFFER for="' + construct.idl_type + '" idlType="' + text + '">',
-            "</BUFFER>",
+            startTag("BUFFER", {"for": construct.idl_type, "idlType": text}),
+            endTag("BUFFER"),
         )
 
     def markup_string_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
-            '<STRING for="' + construct.idl_type + '" idlType="' + text + '">',
-            "</STRING>",
+            startTag("STRING", {"for": construct.idl_type, "idlType": text}),
+            endTag("STRING"),
         )
 
     def markup_object_type(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
-            '<OBJECT for="' + construct.idl_type + '" idlType="' + text + '">',
-            "</OBJECT>",
+            startTag("OBJECT", {"for": construct.idl_type, "idlType": text}),
+            endTag("OBJECT"),
         )
 
     def markup_type_name(
@@ -111,28 +101,40 @@ class DebugMarker(widlparser.protocols.Marker):
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ('<TYPE-NAME idlType="' + construct.idl_type + '">', "</TYPE-NAME>")
+        return (
+            startTag("TYPE-NAME", {"idlType": construct.idl_type}),
+            endTag("TYPE-NAME"),
+        )
 
     def markup_name(
         self,
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ('<NAME idlType="' + construct.idl_type + '">', "</NAME>")
+        return (
+            startTag("NAME", {"idlType": construct.idl_type}),
+            endTag("NAME"),
+        )
 
     def markup_keyword(
         self,
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ('<KEYWORD idlType="' + construct.idl_type + '">', "</KEYWORD>")
+        return (
+            startTag("KEYWORD", {"idlType": construct.idl_type}),
+            endTag("KEYWORD"),
+        )
 
     def markup_enum_value(
         self,
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ('<ENUM-VALUE for="' + t.cast(str, construct.name) + '">', "</ENUM-VALUE>")
+        return (
+            startTag("ENUM-VALUE", {"for": construct.idl_type}),
+            endTag("ENUM-VALUE"),
+        )
 
     def encode(self, text: str) -> str:
         return h.escapeHTML(text)
@@ -164,28 +166,28 @@ class IDLMarker(widlparser.protocols.Marker):
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ("<a data-link-type=interface>", "</a>")
+        return (startTag("a", {"data-link-type": "interface"}), endTag("a"))
 
     def markup_string_type(
         self,
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ("<a data-link-type=interface>", "</a>")
+        return (startTag("a", {"data-link-type": "interface"}), endTag("a"))
 
     def markup_buffer_type(
         self,
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ("<a data-link-type=interface>", "</a>")
+        return (startTag("a", {"data-link-type": "interface"}), endTag("a"))
 
     def markup_object_type(
         self,
         text: str,
         construct: widlparser.Construct,
     ) -> MarkupReturnT:  # pylint: disable=unused-argument
-        return ("<a data-link-type=interface>", "</a>")
+        return (startTag("a", {"data-link-type": "interface"}), endTag("a"))
 
     def markup_type_name(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         # Fires for non-defining type names, such as arg types.
@@ -209,27 +211,29 @@ class IDLMarker(widlparser.protocols.Marker):
             typeName = str(memberType).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
-            return (
-                f'<a data-link-type=attribute data-link-for="{typeName}">',
-                "</a>",
-            )
+            return (startTag("a", {"data-link-type": "attribute", "data-link-for": typeName}), endTag("a"))
 
         # LegacyWindowAlias defines additional names for the construct,
         # so all the names should be forced <dfn>s, just like the interface name itself.
         if construct.idl_type == "extended-attribute" and construct.name == "LegacyWindowAlias":
-            return (
-                f'<idl data-idl-type=interface data-lt="{text}">',
-                "</idl>",
-            )
+            return (startTag("idl", {"data-idl-type": "interface", "data-lt": text}), endTag("idl"))
 
+        # The constructor name in [LegacyFactoryFunction], needs to actually be marked up
+        # as the definition of the function.
         if construct.idl_type == "constructor":
             interfaceName = construct.parent.name
-            methodName = construct.name
+            assert interfaceName is not None
+            methodName = construct.normal_name
+            assert methodName is not None
             return (
-                f"<idl data-idl-type=constructor data-idl-for='{interfaceName}' data-lt='{methodName}()'>",
-                "</idl>",
+                startTag(
+                    "idl",
+                    {"data-idl-type": "constructor", "data-idl-for": interfaceName, "data-lt": methodName},
+                ),
+                endTag("idl"),
             )
-        return ('<a data-link-type="idl-name">', "</a>")
+
+        return (startTag("a", {"data-link-type": "idl-name"}), endTag("a"))
 
     def markup_keyword(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         # Fires on the various "keywords" of WebIDL -
@@ -237,18 +241,27 @@ class IDLMarker(widlparser.protocols.Marker):
         # rather than names exposed to JS.
         # Examples: "interface", "stringifier", the IDL-defined type names like "DOMString" and "long".
         if text == "stringifier":
+            parentName = construct.parent.full_name
+            assert parentName is not None
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
                 return (
-                    "<a dfn for='{}' data-lt='stringification behavior'>".format(construct.parent.full_name),
-                    "</a>",
+                    startTag("a", {"data-link-type": "dfn", "for": parentName, "data-lt": "stringification behavior"}),
+                    endTag("a"),
                 )
             # Otherwise, you *can* point to/dfn stringification behavior if you want.
             return (
-                "<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(
-                    construct.parent.full_name,
+                startTag(
+                    "idl",
+                    {
+                        "data-export": "",
+                        "data-idl-type": "dfn",
+                        "data-idl-for": parentName,
+                        "data-lt": "stringification behavior",
+                        "id": f"{parentName}-stringification-behavior",
+                    },
                 ),
-                "</idl>",
+                endTag("idl"),
             )
         # The remaining built-in types that aren't covered by a more specific function.
         builtinTypes = {
@@ -261,8 +274,8 @@ class IDLMarker(widlparser.protocols.Marker):
         }
         if text in builtinTypes:
             return (
-                f'<a data-link-spec=webidl data-link-type="{builtinTypes[text]}">',
-                "</a>",
+                startTag("a", {"data-link-spec": "webidl", "data-link-type": builtinTypes[text]}),
+                endTag("a"),
             )
         return (None, None)
 
@@ -284,20 +297,24 @@ class IDLMarker(widlparser.protocols.Marker):
                 )
                 return (None, None)
             # Otherwise it's [LegacyNamedConstructor], which is allowed
-            return ("<a data-link-type=extended-attribute data-link-for>", "</a>")
+            return (startTag("a", {"data-link-type": "extended-attribute", "data-link-for": ""}), endTag("a"))
 
         if idlType == "argument" and construct.parent.idl_type == "constructor":
             # Don't mark up the arguments to [Constructor] either
             return (None, None)
 
+        attrs: dict[str, str] = {}
+        refType = "idl"
+
         idlTitle = construct.normal_name
         if idlType == "method" and idlTitle and idlTitle.startswith("constructor("):
             idlType = "constructor"
-
-        extraParameters = ""
-        refType = "idl"
         if idlType in config.functionishTypes:
             idlTitle = "|".join(self.methodLinkingTexts(construct))  # type: ignore
+        assert idlTitle is not None
+
+        if idlType in config.functionishTypes:
+            pass
         elif idlType == "extended-attribute":
             refType = "link"
         elif idlType == "attribute":
@@ -310,20 +327,18 @@ class IDLMarker(widlparser.protocols.Marker):
                 m.die(f"Can't figure out how to construct attribute-info from:\n  {construct}")
                 return (None, None)
             if rest.readonly is not None:
-                readonly = "data-readonly"
-            else:
-                readonly = ""
-            extraParameters = '{} data-type="{}"'.format(readonly, str(rest.type.type) + str(rest.type.suffix or ""))
+                attrs["data-readonly"] = ""
+            attrs["data-type"] = str(rest.type.type) + str(rest.type.suffix or "")
         elif idlType == "dict-member":
             assert isinstance(construct, widlparser.DictionaryMember)
-            extraParameters = 'data-type="{}"'.format(str(construct.type.type) + str(construct.type.suffix or ""))
+            attrs["data-type"] = str(construct.type.type) + str(construct.type.suffix or "")
             if construct.default is not None:
                 value = str(construct.default).split("=", 1)[1].strip()
                 if value.startswith("["):
                     value = "[]"
                 elif value.startswith("}"):
                     value = "{}"
-                extraParameters += ' data-default="{}"'.format(h.escapeAttr(value))
+                attrs["data-default"] = value
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:  # type: ignore
                 refType = "link"
@@ -337,30 +352,23 @@ class IDLMarker(widlparser.protocols.Marker):
             if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
                 methodNames = [f"{interfaceName}/{m}" for m in self.methodLinkingTexts(construct.parent)]  # type: ignore
-                idlFor = "data-idl-for='{}'".format(", ".join(methodNames))
+                attrs["data-idl-for"] = ", ".join(methodNames)
             else:
-                idlFor = f"data-idl-for='{construct.parent.full_name}'"
-        else:
-            idlFor = ""
-        return (
-            '<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(
-                idlTitle,
-                idlType,
-                idlFor,
-                extraParameters,
-                name=elementName,
-                refType=refType,
-            ),
-            f"</{elementName}>",
-        )
+                parentName = construct.parent.full_name
+                assert parentName is not None
+                attrs["data-idl-for"] = parentName
+
+        attrs["data-lt"] = idlTitle
+        attrs[f"data-{refType}-type"] = idlType
+        return (startTag(elementName, attrs), endTag(elementName))
 
     def markup_enum_value(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
-            "<idl data-idl-type=enum-value data-idl-for='{}' data-lt='{}'>".format(
-                h.escapeAttr(t.cast(str, construct.name)),
-                h.escapeAttr(text),
+            startTag(
+                "idl",
+                {"data-idl-type": "enum-value", "data-idl-for": t.cast(str, construct.name), "data-lt": text},
             ),
-            "</idl>",
+            endTag("idl"),
         )
 
     def encode(self, text: str) -> str:
@@ -417,12 +425,14 @@ def markupIDL(doc: t.SpecT) -> None:
     # and collect it for the index.
     for el in idlEls:
         if h.isNormative(doc, el):
+            lineNum = getContentStartingLineNum(el) or 1
             text = h.textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             widl = widlparser.parser.Parser(text, ui=IDLUI.fromEl(el), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
-
-            h.replaceContents(el, h.parseHTML(str(widl.markup(marker)).lstrip()))
+            markedUp = str(widl.markup(marker)).lstrip()
+            parsed = list(h.parseHTML(h.safeHtml(markedUp, startLine=lineNum)))
+            h.replaceContents(el, parsed)
             # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
         h.addClass(doc, el, "highlight")
@@ -436,6 +446,27 @@ def markupIDL(doc: t.SpecT) -> None:
         return
 
 
+def getContentStartingLineNum(el: t.ElementT) -> int | None:
+    lineNum = h.parseLineNumber(el)
+    if not lineNum:
+        return None
+    lineNum += int(el.get("bs-line-number-content-adjustment", "0"))
+    if len(el) == 0:
+        return lineNum
+    for node in h.childNodes(el):
+        if isinstance(node, str):
+            if node.strip() != "":
+                return lineNum
+            else:
+                pass
+        if h.isElement(node):
+            if h.hasAttr(el, "bs-line-number-content-adjustment"):
+                lineNum += int(el.get("bs-line-number-content-adjustment", "0"))
+            else:
+                return lineNum
+    return lineNum
+
+
 def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
     localDfns = set()
     forcedInterfaces = []
@@ -446,7 +477,12 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
         forcedInterfaces.append(x)
     for el in h.findAll("idl", pre):
         idlType = el.get("data-idl-type")
-        assert isinstance(idlType, str)
+        if idlType is None:
+            m.die(
+                "PROGRAMMING ERROR: An <idl> element (auto-generated by Bikeshed) ended up without a data-idl-type attribute. Please report this!",
+                el=el,
+            )
+            continue
         forceDfn = False
         ref = None
         idlText: str
@@ -672,3 +708,16 @@ def _nodesFromProduction(prod: widlparser.productions.Production | widlparser.pr
     # Anything else, also return as plain str, but warn.
     m.warn(f"Unhandled IDL production type '{type(prod)}' in _nodesFromProduction, please report as a Bikeshed issue.")
     return str(prod)
+
+
+def startTag(tagName: str, attrs: dict[str, str] | None = None) -> str:
+    s = f"<{tagName} "
+    if attrs:
+        for k, v in attrs.items():
+            s += f' {k}="{h.escapeAttr(v)}"'
+    s += ">"
+    return s
+
+
+def endTag(tagName: str) -> str:
+    return f"</{tagName}>"

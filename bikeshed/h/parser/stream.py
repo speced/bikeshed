@@ -54,6 +54,9 @@ class ParseConfig:
         )
 
 
+DEFAULT_PARSE_CONFIG = ParseConfig()
+
+
 @dataclass
 class Stream:
     _chars: str

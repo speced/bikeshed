@@ -29,8 +29,10 @@ from .parser import (
 )
 from .simpleparser import (
     parseDocument,
+    parseFragment,
 )
 from .stream import (
+    DEFAULT_PARSE_CONFIG,
     ParseConfig,
     Stream,
 )

@@ -62,7 +62,10 @@ def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     # Removes empty initial lines, removes shared indent, and possibly re-adds a <code> wrapper.
     h.clearContents(el)
     lines = data.split("\n")
+    lineNum = h.parseLineNumber(el) or 1
+    lineNumAdjustment = 0
     while lines and lines[0].strip() == "":
+        lineNumAdjustment += 1
         lines = lines[1:]
     # Remove smallest indent, and replace tabs with 2 spaces,
     # since these will be displayed and 2 is the right size for display,
@@ -72,15 +75,19 @@ def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
         # If the parser pulled out a start/end <code> tag, put it back now.
         lines[0] = el.get("bs-code-start-tag", "") + lines[0]
         lines[-1] = lines[-1] + el.get("bs-code-end-tag", "")
-    return h.parseInto(el, "\n".join(lines))
+    norm = h.safeHtml("\n".join(lines), context=el, startLine=lineNum + lineNumAdjustment)
+    el.set("bs-line-number-content-adjustment", str(lineNumAdjustment))
+    return h.parseInto(el, norm, allowEmpty=True)
 
 
 def transformOpaque(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     # Just removes indent, nothing else.
     h.clearContents(el)
     lines = data.split("\n")
+    lineNum = h.parseLineNumber(el) or 1
     lines = removeIndent(lines, 2)
-    return h.parseInto(el, "\n".join(lines))
+    norm = h.safeHtml("\n".join(lines), context=el, startLine=lineNum)
+    return h.parseInto(el, norm, allowEmpty=True)
 
 
 def transformRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
@@ -97,7 +104,7 @@ def transformSimpleDef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | 
     tbody = h.appendChild(table, h.E.tbody())
     for key, val in rows.items():
         th = h.E.th()
-        h.parseInto(th, key)
+        h.parseInto(th, t.EarlyParsedHtmlStr(key + ":"))
         td = h.E.td()
         h.parseInto(td, val)
         h.appendChild(tbody, h.E.tr({}, th, td))
@@ -106,7 +113,7 @@ def transformSimpleDef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | 
 
 def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     parsedAttrs = parseDefBlock(data, "propdef", el, doc)
-    attrs: OrderedDict[str, str | None] = OrderedDict()
+    attrs: OrderedDict[str, t.SafeHtmlStr | None] = OrderedDict()
     # Displays entries in the order specified in attrs,
     # then if there are any unknown parsedAttrs values,
     # they're displayed afterward in the order they were specified.
@@ -151,8 +158,8 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
     attrsToPrint = canonicalizeAttrs(parsedAttrs, attrs, "propdef", el)
     for key, val in attrsToPrint:
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":")
-        td = h.parseInto(h.E.td(), val)
+        th = h.parseInto(h.E.th(), h.safeHtml(key + ":"))
+        td = h.parseInto(h.E.td(), h.safeHtml(val))
         h.appendChild(tr, th, td)
 
         if key in ("Value", "New values"):
@@ -193,6 +200,10 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
 # TODO: Make these functions match transformPropdef's new structure
 
 
+def blessList(items: list[str]) -> list[t.SafeHtmlStr]:
+    return t.cast("list[t.SafeHtmlStr]", items)  # type: ignore[redundant-cast]
+
+
 def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
     parsedAttrs = parseDefBlock(data, "descdef", el, doc)
     table = h.transferAttributes(el, h.E.table())
@@ -203,15 +214,15 @@ def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
     if "For" in parsedAttrs:
         table.set("data-dfn-for", h.escapeAttr(parsedAttrs["For"]))
     if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
-        requiredKeys = ["Name", "For"]
+        requiredKeys = blessList(["Name", "For"])
     if h.hasClass(doc, table, "mq"):
-        requiredKeys = ["Name", "For", "Value"]
+        requiredKeys = blessList(["Name", "For", "Value"])
     else:
-        requiredKeys = ["Name", "For", "Value", "Initial"]
+        requiredKeys = blessList(["Name", "For", "Value", "Initial"])
 
     for key in requiredKeys:
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":")
+        th = h.parseInto(h.E.th(), h.safeHtml(key + ":"))
         td = h.parseInto(h.E.td(), parsedAttrs.get(key, f"(no {key} specified)"))
         h.appendChild(tr, th, td)
 
@@ -228,7 +239,7 @@ def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
         if key in requiredKeys:
             continue
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":")
+        th = h.parseInto(h.E.th(), t.EarlyParsedHtmlStr(key + ":"))
         td = h.parseInto(h.E.td(), val)
         h.appendChild(tr, th, td)
 
@@ -246,7 +257,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
         attributeList = h.E.ul()
         if "Attribute groups" in parsedAttrs:
-            groups = [x.strip() for x in parsedAttrs["Attribute groups"].split(",")]
+            groups = blessList([x.strip() for x in parsedAttrs["Attribute groups"].split(",")])
             for group in groups:
                 h.appendChild(
                     attributeList,
@@ -257,7 +268,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
                 )
             del parsedAttrs["Attribute groups"]
         if "Attributes" in parsedAttrs:
-            atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
+            atts = blessList([x.strip() for x in parsedAttrs["Attributes"].split(",")])
             if "Name" in parsedAttrs:
                 dataFor = parsedAttrs.get("Name", "")
             else:
@@ -273,7 +284,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
         # Give a dummy value to signal that it was specified
         parsedAttrs["Attributes"] = ""
 
-    attrs: OrderedDict[str, str | None] = OrderedDict()
+    attrs: OrderedDict[str, t.SafeHtmlStr | None] = OrderedDict()
     attrs["Name"] = None
     attrs["Categories"] = None
     attrs["Contexts"] = None
@@ -284,7 +295,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
     attrsToPrint = canonicalizeAttrs(parsedAttrs, attrs, "elementdef", el)
     for key, val in attrsToPrint:
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":")
+        th = h.parseInto(h.E.th(), t.EarlyParsedHtmlStr(key + ":"))
         if key == "Attributes":
             if attributeList is not None:
                 td = h.E.td({}, attributeList)
@@ -368,7 +379,7 @@ def parseDefBlock(
     el: t.ElementT,
     doc: t.SpecT,
     capitalizeKeys: bool = True,
-) -> OrderedDict[str, str]:
+) -> OrderedDict[t.SafeHtmlStr, t.SafeHtmlStr]:
     # Parses a 'def block' (lines of key:val pairs)
     # Returns a dict of the (bs-parsed) key and value.
     # Concatenates values (with a newline) from lines with the same key
@@ -417,7 +428,7 @@ def parseDefBlock(
             vals[key] = (vals[key][0], vals[key][1] + "\n" + val)
         else:
             vals[key] = (lineNum, val)
-    retVals: OrderedDict[str, str] = OrderedDict()
+    retVals: OrderedDict[t.SafeHtmlStr, t.SafeHtmlStr] = OrderedDict()
     for key, (lineNum, val) in vals.items():
         keyConfig = h.ParseConfig.fromSpec(doc, "the line's key (before the colon)")
         valConfig = h.ParseConfig.fromSpec(doc, "the line's value (after the colon)")
@@ -432,7 +443,7 @@ def parseDefBlock(
                         f"'Name' key should contain just the property/descriptor name, or a comma-separated list. Found markup:\n  {val}",
                         lineNum=lineNum,
                     )
-            retVals[key] = newVal
+            retVals[key] = t.EarlyParsedHtmlStr(newVal)
         else:
             retVals[key] = h.parseText(val, valConfig, startLine=lineNum, closeElements=True, context=el)
     return retVals
@@ -451,18 +462,18 @@ def wrapCommaList(text: str, tagName: str, type: str) -> list[t.NodeT]:
 
 
 def canonicalizeAttrs(
-    parsedAttrs: OrderedDict[str, str],
-    attrs: OrderedDict[str, str | None],
+    parsedAttrs: OrderedDict[t.SafeHtmlStr, t.SafeHtmlStr],
+    attrs: OrderedDict[t.SafeHtmlStr, t.SafeHtmlStr | None],
     type: str,
     el: t.ElementT,
-) -> list[tuple[str, str]]:
+) -> list[tuple[t.SafeHtmlStr, t.SafeHtmlStr]]:
     # Processes and re-orders parsedAttrs.
     # attrs specifies the keys that are required (with a value of None)
     # and optional (with a non-None default value).
     # The order of attrs keys is also respected,
     # with any additional keys in parsedAttrs put at the end.
     # Returns a list of (key, value) tuples, in the desired order.
-    attrsToPrint = []
+    attrsToPrint: list[tuple[t.SafeHtmlStr, t.SafeHtmlStr]] = []
     for key, defaultVal in attrs.items():
         if key in parsedAttrs:
             # Key was provided
@@ -471,7 +482,10 @@ def canonicalizeAttrs(
         elif defaultVal is None:
             # Required key, not provided
             if "Name" in parsedAttrs:
-                m.die(f"The {type} block for '{parsedAttrs.get('Name')}' is missing a '{key}' line.", el=el)
+                m.die(
+                    f"The {type} block for '{parsedAttrs.get("Name")}' is missing a '{key}' line.",
+                    el=el,
+                )
             else:
                 m.die(f"The {type} block is missing a '{key}' line.", el=el)
             continue
@@ -499,7 +513,7 @@ def transformRailroad(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | N
         doc.extraJC.addRailroad()
         temp = io.StringIO()
         diagram.writeSvg(temp.write)
-        return h.parseInto(ret, temp.getvalue())
+        return h.parseInto(ret, h.safeHtml(temp.getvalue()))
     return None
 
 

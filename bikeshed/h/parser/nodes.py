@@ -43,12 +43,13 @@ def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
 
 
 def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
-    attrs: t.SafeAttrDict = {**node.attrs, "bs-line-number": escapeAttr(node.loc)}
-    if node.context:
-        attrs["bs-parse-context"] = escapeAttr(node.context)
+    if "bs-line-number" not in node.attrs:
+        node.attrs["bs-line-number"] = escapeAttr(node.loc)
+    if "bs-parse-context" not in node.attrs and node.context:
+        node.attrs["bs-parse-context"] = escapeAttr(node.context)
     if node.classes:
-        attrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
-    return startTagStr(node.tag, attrs)
+        node.attrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
+    return startTagStr(node.tag, node.attrs)
 
 
 @dataclass

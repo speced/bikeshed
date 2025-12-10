@@ -34,4 +34,4 @@ def processTags(doc: t.SpecT) -> None:
                     el=el,
                 )
                 continue
-            h.replaceContents(el, h.parseHTML(str(out)))
+            h.parseInto(el, h.safeHtml(out), allowEmpty=True)

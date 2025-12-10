@@ -10,8 +10,9 @@ import lxml
 from lxml import etree
 from lxml.cssselect import CSSSelector
 
-from .. import t
+from .. import constants, t
 from ..messages import die, warn
+from . import parser
 
 if t.TYPE_CHECKING:
     ElementPredT: t.TypeAlias = t.Callable[[t.ElementT], bool]
@@ -277,17 +278,40 @@ def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
     return sorted(el, key=lambda x: (x.get("bs-line-number", ""), textContent(x)))
 
 
-def parseHTML(text: str) -> list[t.ElementT | str]:
+def safeHtml(
+    text: str,
+    startLine: int = 1,  # pylint: disable=unused-argument
+    context: str | parser.StartTag | t.ElementT | None = None,  # pylint: disable=unused-argument
+) -> t.SafeHtmlStr:
+    if constants.virtualLineBreak in text:
+        return text.replace(constants.virtualLineBreak, "\n")
+    return text
+    # return parser.parseText(text, h.DEFAULT_PARSE_CONFIG, context, startLine)
+
+
+def safeBikeshedHtml(
+    text: str,
+    config: parser.ParseConfig,  # pylint: disable=unused-argument
+    startLine: int = 1,  # pylint: disable=unused-argument
+    context: str | parser.StartTag | t.ElementT | None = None,  # pylint: disable=unused-argument
+) -> t.SafeHtmlStr:
+    return parser.parseText(text, config, context, startLine)
+
+
+def parseHTML(text: t.SafeHtmlStr) -> list[t.ElementT | str]:
+    # container = parser.parseFragment(text)
     container = lxml.html.fragment_fromstring(text, create_parent="div")
     return list(childNodes(container, clear=True))
 
 
-def parseElements(text: str) -> list[t.ElementT]:
+def parseElements(text: t.SafeHtmlStr) -> list[t.ElementT]:
+    # container = parser.parseFragment(text)
     container = lxml.html.fragment_fromstring(text, create_parent="div")
     return [x for x in childNodes(container, clear=True) if isElement(x)]
 
 
-def parseInto(container: t.ElementT, text: str, allowEmpty: bool = False) -> t.ElementT:
+def parseInto(container: t.ElementT, text: t.SafeHtmlStr, allowEmpty: bool = False) -> t.ElementT:
+    clearContents(container)
     appendChild(container, *parseHTML(text), allowEmpty=allowEmpty)
     return container
 

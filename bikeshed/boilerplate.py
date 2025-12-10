@@ -20,7 +20,11 @@ if t.TYPE_CHECKING:
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> t.NodesT:
     htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context), context=context)
-    bp = h.E.div({}, h.parseHTML(htmlString))
+    # FIXME: Here I'm having to pass a value that's already an EarlyParsedHtmlStr
+    # (and thus should be safe for parsing into a doc) back thru h.safeHtml(),
+    # because h.parseHTML() is still using the lxml parser, not my SimpleParser,
+    # so the virtualLinebreak chars don't get handled unless I do it myself.
+    bp = h.E.div({}, h.parseHTML(h.safeHtml(htmlString)))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
 
@@ -205,21 +209,30 @@ def addObsoletionNotice(doc: t.SpecT) -> None:
 def addAtRisk(doc: t.SpecT) -> None:
     if len(doc.md.atRisk) == 0:
         return
-    html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
+    html = [
+        h.E.p({}, "The following features are at-risk, and may be dropped during the CR period:\n"),
+    ]
+    ul = h.E.ul()
+    html.append(ul)
     for feature in doc.md.atRisk:
-        html += "<li>" + h.parseText(
+        li = h.E.li()
+        normFeature = h.safeBikeshedHtml(
             feature,
             h.ParseConfig.fromSpec(doc, context="At Risk metadata"),
             context="At Risk metadata",
         )
-    html += (
-        "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
-        + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
-        + "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
-        + "without having to publish a new Candidate Rec without the feature first."
+        h.parseInto(li, normFeature)
+        h.appendChild(ul, li)
+    html.append(
+        h.E.p(
+            {},
+            "“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. "
+            + "It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, "
+            + "and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, "
+            + "without having to publish a new Candidate Rec without the feature first.",
+        ),
     )
-    frag = h.parseHTML(html)
-    fillWith("at-risk", frag, doc=doc)
+    fillWith("at-risk", html, doc=doc)
 
 
 def addStyles(doc: t.SpecT) -> None:

@@ -18,6 +18,12 @@ def parseDocument(text: str) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
     return parse(stream, 0)
 
 
+def parseFragment(text: str) -> t.ElementT:
+    stream = SimpleStream("<bs-fragment-container>" + text + "</bs-fragment-container>")
+    _, _, body = parse(stream, 0)
+    return body[0]
+
+
 VOID_ELEMENTS = {
     "area",
     "base",
@@ -197,6 +203,18 @@ def parseEscape(s: SimpleStream, start: int) -> tuple[str, int]:
             return "&", start + 1
         i += 1  # skip the ;
         return escape, i
+    elif s.slice(i, i + 3) == "lt;":
+        i += 3
+        return "<", i
+    elif s.slice(i, i + 4) == "amp;":
+        i += 4
+        return "&", i
+    elif s.slice(i, i + 5) == "apos;":
+        i += 5
+        return "'", i
+    elif s.slice(i, i + 5) == "quot;":
+        i += 5
+        return '"', i
     else:
         return "&", i
 

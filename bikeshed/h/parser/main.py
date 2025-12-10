@@ -57,7 +57,7 @@ def initialDocumentParse(
     return nodes
 
 
-def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
+def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> t.EarlyParsedHtmlStr:
     strs = []
     ilcc = constants.incrementLineCountChar
     dlcc = constants.decrementLineCountChar
@@ -77,11 +77,11 @@ def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> str:
             elif diff < 0:
                 s += dlcc * -diff
         strs.append(s)
-    return "".join(strs)
+    return t.EarlyParsedHtmlStr("".join(strs))
 
 
-def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
-    return strFromNodes(nodes).split("\n")
+def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[t.EarlyParsedHtmlStr]:
+    return t.cast("list[t.EarlyParsedHtmlStr]", strFromNodes(nodes).split("\n"))
 
 
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
@@ -98,24 +98,21 @@ def parseLines(
     context: str | StartTag | t.ElementT | None,
     startLine: int = 1,
     closeElements: bool = False,
-) -> list[str]:
+) -> list[t.EarlyParsedHtmlStr]:
     # Runs a list of lines thru the parser,
     # returning another list of lines.
 
     if len(textLines) == 0:
-        return textLines
+        return t.cast("list[t.EarlyParsedHtmlStr]", textLines)
     endingWithNewline = textLines[0].endswith("\n")
     if endingWithNewline:
         text = "".join(textLines)
     else:
         text = "\n".join(textLines)
-    parsedLines = strFromNodes(
-        nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context),
-    ).split(
-        "\n",
-    )
+    parsedNodes = list(nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context))
+    parsedLines = linesFromNodes(parsedNodes)
     if endingWithNewline:
-        parsedLines = [x + "\n" for x in parsedLines]
+        parsedLines = [t.EarlyParsedHtmlStr(x + "\n") for x in parsedLines]
 
     return parsedLines
 
@@ -126,7 +123,7 @@ def parseText(
     context: str | StartTag | t.ElementT | None,
     startLine: int = 1,
     closeElements: bool = False,
-) -> str:
+) -> t.EarlyParsedHtmlStr:
     # Just runs the text thru the parser.
     return strFromNodes(
         nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context),
@@ -136,9 +133,9 @@ def parseText(
 def parseTitle(
     text: str,
     config: ParseConfig,
-    startLine: int = 1,
     context: str | StartTag | t.ElementT | None = None,
-) -> str:
+    startLine: int = 1,
+) -> t.EarlyParsedHtmlStr:
     # Parses the text, but removes any tags from the content,
     # as they'll just show up as literal text in <title>.
     nodes = nodesFromHtml(text, config, startLine=startLine, context=context)

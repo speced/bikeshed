@@ -13,7 +13,12 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import assert_never, assert_type
 
+# Representing a string that has been escaped so it's safe to be emitted raw in an attr value.
 SafeAttrStr = NewType("SafeAttrStr", str)
+
+# Representing HTML that's guaranteed to be safe for the SimpleParser.
+# Being passed through EarlyParser is sufficient, but raw HTML from the outside world isn't.
+EarlyParsedHtmlStr = NewType("EarlyParsedHtmlStr", str)
 
 if TYPE_CHECKING:
     from typing import (
@@ -30,6 +35,7 @@ if TYPE_CHECKING:
         Iterable,
         Iterator,
         Literal,
+        LiteralString,
         Mapping,
         MutableMapping,
         MutableSequence,
@@ -56,6 +62,8 @@ if TYPE_CHECKING:
 
     SafeAttrDict = dict[str, SafeAttrStr | Literal[""]]
     EmptyLiteralStr = Literal[""]
+
+    type SafeHtmlStr = LiteralString | EarlyParsedHtmlStr
 
     # In many places I treat lists as an "anonymous" element
     ElementishT: TypeAlias = ElementT | list[NodeT]

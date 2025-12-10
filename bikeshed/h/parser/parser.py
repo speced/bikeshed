@@ -810,6 +810,17 @@ def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) ->
     # by instead shoving the contents into an attribute, after linebreaks are removed.
     # Then add blank lines back, to keep the line counts correct.
 
+    # If this is from text that's been re-parsed, don't overwrite an already-smuggled value.
+    if "bs-datablock-data" in el.startTag.attrs:
+        if text == "":
+            return
+        else:
+            m.die(
+                "PROGRAMMING ERROR: An already-smuggled datablock tried to smuggle a new non-empty value.",
+                lineNum=el.loc,
+            )
+            return
+
     # Make the element single-line,
     el.data = ""
     singleLineText = text.replace("\n", constants.virtualLineBreak)
@@ -1731,6 +1742,12 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
             textEnd = i
             nodeEnd = i + 2
             break
+    else:
+        m.die(
+            "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &bs';&bs'; if it wasn't intended at all.",
+            lineNum=s.loc(textStart),
+        )
+        return Err(textStart)
 
     rawText = s.slice(textStart, textEnd)
     if s.config.macrosInAutolinks:

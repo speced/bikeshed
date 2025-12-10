@@ -71,6 +71,8 @@ from .dom import (
     replaceMacrosTextly,
     replaceNode,
     replaceWithContents,
+    safeBikeshedHtml,
+    safeHtml,
     safeID,
     scopingElements,
     sectionName,
@@ -87,6 +89,7 @@ from .dom import (
     wrapContents,
 )
 from .parser import (
+    DEFAULT_PARSE_CONFIG,
     ParseConfig,
     debugNodes,
     initialDocumentParse,
