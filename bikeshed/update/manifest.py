@@ -55,7 +55,7 @@ ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-data/main/data/"
 # To avoid 'Event loop is closed' RuntimeError due to compatibility issue with aiohttp
 if sys.platform.startswith("win") and sys.version_info >= (3, 8):
     try:
-        from asyncio import WindowsSelectorEventLoopPolicy
+        from asyncio import WindowsSelectorEventLoopPolicy  # pylint: disable=deprecated-class
     except ImportError:
         pass
     else:
