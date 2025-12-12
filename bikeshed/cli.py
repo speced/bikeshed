@@ -700,7 +700,9 @@ def handleIssuesList(options: argparse.Namespace) -> None:
     if options.printTemplate:
         issuelist.printHelpMessage()
     else:
-        issuelist.printIssueList(options.infile, options.outfile)
+        success = issuelist.printIssueList(options.infile, options.outfile)
+        if not success:
+            m.failure("An error prevented the issues list from being generated.")
 
 
 def handleSource(options: argparse.Namespace) -> None:

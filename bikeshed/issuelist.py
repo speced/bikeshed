@@ -35,16 +35,16 @@ class HeaderInfo:
     intro: str | None = None
 
 
-def printIssueList(infilename: str | None = None, outfilename: str | None = None) -> None:
+def printIssueList(infilename: str | None = None, outfilename: str | None = None) -> bool:
     if infilename is None:
         infilename = findIssuesFile()
         if infilename is None:
             printHelpMessage()
-            return
+            return False
     if infilename == "-":
         infile = sys.stdin
     else:
-        for suffix in [".txt", "txt", ""]:
+        for suffix in [".txt", ".bsi", ""]:
             try:
                 infile = open(infilename + suffix, encoding="utf-8")  # noqa: SIM115
                 infilename += suffix
@@ -53,13 +53,13 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
                 pass
         else:
             m.die("Couldn't read from the infile(s)")
-            return
+            return False
 
     lines = infile.readlines()
     headerInfo = extractHeaderInfo(lines, infilename)
     if headerInfo is None:
         m.die("Couldn't parse header info.")
-        return
+        return False
 
     if outfilename is None:
         if infilename == "-":
@@ -75,12 +75,12 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
             outfile = open(outfilename, "w", encoding="utf-8")  # noqa: SIM115
         except Exception as e:
             m.die(f"Couldn't write to outfile:\n{e}")
-            return
+            return False
 
     printHeader(outfile, headerInfo)
-
     printIssues(outfile, lines)
     printScript(outfile)
+    return True
 
 
 def findIssuesFile() -> str | None:
