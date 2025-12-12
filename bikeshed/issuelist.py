@@ -232,11 +232,11 @@ def printHeader(outfile: t.TextIO, hi: HeaderInfo) -> None:
   :target {{ box-shadow: 0.25em 0.25em 0.25em;  }}
 </style>
 
-<h1>{hi.title} Disposition of Comments for {hi.date} {hi.status}</h1>
+<h1>{html(hi.title)} Disposition of Comments for {html(hi.date)} {html(hi.status)}</h1>
 
-<p>Review document: <a href="{hi.url}">{hi.url}</a>
+<p>Review document: <a href="{attr(hi.url)}">{html(hi.url)}</a>
 
-<p>Editor's draft: <a href="{hi.ed}">{hi.ed}</a></p>
+<p>Editor's draft: <a href="{attr(hi.ed)}">{html(hi.ed)}</a></p>
 
 {hi.intro or ""}
 
@@ -259,11 +259,19 @@ def printHeader(outfile: t.TextIO, hi: HeaderInfo) -> None:
     )
 
 
+def attr(text: str) -> str:
+    return text.replace("&", "&amp;").replace('"', "&quot;")
+
+
+def html(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;")
+
+
 def printIssues(outfile: t.TextIO, lines: list[str]) -> None:
     text = "".join(lines)
     issues = text.split("----\n")[1:]
     for issue in issues:
-        issue = issue.strip().replace("&", "&amp;").replace("<", "&lt;")
+        issue = html(issue).strip()
         if issue == "":
             continue
         originalText = issue[:]
