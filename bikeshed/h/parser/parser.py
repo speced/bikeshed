@@ -3113,7 +3113,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
+            val += s.slice(startSeg, startEscape) + ch
             startSeg = i
             continue
         elif s[i] == "&":
@@ -3122,7 +3122,9 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
+            if isinstance(ch, SafeText):
+                ch = ch.text
+            val += s.slice(startSeg, startRef) + ch
             startSeg = i
             continue
         elif s[i] == ">":
@@ -3159,7 +3161,7 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
+            val += s.slice(startSeg, startEscape) + ch
             startSeg = i
             continue
         elif s[i] == "&":
@@ -3168,7 +3170,9 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
+            if isinstance(ch, SafeText):
+                ch = ch.text
+            val += s.slice(startSeg, startRef) + ch
             startSeg = i
             continue
         elif isControl(s[i]):
