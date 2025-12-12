@@ -65,7 +65,7 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
     if outfilename is None:
         if infilename == "-":
             outfilename = f"issues-{headerInfo.status}-{headerInfo.cdate}.html".lower()
-        elif infilename.endswith(".txt"):
+        elif infilename.endswith(".txt") or infilename.endswith(".bsi"):
             outfilename = infilename[:-4] + ".html"
         else:
             outfilename = infilename + ".html"
