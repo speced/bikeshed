@@ -56,6 +56,7 @@ def printIssueList(infilename: str | None = None, outfilename: str | None = None
             return False
 
     lines = infile.readlines()
+    infile.close()
     headerInfo = extractHeaderInfo(lines, infilename)
     if headerInfo is None:
         m.die("Couldn't parse header info.")
