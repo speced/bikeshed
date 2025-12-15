@@ -4,7 +4,7 @@ from .. import config
 from .. import messages as m
 
 
-def getTemplate(variant: str) -> str:
+def getTemplate(variant: str) -> str | None:
     match variant:
         case "spec" | "minimal" | "test":
             with open(config.scriptPath("template", f"{variant}.bs"), "r", encoding="utf-8") as fh:
@@ -14,4 +14,4 @@ def getTemplate(variant: str) -> str:
                 return fh.read()
         case _:
             m.die(f"Unknown template variant '{variant}'.")
-            return ""
+            return None

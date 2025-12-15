@@ -759,24 +759,26 @@ def handleProfile(options: argparse.Namespace) -> None:
 
 def handleTemplate(options: argparse.Namespace) -> None:
     if not options.outfile:
-        if m.wrappedOutput():
-            m.die(f"`bikeshed template` only supports printing to console. You set --print={m.state.printMode}")
-            return
-        m.say(template.getTemplate(options.variant))
+        ret = template.getTemplate(options.variant)
+        if ret:
+            m.say(ret)
+        else:
+            m.failure("Could not generate a template.")
     else:
         with open(options.outfile, "w", encoding="utf-8") as fh:
-            fh.write(template.getTemplate(options.variant))
+            fh.write(template.getTemplate(options.variant) or "")
 
 
 def handleWpt(options: argparse.Namespace) -> None:
     if options.template:
         if not options.outfile:
-            if m.wrappedOutput():
-                m.die(f"`bikeshed wpt` only supports printing to console. You set --print={m.state.printMode}")
-                return
-            m.say(template.getTemplate("wpt"))
+            ret = template.getTemplate("wpt")
+            if ret:
+                m.say(ret)
+            else:
+                m.failure("Could not generate a template.")
         else:
             with open(options.outfile, "w", encoding="utf-8") as fh:
-                fh.write(template.getTemplate("wpt"))
+                fh.write(template.getTemplate("wpt") or "")
     else:
-        m.die("Unknown sub-option for `bikeshed wpt` (currently only --template is supported).")
+        m.failure("Unknown sub-option for `bikeshed wpt` (currently only --template is supported).")
