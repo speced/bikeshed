@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from . import config, constants, printjson, update
+from . import config, constants, printjson, template, update
 from . import messages as m
 
 
@@ -449,10 +449,11 @@ def main() -> None:
     templateParser = subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
     templateParser.add_argument(
         "variant",
-        choices=["base", "minimal", "test"],
+        choices=["spec", "minimal", "test"],
         nargs="?",
-        default="base",
+        default="spec",
     )
+    templateParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
 
     wptParser = subparsers.add_parser("wpt", help="Tools for writing Web Platform Tests.")
     wptParser.add_argument(
@@ -461,6 +462,7 @@ def main() -> None:
         action="store_true",
         help="Outputs a skeleton WPT file for you to start with.",
     )
+    wptParser.add_argument("outfile", nargs="?", default=None, help="Path to the output file.")
 
     options, extras = argparser.parse_known_args()
 
@@ -756,110 +758,25 @@ def handleProfile(options: argparse.Namespace) -> None:
 
 
 def handleTemplate(options: argparse.Namespace) -> None:
-    if m.wrappedOutput():
-        m.die(f"`bikeshed template` only supports printing to console. You set --print={m.state.printMode}")
-        return
-    if options.variant == "base":
-        m.say(
-            """<pre class='metadata'>
-Title: Your Spec Title
-Shortname: your-spec
-Level: 1
-Status: w3c/UD
-Group: WGNAMEORWHATEVER
-Repository: org/repo-name
-URL: http://example.com/url-this-spec-will-live-at
-Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
-Abstract: A short description of your spec, one or two sentences.
-Complain About: accidental-2119 yes, missing-example-ids yes
-Markup Shorthands: markdown yes, css no
-</pre>
-
-Introduction {#intro}
-=====================
-
-Introduction here.
-""",
-        )
-    elif options.variant == "minimal":
-        m.say(
-            """<pre class='metadata'>
-Title: Test
-Editor: test
-Abstract: test
-Group: test
-Status: ls
-Shortname: test
-Boilerplate: style-autolinks off, style-colors off, style-counters off, style-selflinks off, style-issues off, style-md-lists off, style-dfn-panel off, script-dfn-panel off, script-dfn-panel-json off, script-dom-helper off, style-ref-hints off, script-ref-hints off, script-link-titles off, table-of-contents off, abstract off, index off, references off
-Markup Shorthands: markdown on
-</pre>
-""",
-        )
-    elif options.variant == "test":
-        m.say(
-            """<pre class=metadata>
-Group: test
-Shortname: foo
-Level: 1
-Status: LS
-ED: http://example.com/foo
-Editor: Example Editor
-Date: 1970-01-01
-Title: Test Title
-Abstract: Test Description
-</pre>
-""",
-        )
+    if not options.outfile:
+        if m.wrappedOutput():
+            m.die(f"`bikeshed template` only supports printing to console. You set --print={m.state.printMode}")
+            return
+        m.say(template.getTemplate(options.variant))
+    else:
+        with open(options.outfile, "w", encoding="utf-8") as fh:
+            fh.write(template.getTemplate(options.variant))
 
 
 def handleWpt(options: argparse.Namespace) -> None:
-    if m.wrappedOutput():
-        m.die(f"`bikeshed wpt` only supports printing to console. You set --print={m.state.printMode}")
-        return
     if options.template:
-        m.say(
-            """<!DOCTYPE html>
-<meta charset=utf-8>
-<title>window.offscreenBuffering</title>
-<link rel=author title="AUTHOR NAME HERE" href="mailto:AUTHOR EMAIL HERE">
-<link rel=help href="LINK TO ROUGHLY WHAT'S BEING TESTED HERE">
-<script src="/resources/testharness.js"></script>
-<script src="/resources/testharnessreport.js"></script>
-<script>
-/* Choose the test type you want: */
-
-
-/* 1. Standard, synchronous test */
-test(function() {
-    /* test code here */
-}, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
-
-
-/* 2. Async test */
-let t = async_test("TEST NAME HERE / SHORT DESCRIPTION PHRASE");
-somethingWithACallback( function(){ t.step(()=>{ /* test code here */}) );
-something.addEventListener('foo', t.step_func(()=>{ /* test code here */}));
-t.done(); // when all tests are finished running
-// or call the following if there's only one test, automatically does .done() for you
-something.addEventListener('foo', t.step_func_done(()=>{ /* test code here */}));
-
-
-/* 3. Promise test */
-promise_test(function(){
-    return somePromiseFunc().then(()=>{ /* test code here */ });
-}, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
-// auto-finishes when the returned promise fulfills
-// or if promise should reject:
-promise_test(function(t){
-    return promise_rejects(t, new ExpectedError(), somePromiseCode());
-}, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
-
-
-/* "test code here" Asserts */
-// Only use inside of /* test code here */ regions
-assert_true(VALUE HERE, "TEST DESCRIPTION");
-assert_equals(ACTUAL VALUE HERE, EXPECTED VALUE HERE, "TEST DESCRIPTION");
-// lots more at http://web-platform-tests.org/writing-tests/testharness-api.html#list-of-assertions
-</script>
-""",
-        )
+        if not options.outfile:
+            if m.wrappedOutput():
+                m.die(f"`bikeshed wpt` only supports printing to console. You set --print={m.state.printMode}")
+                return
+            m.say(template.getTemplate("wpt"))
+        else:
+            with open(options.outfile, "w", encoding="utf-8") as fh:
+                fh.write(template.getTemplate("wpt"))
+    else:
+        m.die("Unknown sub-option for `bikeshed wpt` (currently only --template is supported).")
