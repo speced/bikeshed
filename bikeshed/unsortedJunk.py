@@ -1379,6 +1379,21 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
             else:
                 m.warn(f"Connection error fetching issue #{issue.num}")
                 continue
+        except requests.exceptions.ReadTimeout:
+            # Took too long
+            if key in responses:
+                data = responses[key]
+            else:
+                m.warn(f"Timeout while fetching issue #{issue.num}")
+                continue
+        except Exception as e:
+            # Something else
+            if key in responses:
+                data = responses[key]
+            else:
+                m.warn(f"Error while fetching issue #{issue.num}:\n{e}")
+                continue
+
         if res is None:
             # Already handled in the except block
             pass
