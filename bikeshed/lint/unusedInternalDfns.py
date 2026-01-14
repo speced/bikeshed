@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from .. import h, t
 from .. import messages as m
-from ..config import dfnElementsSelector
 
 
 def unusedInternalDfns(doc: t.SpecT) -> None:
@@ -11,7 +10,7 @@ def unusedInternalDfns(doc: t.SpecT) -> None:
     If you don't actually *use* a noexport dfn, that's probably an error.
     In particular, this'll probably help find *untagged* dfns that are defaulting to noexport.
     """
-    noexportDfns = [el for el in h.findAll(dfnElementsSelector, doc) if el.get("data-noexport") == "by-default"]
+    noexportDfns = [el for el in h.collectDfns(doc.body) if el.get("data-noexport") == "by-default"]
 
     def local(el: t.ElementT) -> bool:
         return (

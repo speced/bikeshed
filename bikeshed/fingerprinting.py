@@ -5,19 +5,19 @@ from . import h, t
 trackingVectorId = "b732b3fe"  # hashlib.md5("tracking-vector").hexdigest()[0:8], to minimize chance of collision
 
 
-def addTrackingVector(doc: t.SpecT) -> None:
+def addTrackingVector(doc: t.SpecT, body: t.ElementT) -> None:
     if doc.md.trackingVectorClass is None:
         return
 
-    els = h.findAll("[tracking-vector]", doc)
+    els = h.findAll("[tracking-vector]", body)
 
     if len(els) == 0:
         return
 
-    if doc.md.trackingVectorImage is None:
+    if doc.md.trackingVectorImage is None and h.find("#" + trackingVectorId, body) is None:
         # Generate an SVG and <use> it in all the individual spots
         h.appendChild(
-            doc.body,
+            body,
             h.E.svg(
                 {"viewBox": "0 0 46 64", "style": "display:none"},
                 h.E.defs(

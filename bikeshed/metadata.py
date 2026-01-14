@@ -13,7 +13,7 @@ from functools import partial
 
 from isodate import Duration, parse_duration
 
-from . import config, constants, h, markdown, repository, t
+from . import config, constants, h, markdown, pagesplit, repository, t
 from . import messages as m
 from .translate import _t
 
@@ -122,9 +122,10 @@ class MetadataManager:
                 "repository-links",
             ],
         )
-        self.maxToCDepth: int | float | None = float("inf")
+        self.maxToCDepth: int | None = None
         self.metadataInclude: config.BoolSet = config.BoolSet(default=True)
         self.metadataOrder: list[str] = ["*", "!*"]
+        self.multipage: pagesplit.PageSplitConfig | None = None
         self.noAbstract: bool = False
         self.noEditor: bool = False
         self.noteClass: str = "note"
@@ -1002,9 +1003,9 @@ def parseEditorTerm(key: str, val: str, lineNum: str | int | None) -> dict[str, 
     return {"singular": "Editor", "plural": "Editors"}
 
 
-def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> int | float:
+def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> int | None:
     if val.lower() == "none":
-        return float("inf")
+        return None
     try:
         v = int(val)
     except ValueError:
@@ -1012,19 +1013,35 @@ def parseMaxToCDepth(key: str, val: str, lineNum: str | int | None) -> int | flo
             f"Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{val}'.",
             lineNum=lineNum,
         )
-        return float("inf")
+        return None
     if not (1 <= v <= 5):
         m.die(
             f"Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{val}'.",
             lineNum=lineNum,
         )
-        return float("inf")
+        return None
     return v
 
 
 def parseMetadataOrder(key: str, val: str, lineNum: str | int | None) -> list[str]:
     pieces = [x.strip() for x in val.split(",")]
     return pieces
+
+
+def parseMultipage(key: str, val: str, lineNum: str | int | None) -> pagesplit.PageSplitConfig | None:
+    # Can be just a boolean...
+    match boolish(val.strip()):
+        case False:
+            return None
+        case True:
+            return pagesplit.PageSplitConfig(autoLevel=None)
+    # Or more complicated value
+    if match := re.match(r"auto\s+h(\d)$", val.strip()):
+        level = int(match[1])
+        return pagesplit.PageSplitConfig(autoLevel=level)
+    else:
+        m.die(f"Can't parse Multipage metadata. Expected a bool or 'auto hN' value; got '{val}'.")
+        return None
 
 
 def parseWptDisplay(key: str, val: str, lineNum: str | int | None) -> str:
@@ -1505,6 +1522,7 @@ KNOWN_KEYS = {
         partial(parseBoolishList, default=True),
     ),
     "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
+    "Multipage": Metadata("Multipage", "multipage", joinValue, parseMultipage),
     "No Abstract": Metadata("No Abstract", "noAbstract", joinValue, parseBoolean),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),

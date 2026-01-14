@@ -17,7 +17,6 @@ if t.TYPE_CHECKING:
     import widlparser  # pylint: disable=unused-import
 
     from . import refs
-    from .line import Line
 
 
 def stripBOM(doc: t.SpecT) -> None:
@@ -327,7 +326,7 @@ def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: st
 
 
 def processDfns(doc: t.SpecT) -> None:
-    dfns = h.findAll(config.dfnElementsSelector, doc)
+    dfns = h.collectDfns(doc.body)
     classifyDfns(doc, dfns)
     h.fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(doc, (dfn for dfn in dfns if dfn.get("id") is not None))
@@ -965,7 +964,7 @@ def addSelfLinks(doc: t.SpecT) -> None:
     def makeSelfLink(el: t.ElementT) -> t.ElementT:
         return h.E.a({"href": "#" + h.escapeUrlFrag(el.get("id", "")), "class": "self-link"})
 
-    dfnElements = h.findAll(config.dfnElementsSelector, doc)
+    dfnElements = h.collectDfns(doc.body)
 
     foundFirstNumberedSection = False
     for el in h.findAll("h2, h3, h4, h5, h6", doc):
@@ -1006,7 +1005,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
     styleScoped = []
     nestedLists = []
     flattenEls = []
-    for el in doc.document.iter():
+    for el in doc.root.iter():
         if head is None and el.tag == "head":
             head = el
             continue
@@ -1228,27 +1227,8 @@ def cleanupHTML(doc: t.SpecT) -> None:
         h.moveContents(fromEl=el[0], toEl=el)
 
 
-def finalHackyCleanup(text: str) -> str:
-    # For hacky last-minute string-based cleanups of the rendered html.
-
-    return text
-
-
-def hackyLineNumbers(lines: list[Line]) -> list[Line]:
-    # Hackily adds line-number information to each thing that looks like an open tag.
-    # This is just regex text-munging, so potentially dangerous!
-    for line in lines:
-        line.text = re.sub(
-            r"(^|[^<])(<[\w-]+)([ >])",
-            rf"\1\2 line-number={line.i}\3",
-            line.text,
-        )
-    return lines
-
-
 def correctFrontMatter(doc: t.SpecT) -> None:
-    # Detect and move around some bits of information,
-    # if you provided them in your
+    # Detect and move around some bits of information.
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
     h1s = [h1 for h1 in h.findAll("h1", doc) if h.isNormative(doc, h1)]
     if len(h1s) == 2:
@@ -1485,13 +1465,6 @@ def lineNumberFromBsLineNumber(value: str | None) -> int:
     except:
         pass
     return 1
-
-
-def locateFillContainers(doc: t.SpecT) -> t.FillContainersT:
-    fillContainers = defaultdict(list)
-    for el in h.findAll("[data-fill-with]", doc):
-        fillContainers[t.cast(str, el.get("data-fill-with"))].append(el)
-    return fillContainers
 
 
 def forceCrossorigin(doc: t.SpecT) -> None:

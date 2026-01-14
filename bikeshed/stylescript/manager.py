@@ -205,7 +205,7 @@ class Script(JCResource):
         if not text.endswith("\n"):
             text += "\n"
         text += "}\n"
-        return h.E.script(text)
+        return h.E.script({"bs-boilerplate-added": self.name}, text)
 
 
 @dataclasses.dataclass
@@ -218,7 +218,10 @@ class Library(JCResource):
     def toElement(self) -> t.ElementT:
         with self.path.open("r", encoding="utf-8") as fh:
             text = fh.read()
-        return h.E.script(f'/* Boilerplate: script-{self.name} */\n"use strict";\n{text}')
+        return h.E.script(
+            {"bs-boilerplate-added": self.name},
+            f'/* Boilerplate: script-{self.name} */\n"use strict";\n{text}',
+        )
 
 
 @dataclasses.dataclass
@@ -236,7 +239,7 @@ class Style(JCResource):
             sheet = removeInlineDarkStyles(self.name, sheet)
         if not sheet.endswith("\n"):
             sheet += "\n"
-        return h.E.style(f"/* Boilerplate: style-{self.name} */\n{sheet}")
+        return h.E.style({"bs-boilerplate-added": self.name}, f"/* Boilerplate: style-{self.name} */\n{sheet}")
 
 
 darkModeRe = re.compile(

@@ -6,7 +6,6 @@ from .dfnTypes import (
     cssTypes,
     dfnClassToType,
     dfnElements,
-    dfnElementsSelector,
     dfnTypes,
     functionishTypes,
     idlMethodTypes,

@@ -16,7 +16,6 @@ from . import parser
 
 if t.TYPE_CHECKING:
     ElementPredT: t.TypeAlias = t.Callable[[t.ElementT], bool]
-    from .parser import StartTag
 
 
 def flatten(arr: t.Iterable) -> t.Iterator:
@@ -35,7 +34,7 @@ def findAll(sel: str, context: t.SpecT | t.ElementT) -> list[t.ElementT]:
     if isElement(context):
         pass
     else:
-        context = context.document
+        context = context.root
     try:
         return t.cast("list[t.ElementT]", CSSSelector(sel, namespaces={"svg": "http://www.w3.org/2000/svg"})(context))
     except Exception as e:
@@ -151,34 +150,34 @@ def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = Fals
     return t.cast(str, lxml.html.tostring(el, with_tail=with_tail, encoding="unicode"))
 
 
-def printNodeTree(node: t.NodeT | str, maxDepth: int | None = None, depth: int = 0) -> str:
+def printNodeTree(node: t.ElementishT | str, maxDepth: int | None = None, depth: int = 1) -> str:
     # Debugging tool
     if isinstance(node, str):
         content = repr(node)
         if len(content) > 60:
             content = content[:60] + " [...]"
         return "#text: " + content
-    if isOddNode(node):
+    if isOddNode(node, allowElementish=True):
         return outerHTML(node)
     subLines: list[list[str]] = []
     if isinstance(node, list):
         s = "[]"
     else:
         s = f"{serializeTag(node, includeBs=True, shortenAttrs=True)}"
-    if len(s) > 60:
-        s = f"<{node.tag} [...]>"
-        subLines.append([])
-        for k, v in node.attrib.items():
-            if len(v) < 80:
-                subLines[0].append(f'# {k!s}="{escapeAttr(str(v))}"')
-            else:
-                subLines[0].append(f'# {k!s}="{escapeAttr(str(v[0:40]))}[...]"')
+        if len(s) > 60:
+            s = f"<{node.tag} [...]>"
+            subLines.append([])
+            for k, v in node.attrib.items():
+                if len(v) < 80:
+                    subLines[0].append(f'# {k!s}="{escapeAttr(str(v))}"')
+                else:
+                    subLines[0].append(f'# {k!s}="{escapeAttr(str(v[0:40]))}[...]"')
     if not maxDepth or depth < maxDepth:
         subLines.extend(
             printNodeTree(child, maxDepth, depth + 1).split("\n") for child in childNodes(node, skipOddNodes=False)
         )
     else:
-        childCount = f"({len(node)} children)"
+        childCount = f"({len(node)} additional children)"
         if not subLines and len(s) < 40:
             s += " " + childCount
         else:
@@ -314,51 +313,6 @@ def parseInto(container: t.ElementT, text: t.SafeHtmlStr, allowEmpty: bool = Fal
     clearContents(container)
     appendChild(container, *parseHTML(text), allowEmpty=allowEmpty)
     return container
-
-
-def parseDocument(
-    text: str,
-    structuralNodes: list[StartTag] | None = None,
-) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
-    # Parse an html string into a complete document, using lxml's parser.
-    # The lxml parser is unreliable, so I have to ensure I get a <head> and <body>.
-    # Then, since the lxml parser doesn't merge html/head/body elements together
-    # like HTML5 requires, do that manually with the extracted tags from the
-    # document parse.
-    htmlEl = lxml.html.document_fromstring(text)
-    assert htmlEl.tag == "html", "parseDocument() always produces an <html> element"
-    headEl: t.ElementT | None = None
-    bodyEl: t.ElementT | None = None
-    for child in htmlEl:
-        if child.tag == "head":
-            if headEl is not None:
-                die("Your boilerplate contains multiple <head> elements.", el=child)
-            headEl = child
-        elif child.tag == "body":
-            if bodyEl is not None:
-                die("Your boilerplate contains multiple <body> elements.", el=child)
-            bodyEl = child
-    if headEl is None:
-        headEl = E.head()
-        prependChild(htmlEl, headEl)
-    if bodyEl is None:
-        bodyEl = E.body()
-        appendChild(htmlEl, bodyEl)
-    assert len(htmlEl) == 2, "parseDocument() always produces one <head> and one <body> element"
-    if structuralNodes:
-        for startTag in structuralNodes:
-            if startTag.tag == "html":
-                el = htmlEl
-            elif startTag.tag == "head":
-                el = headEl
-            else:
-                el = bodyEl
-            for key, val in startTag.attrs.items():
-                if key == "class" and hasAttr(el, "class"):
-                    el.set("class", el.get("class", "") + " " + val)
-                else:
-                    el.set(key, val)
-    return htmlEl, headEl, bodyEl
 
 
 def escapeHTML(text: str) -> str:
@@ -652,6 +606,21 @@ def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.Elemen
     yield from el.iterancestors()
 
 
+def descendantElements(root: t.ElementishT, self: bool = False) -> t.Iterator[t.ElementT]:
+    # Iterates thru an an element (or list holding elements) in depth-first order,
+    # yielding each element.
+    # If root is an element, yields it first.
+    if isinstance(root, list):
+        for child in root:
+            if isElement(child):
+                yield child
+                yield from child.iterdescendants("*")
+    else:
+        if self:
+            yield root
+        yield from root.iterdescendants("*")
+
+
 def childNodes(
     parentEl: t.ElementishT,
     clear: bool = False,
@@ -731,29 +700,33 @@ def childNodes(
     return ret
 
 
-def nodeIter(el: t.ElementT, clear: bool = False, skipOddNodes: bool = True) -> t.Generator[t.NodeT, None, None]:
+def nodeIter(
+    root: t.ElementT | list[t.ElementT],
+    clear: bool = False,
+    skipOddNodes: bool = True,
+) -> t.Generator[t.NodeT, None, None]:
     # Iterates thru an element and all its descendants,
     # yielding up each child node it sees in depth-first order.
     # (In other words, same as el.iter(),
     #  but returning nodes+strings rather than the stupid LXML model.)
     # Takes the same kwargs as childNodes
-    if isinstance(el, str):
-        yield el
-        return
-    if isinstance(el, etree.t.ElementTree):
-        el = el.getroot()
-    text = el.text
-    tail = el.tail
-    if clear:
-        el.text = None
-        el.tail = None
-    yield el
-    if text is not None:
-        yield text
-    for c in childElements(el, oddNodes=True):
+    if isElement(root):
+        text = root.text
+        tail = root.tail
+        if clear:
+            root.text = None
+            root.tail = None
+        yield root
+        if text is not None:
+            yield text
+        children = childElements(root, oddNodes=True)
+    else:
+        tail = None
+        children = root
+
+    for c in children:
         if skipOddNodes and isOddNode(c):
             continue
-        # yield from nodeIter(c, clear=clear, skipOddNodes=skipOddNodes)
         yield from nodeIter(c, clear=clear, skipOddNodes=skipOddNodes)
     if tail is not None:
         yield tail
@@ -888,11 +861,13 @@ def isNodes(nodes: t.Any) -> t.TypeIs[t.NodesT]:
     return all(isNodes(child) for child in nodes)
 
 
-def isOddNode(node: t.Any) -> bool:
+def isOddNode(node: t.Any, allowElementish: bool = False) -> bool:
     # Something other than an element node or string.
     if isinstance(node, str):
         return False
     if isElement(node):
+        return False
+    if allowElementish and isinstance(node, list):
         return False
     return True
 
@@ -1181,6 +1156,13 @@ def collectSyntaxHighlightables(el: t.ElementT, els: list[t.ElementT] | None = N
     for child in childElements(el):
         collectSyntaxHighlightables(child, els)
     return els
+
+
+def collectDfns(root: t.ElementT) -> list[t.ElementT]:
+    return findAll(
+        "dfn:not([data-var-ignore]), h2[data-dfn-type], h3[data-dfn-type], h4[data-dfn-type], h5[data-dfn-type], h6[data-dfn-type]",
+        root,
+    )
 
 
 def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:

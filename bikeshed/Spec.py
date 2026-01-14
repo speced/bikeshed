@@ -34,6 +34,7 @@ from . import (
     markdown,
     mdn,
     metadata,
+    pagesplit,
     refs,
     retrieve,
     shorthands,
@@ -238,12 +239,12 @@ class Spec:
         boilerplate.addHeaderFooter(self)
 
         # Build the document
-        self.document, self.head, self.body = h.parseDocument(self.html)
+        self.root, self.head, self.body = h.parseDocument(self.html)
         if self.debugPrint == "boilerplate":
-            print(h.printNodeTree(self.document))  # noqa: T201
-        datablocks.transformDataBlocks(self, self.document)
+            print(h.printNodeTree(self.root))  # noqa: T201
+        datablocks.transformDataBlocks(self, self.root)
         if self.debugPrint == "datablocks":
-            print(h.printNodeTree(self.document))  # noqa: T201
+            print(h.printNodeTree(self.root))  # noqa: T201
         self.refs.setSpecData(self)
         u.correctFrontMatter(self)
         includes.processInclusions(self)
@@ -253,24 +254,23 @@ class Spec:
     def processDocument(self) -> Spec:
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
-        self.fillContainers: t.FillContainersT = u.locateFillContainers(self)
         lint.exampleIDs(self)
         wpt.processWptElements(self)
 
-        boilerplate.addBikeshedVersion(self)
-        boilerplate.addCanonicalURL(self)
-        boilerplate.addFavicon(self)
-        boilerplate.addSpecVersion(self)
-        boilerplate.addStatusSection(self)
-        boilerplate.addLogo(self)
-        boilerplate.addCopyright(self)
-        boilerplate.addSpecMetadataSection(self)
-        boilerplate.addAbstract(self)
-        boilerplate.addExpiryNotice(self)
-        boilerplate.addObsoletionNotice(self)
-        boilerplate.addAtRisk(self)
+        boilerplate.addBikeshedVersion(doc=self, head=self.head)
+        boilerplate.addCanonicalURL(doc=self, head=self.head)
+        boilerplate.addFavicon(doc=self, head=self.head)
+        boilerplate.addSpecVersion(doc=self, head=self.head)
+        boilerplate.addStatusSection(doc=self, body=self.body)
+        boilerplate.addLogo(doc=self, body=self.body)
+        boilerplate.addCopyright(doc=self, body=self.body)
+        boilerplate.addSpecMetadataSection(doc=self, body=self.body)
+        boilerplate.addAbstract(doc=self, body=self.body)
+        boilerplate.addExpiryNotice(doc=self, body=self.body)
+        boilerplate.addObsoletionNotice(doc=self, body=self.body)
+        boilerplate.addAtRisk(doc=self, body=self.body)
         u.addNoteHeaders(self)
-        boilerplate.removeUnwantedBoilerplate(self)
+        boilerplate.removeUnwantedBoilerplate(doc=self, root=self.root)
         shorthands.run(self)
         inlineTags.processTags(self)
         u.canonicalizeShortcuts(self.body)
@@ -295,34 +295,35 @@ class Spec:
         u.processAutolinks(self)
         u.fixInterDocumentReferences(self)
         biblio.dedupBiblioReferences(self)
-        boilerplate.addIndexSection(self)
-        boilerplate.addExplicitIndexes(self)
-        boilerplate.addStyles(self)
-        boilerplate.addReferencesSection(self)
-        boilerplate.addPropertyIndex(self)
-        boilerplate.addIDLSection(self)
-        boilerplate.addCDDLSection(self)
-        boilerplate.addIssuesSection(self)
-        boilerplate.addCustomBoilerplate(self)
+        boilerplate.addIndexSection(doc=self, body=self.body)
+        boilerplate.addExplicitIndexes(doc=self, body=self.body)
+        boilerplate.addStyles(doc=self, head=self.head)
+        boilerplate.addReferencesSection(doc=self, body=self.body)
+        boilerplate.addPropertyIndex(doc=self, body=self.body)
+        boilerplate.addIDLSection(doc=self, body=self.body)
+        boilerplate.addCDDLSection(doc=self, body=self.body)
+        boilerplate.addIssuesSection(doc=self, body=self.body)
+        boilerplate.addCustomBoilerplate(doc=self, root=self.root)
         headings.processHeadings(self, "all")  # again
-        boilerplate.removeUnwantedBoilerplate(self)
-        boilerplate.addTOCSection(self)
+        boilerplate.removeUnwantedBoilerplate(doc=self, root=self.root)
+        self.tocEntries = boilerplate.buildTOCGraph(doc=self, body=self.body)
+        boilerplate.addTOCSection(doc=self, body=self.body)
         u.addSelfLinks(self)
         u.processAutolinks(self)
-        boilerplate.removeUnwantedBoilerplate(self)
+        boilerplate.removeUnwantedBoilerplate(doc=self, root=self.root)
         # Add MDN panels after all IDs/anchors have been added
         mdn.addMdnPanels(self)
         caniuse.addCanIUsePanels(self)
         highlight.addSyntaxHighlighting(self)
-        boilerplate.addBikeshedBoilerplate(self)
-        boilerplate.addDarkmodeIndicators(self)
-        fingerprinting.addTrackingVector(self)
+        addDomintroStyles(self)
+        boilerplate.addBikeshedStyleScripts(doc=self, head=self.head)
+        boilerplate.addDarkmodeIndicators(doc=self, head=self.head)
+        fingerprinting.addTrackingVector(doc=self, body=self.body)
         u.fixIntraDocumentReferences(self)
         u.fixInterDocumentReferences(self)
         u.verifyUsageOfAllLocalBiblios(self)
         u.removeMultipleLinks(self)
         u.forceCrossorigin(self)
-        addDomintroStyles(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
@@ -330,7 +331,7 @@ class Spec:
         lint.unusedInternalDfns(self)
 
         if self.debugPrint == "final":
-            print(h.printNodeTree(self.document))  # noqa: T201
+            print(h.printNodeTree(self.root))  # noqa: T201
 
         # Any final HTML cleanups
         u.cleanupHTML(self)
@@ -355,13 +356,14 @@ class Spec:
 
         return self
 
-    def serialize(self) -> str | None:
+    def serialize(self, tree: t.ElementT | None = None) -> str | None:
+        if tree is None:
+            tree = self.root
         try:
-            rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
+            rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(tree)
         except Exception as e:
             m.die(str(e))
             return None
-        rendered = u.finalHackyCleanup(rendered)
         return rendered
 
     def fixMissingOutputFilename(self, outputFilename: str | None) -> str:
@@ -385,6 +387,9 @@ class Spec:
         catchArgparseBug(outputFilename)
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
+        if self.md.multipage and outputFilename != "-":
+            self.finishMultipage(outputFilename, newline)
+            return
         rendered = self.serialize()
         if rendered and not constants.dryRun:
             try:
@@ -395,6 +400,37 @@ class Spec:
                         f.write(rendered)
             except Exception as e:
                 m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+
+    def finishMultipage(self, outputFilename: str, newline: str | None = None) -> None:
+        config = self.md.multipage
+        if config is None:
+            m.die("finishMultipage() was called without a multipage config being set; aborting.")
+            return
+        _, _, config.rootPageName = outputFilename.rpartition("/")
+        pages = pagesplit.extractPages(self.root, config)
+        if pages is None:
+            return
+        pagesplit.rewriteLocalLinks(self.root, pages[0], pages)
+        renderedMain = self.serialize(self.root)
+        if renderedMain and not constants.dryRun:
+            try:
+                with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
+                    f.write(renderedMain)
+            except Exception as e:
+                m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+        for page in pages[1:]:
+            preppedTree = pagesplit.prepTree(page, pages, self)
+            if preppedTree is None:
+                m.die(f"Couldn't produce the full page for {page.name}.html; didn't save.")
+                continue
+            rendered = self.serialize(preppedTree)
+            if rendered and not constants.dryRun:
+                outputFilename = page.name
+                try:
+                    with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
+                        f.write(rendered)
+                except Exception as e:
+                    m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.

@@ -5,13 +5,7 @@ from __future__ import annotations
 import sys
 
 # The only things that should be available during runtime.
-from typing import TYPE_CHECKING, Generic, NewType, TypedDict, TypeVar, cast, overload
-
-# Only available in 3.11, so stub them out for earlier versions
-if sys.version_info >= (3, 11):
-    from typing import assert_never, assert_type
-else:
-    from typing_extensions import assert_never, assert_type
+from typing import TYPE_CHECKING, Generic, NewType, TypedDict, TypeVar, assert_never, assert_type, cast, overload
 
 # Representing a string that has been escaped so it's safe to be emitted raw in an attr value.
 SafeAttrStr = NewType("SafeAttrStr", str)
@@ -89,7 +83,5 @@ if TYPE_CHECKING:
     from .retrieve import DataFileRequester
 
     BiblioStorageT: TypeAlias = DefaultDict[str, list[BiblioEntry]]
-
-    FillContainersT: TypeAlias = DefaultDict[str, list[ElementT]]
 
     LinkDefaultsT: TypeAlias = DefaultDict[str, list[tuple[str, str, str | None, str | None]]]
