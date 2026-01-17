@@ -23,6 +23,17 @@ def addTOCSection(doc: t.SpecT, body: t.ElementT) -> None:
     )
 
 
+def addTOCInner(doc: t.SpecT, body: t.ElementT) -> None:
+    # *Just* the nested list of links, in case you want to customize the surrounding content.
+    tocContainer = main.getFillContainer("toc-links", doc=doc, tree=body)
+    if tocContainer is None:
+        return
+    h.appendChild(
+        tocContainer,
+        buildTOCLevel(doc.tocEntries),
+    )
+
+
 def buildTOCLevel(entries: list[TOCEntry]) -> t.ElementT:
     ol = h.E.ol({"class": "toc"})
     for entry in entries:

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .. import boilerplate, h, retrieve, t
+from .. import boilerplate, datablocks, h, retrieve, t
 from .. import messages as m
+from . import toc
 from .main import SubPage
 
 
@@ -13,12 +14,11 @@ def prepTree(page: SubPage, pages: list[SubPage], doc: t.SpecT) -> t.ElementT | 
         h.ParseConfig.fromSpec(doc, context="multipage.include"),
     )
     newRoot, newHead, newBody = h.parseDocument(fullPageText)
+    datablocks.transformDataBlocks(doc, newRoot)
     if (fillContainer := findFillRoot(newRoot)) is None:
         m.die(f"Can't fill out the full page for {page.name}.html")
         return None
     h.appendChild(fillContainer, page.nodes)
-
-    rewriteLocalLinks(newRoot, page, pages)
 
     boilerplate.addBikeshedVersion(doc=doc, head=newHead)
     # boilerplate.addCanonicalURL(doc)
@@ -33,7 +33,7 @@ def prepTree(page: SubPage, pages: list[SubPage], doc: t.SpecT) -> t.ElementT | 
     boilerplate.addObsoletionNotice(doc=doc, body=newBody)
     boilerplate.addAtRisk(doc=doc, body=newBody)
     # boilerplate.addIndexSection(doc)
-    # boilerplate.addExplicitIndexes(doc)
+    boilerplate.addExplicitIndexes(doc=doc, body=newBody)
     boilerplate.addStyles(doc=doc, head=newHead)
     # boilerplate.addReferencesSection(doc)
     # boilerplate.addPropertyIndex(doc)
@@ -43,8 +43,14 @@ def prepTree(page: SubPage, pages: list[SubPage], doc: t.SpecT) -> t.ElementT | 
     boilerplate.addCustomBoilerplate(doc=doc, root=newRoot)
     boilerplate.removeUnwantedBoilerplate(doc=doc, root=newRoot)
     boilerplate.addTOCSection(doc=doc, body=newBody)
+    boilerplate.addTOCInner(doc=doc, body=newBody)
+    toc.addSmallTOCSection(doc=doc, body=newBody, page=page)
+    toc.addSmallTOCInner(doc=doc, body=newBody, page=page)
+    toc.addPageLinks(doc=doc, body=newBody, page=page, pages=pages)
     boilerplate.addBikeshedStyleScripts(doc=doc, head=newHead)
     boilerplate.addDarkmodeIndicators(doc=doc, head=newHead)
+
+    rewriteLocalLinks(newRoot, page, pages)
 
     return newRoot
 
@@ -73,10 +79,9 @@ def findFillRoot(tree: t.ElementT) -> t.ElementT | None:
 
 
 def rewriteLocalLinks(root: t.ElementT, page: SubPage, pages: list[SubPage]) -> None:
-    if page.name != "index.html":
-        return
     for el, href in getLocalLinkElements(root):
-        pageName = pageFromId(href, pages)
+        id = href[1:]
+        pageName = pageFromId(id, pages)
         if pageName is None:
             # A link in the boilerplate, presumably.
             # TODO: verify that the ID still links to something in the page.

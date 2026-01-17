@@ -9,7 +9,7 @@ from .indexes import (
     addPropertyIndex,
     addReferencesSection,
 )
-from .main import parseBoilerplate
+from .main import getFillContainer, parseBoilerplate
 from .metadata import addSpecMetadataSection
 from .misc import (
     addAbstract,
@@ -31,4 +31,4 @@ from .misc import (
     removeUnwantedBoilerplate,
     w3cStylesheetInUse,
 )
-from .toc import addTOCSection, buildTOCGraph
+from .toc import TOCEntry, addTOCInner, addTOCSection, buildTOCGraph

@@ -308,6 +308,7 @@ class Spec:
         boilerplate.removeUnwantedBoilerplate(doc=self, root=self.root)
         self.tocEntries = boilerplate.buildTOCGraph(doc=self, body=self.body)
         boilerplate.addTOCSection(doc=self, body=self.body)
+        boilerplate.addTOCInner(doc=self, body=self.body)
         u.addSelfLinks(self)
         u.processAutolinks(self)
         boilerplate.removeUnwantedBoilerplate(doc=self, root=self.root)

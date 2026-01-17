@@ -108,5 +108,4 @@ def getIdElements(page: SubPage) -> t.Iterator[tuple[t.ElementT, str]]:
 def gatherIds(page: SubPage) -> None:
     # Gather the IDs, so later things can rewrite.
     for _, id in getIdElements(page):
-        id = "#" + id
         page.ids.add(id)

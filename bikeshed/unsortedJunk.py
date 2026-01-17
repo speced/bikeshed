@@ -1013,7 +1013,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
             inBody = True
 
         # Move any stray <link>, <meta>, or <style> into the <head>.
-        if inBody and el.tag in ["link", "meta", "style"]:
+        if inBody and el.tag in ["link", "meta", "style"] and not h.hasAttr(el, "bs-no-move"):
             strayHeadEls.append(el)
 
         if el.tag == "style" and el.get("scoped") is not None:
