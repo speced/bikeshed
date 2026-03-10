@@ -23,4 +23,4 @@ We love contributions from our users. As bikeshed is all about precise, clear sp
 
 1. **Include an updated `index.html`** in your Pull Request.
 
-    The quickest way is to use [the Bikeshed API](https://api.csswg.org/bikeshed/) to pre-process your `index.bs` file.
+    The quickest way is to use [the spec-generator](https://www.w3.org/publications/spec-generator/) to pre-process your `index.bs` file.

@@ -19,7 +19,7 @@ and elsewhere!
 [![Release Notes](https://img.shields.io/badge/release-notes-purple.svg)](https://github.com/speced/bikeshed/issues/1773)
 
 The processor can be easily [installed](https://speced.github.io/bikeshed/#installing) and run locally (requiring no
-network access unless you're updating), or accessed as a CGI without any installation at all: <https://api.csswg.org/bikeshed/>
+network access unless you're updating), or accessed online through [spec-generator](https://www.w3.org/publications/spec-generator/).
 
 A short overview of some of Bikeshed's features:
 

@@ -10,9 +10,7 @@ If not, do so.
 Or, are you using Bikeshed infrequently?
 Are you okay with a network roundtrip when invoking it,
 in return for it always being up-to-date?
-If so, then you might want to just use the Bikeshed API: <https://api.csswg.org/bikeshed/>.
-The linked page contains several `curl` recipes,
-suitable to put into a shell alias/function for easy use.
+If so, then you might want to just use spec-generator: <https://www.w3.org/publications/spec-generator/>.
 
 Starting the Spec
 -----------------
