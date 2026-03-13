@@ -197,7 +197,7 @@ class CIUSupport:
         else:
             status = "unsupported"
         minVersion = unparsed[2:]
-        if code == "no" or not minVersion:
+        if code == "n" or not minVersion:
             # has to come first, "n all" should output as "none"
             minVersion = "None"
         elif minVersion == "all":
