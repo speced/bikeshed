@@ -13,20 +13,11 @@ import aiohttp
 import kdl
 import requests
 import tenacity
-from result import Err, Ok, Result
 
 from .. import messages as m
 from .. import t
+from ..result import Err, Ok, Result, isErr, isOk
 from .mode import UpdateMode
-
-
-def isOk(x: t.Any) -> t.TypeGuard[Ok]:
-    return isinstance(x, Ok)
-
-
-def isErr(x: t.Any) -> t.TypeGuard[Err]:
-    return isinstance(x, Err)
-
 
 # Manifest creation relies on these data structures.
 # Add to them whenever new types of data files are created.
@@ -192,8 +183,8 @@ async def updateFiles(localPrefix: str, newPaths: list[str]) -> tuple[list[str],
 
         lastMsgTime = time.time()
         messageDelta = 2
-        goodPaths = []
-        badPaths = []
+        goodPaths: list[str] = []
+        badPaths: list[str] = []
         for future in asyncio.as_completed(tasks):
             result = await future
             if isOk(result):

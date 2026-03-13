@@ -8,19 +8,10 @@ import aiofiles
 import aiohttp
 import requests
 import tenacity
-from result import Err, Ok, Result
 
 from .. import messages as m
 from .. import t
-
-
-def isOk(x: t.Any) -> t.TypeGuard[Ok]:
-    return isinstance(x, Ok)
-
-
-def isErr(x: t.Any) -> t.TypeGuard[Err]:
-    return isinstance(x, Err)
-
+from ..result import Err, Ok, Result, isErr, isOk
 
 ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-boilerplate/main/"
 

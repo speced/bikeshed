@@ -58,7 +58,7 @@ def printjsonobjectarray(x: list[dict[str, t.Any]], indent: str, level: int) -> 
     return ret
 
 
-def printjsonsimplearray(x: list, indent: str, level: int) -> str:  # pylint: disable=unused-argument
+def printjsonsimplearray(x: list[t.Any], indent: str, level: int) -> str:  # pylint: disable=unused-argument
     x = getjson(x)
     ret = m.printColor("[", "blue")
     for i, v in enumerate(x):

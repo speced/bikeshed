@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import bisect
 import dataclasses
-import re
 from dataclasses import dataclass, field
 
 from ... import t
 from .nodes import TagStack
-from .result import Err, Ok, OkT, ResultT, isOk
+from .result import Err, Ok, isOk
 
 if t.TYPE_CHECKING:
     from .nodes import ParserNode, StartTag
+    from .result import OkT, ResultT
 
 
 @dataclass
@@ -151,14 +151,14 @@ class Stream:
             i += 1
         return Err(start)
 
-    def matchRe(self, start: int, pattern: re.Pattern) -> ResultT[re.Match]:
+    def matchRe(self, start: int, pattern: t.Pattern) -> ResultT[t.Match]:
         match = pattern.match(self._chars, start)
         if match:
             return Ok(match, match.end())
         else:
             return Err(start)
 
-    def searchRe(self, start: int, pattern: re.Pattern) -> ResultT[re.Match]:
+    def searchRe(self, start: int, pattern: t.Pattern) -> ResultT[t.Match]:
         match = pattern.search(self._chars, start)
         if match:
             return Ok(match, match.end())

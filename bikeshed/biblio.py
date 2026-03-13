@@ -35,7 +35,7 @@ class BiblioEntry(metaclass=abc.ABCMeta):
             raise ValueError(msg)
 
     @abc.abstractmethod
-    def toHTML(self) -> t.NodesT: ...
+    def toHTML(self) -> t.ElementT: ...
 
     @abc.abstractmethod
     def valid(self) -> bool: ...
@@ -61,8 +61,8 @@ class NormalBiblioEntry(BiblioEntry):
     date: str | None = None
     other: str | None = None
 
-    def toHTML(self) -> t.NodesT:
-        ret: list[t.NodesT] = []
+    def toHTML(self) -> t.ElementT:
+        ret: list[t.NodeT] = []
 
         s = ""
         etAl = self.etAl
@@ -101,7 +101,7 @@ class NormalBiblioEntry(BiblioEntry):
             ret.append("URL: ")
             ret.append(h.E.a({"href": self.url}, self.url))
 
-        return ret
+        return h.E.inline({}, *ret)
 
     def valid(self) -> bool:
         return self.title is not None
@@ -138,8 +138,13 @@ class SpecBiblioEntry(BiblioEntry):
     def valid(self) -> bool:
         return self.snapshotURL is not None or self.currentURL is not None
 
-    def toHTML(self) -> t.NodesT:
-        return [self.title, " URL: ", h.E.a({"href": self.url}, self.url)]
+    def toHTML(self) -> t.ElementT:
+        return h.E.inline(
+            {},
+            self.title,
+            " URL: ",
+            h.E.a({"href": self.url}, self.url),
+        )
 
 
 class StringBiblioEntry(BiblioEntry):
@@ -152,7 +157,7 @@ class StringBiblioEntry(BiblioEntry):
     data: str
 
     def __init__(self, linkText: str, data: str, order: int = 0) -> None:
-        doc = h.E.div({}, h.parseHTML(data))
+        doc = h.E.div({}, *h.parseHTML(data))
         titleEl = h.find("cite", doc)
         if titleEl is not None:
             title = h.textContent(titleEl)
@@ -168,8 +173,8 @@ class StringBiblioEntry(BiblioEntry):
     def valid(self) -> bool:
         return True
 
-    def toHTML(self) -> t.NodesT:
-        return h.parseHTML(self.data.strip())
+    def toHTML(self) -> t.ElementT:
+        return h.E.inline({}, *h.parseHTML(self.data.strip()))
 
 
 class AliasBiblioEntry(BiblioEntry):
@@ -187,8 +192,8 @@ class AliasBiblioEntry(BiblioEntry):
     def valid(self) -> bool:
         return True
 
-    def toHTML(self) -> t.NodesT:
-        return [h.E.small({}, f"(alias of {self.aliasOf})")]
+    def toHTML(self) -> t.ElementT:
+        return h.E.small({}, f"(alias of {self.aliasOf})")
 
 
 def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -> t.BiblioStorageT:

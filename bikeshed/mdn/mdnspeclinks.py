@@ -54,7 +54,7 @@ def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
 
 
 def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.ElementT]) -> t.ElementT:
-    return h.E.div({"class": className}, mdnButton, featureDivs)
+    return h.E.div({"class": className}, mdnButton, *featureDivs)
 
 
 def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
@@ -148,7 +148,7 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
                 ),
             )
         h.appendChild(summary, h.E.span("MDN"))
-        anno = h.E.details({"class": "mdn-anno unpositioned", "data-anno-for": elementId}, summary, featureDivs)
+        anno = h.E.details({"class": "mdn-anno unpositioned", "data-anno-for": elementId}, summary, *featureDivs)
         panels.append(anno)
         h.appendChild(doc.body, anno)
 

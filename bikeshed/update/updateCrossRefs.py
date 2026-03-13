@@ -234,7 +234,7 @@ def headingsFromWebref(status: t.Literal["current" | "snapshot"], urlSuffix: str
 
 
 @tenacity.retry(reraise=True, stop=tenacity.stop_after_attempt(3), wait=tenacity.wait_random(1, 2))
-def dataFromWebref(url: str) -> t.JSONT:
+def dataFromWebref(url: str) -> t.JSONObject:
     webrefAPIUrl = "https://raw.githubusercontent.com/w3c/webref/main/"
     try:
         response = requests.get(webrefAPIUrl + url, timeout=5)
@@ -246,7 +246,7 @@ def dataFromWebref(url: str) -> t.JSONT:
     except Exception as e:
         msg = f"Data retrieved from Webref wasn't valid JSON for some reason. Try downloading again?\n{e}"
         raise Exception(msg) from e
-    return t.cast("t.JSONT", data)
+    return t.cast("t.JSONObject", data)
 
 
 def canonSpecFromWebref(rawSpec: WebrefSpecT) -> SpecT:
@@ -392,7 +392,7 @@ def cleanSpecHeadings(headings: AllHeadingsT) -> None:
 def extractMethodData(anchors: AnchorsT) -> MethodsT:
     """Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}"""
 
-    methods: defaultdict[str, dict] = defaultdict(dict)
+    methods: MethodsT = defaultdict(dict)
     for key, anchors_ in anchors.items():
         # Extract the name and arguments
         match = re.match(r"([^(]+)\((.*)\)", key)

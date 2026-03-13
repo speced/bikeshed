@@ -2,16 +2,8 @@
 # Module for holding types, for easy importing into the rest of the codebase
 from __future__ import annotations
 
-import sys
-
 # The only things that should be available during runtime.
-from typing import TYPE_CHECKING, Generic, NewType, TypedDict, TypeVar, cast, overload
-
-# Only available in 3.11, so stub them out for earlier versions
-if sys.version_info >= (3, 11):
-    from typing import assert_never, assert_type
-else:
-    from typing_extensions import assert_never, assert_type
+from typing import TYPE_CHECKING, Generic, NewType, TypedDict, TypeVar, assert_never, assert_type, cast, overload
 
 # Representing a string that has been escaped so it's safe to be emitted raw in an attr value.
 SafeAttrStr = NewType("SafeAttrStr", str)
@@ -21,6 +13,7 @@ SafeAttrStr = NewType("SafeAttrStr", str)
 EarlyParsedHtmlStr = NewType("EarlyParsedHtmlStr", str)
 
 if TYPE_CHECKING:
+    from types import ModuleType
     from typing import (
         AbstractSet,
         Any,
@@ -57,30 +50,31 @@ if TYPE_CHECKING:
         TypeIs,
     )
 
-    ElementT: TypeAlias = etree._Element
-    NodeT: TypeAlias = str | ElementT
+    type ElementT = etree._Element
+    type NodeT = str | ElementT
+    type NodeListT = Sequence[NodeT]
 
-    SafeAttrDict = dict[str, SafeAttrStr | Literal[""]]
-    EmptyLiteralStr = Literal[""]
+    type SafeAttrDict = dict[str, SafeAttrStr | Literal[""]]
+    type EmptyLiteralStr = Literal[""]
 
     type SafeHtmlStr = LiteralString | EarlyParsedHtmlStr
 
-    # In many places I treat lists as an "anonymous" element
-    ElementishT: TypeAlias = ElementT | list[NodeT]
+    type JSONObject = dict[str, JSONContainer | JSONPrimitive]
+    type JSONArray = list[JSONContainer | JSONPrimitive]
+    type JSONContainer = JSONObject | JSONArray
+    type JSONPrimitive = str | int | float | bool | None
 
-    # Can't actually do recursive types yet :(
-    # Get as close as possible, but let lists be Any
-    NodesT: TypeAlias = list[Any] | NodeT
+    # I basically never regex over bytes
+    import re
 
-    # Similar for JSON
-    JSONT: TypeAlias = dict[str, Any]
+    type Match = re.Match[str]
+    type Pattern = re.Pattern[str]
 
     import sys
-    from types import ModuleType
 
     if "Spec" not in sys.modules:
         from .Spec import Spec
-    SpecT = Spec
+    type SpecT = Spec
 
     from .biblio import BiblioEntry
     from .config.BoolSet import BoolSet
@@ -88,8 +82,6 @@ if TYPE_CHECKING:
     from .refs import MethodVariant, MethodVariants, ReferenceManager, RefSource, RefWrapper
     from .retrieve import DataFileRequester
 
-    BiblioStorageT: TypeAlias = DefaultDict[str, list[BiblioEntry]]
-
-    FillContainersT: TypeAlias = DefaultDict[str, list[ElementT]]
-
-    LinkDefaultsT: TypeAlias = DefaultDict[str, list[tuple[str, str, str | None, str | None]]]
+    type BiblioStorageT = DefaultDict[str, list[BiblioEntry]]
+    type FillContainersT = DefaultDict[str, list[ElementT]]
+    type LinkDefaultsT = DefaultDict[str, list[tuple[str, str, str | None, str | None]]]

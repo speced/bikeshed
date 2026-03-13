@@ -893,7 +893,7 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
             # HTML comment filling the whole line,
             # go ahead and strip it
             continue
-        ws, text = t.cast("re.Match", re.match(r"(\s*)(.*)", line)).groups()
+        ws, text = t.cast("t.Match", re.match(r"(\s*)(.*)", line)).groups()
         if text.startswith("#"):  # comment
             continue
         wsLen = len(ws.replace("\t", indentSpace))

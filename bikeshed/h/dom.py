@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import collections.abc
 import hashlib
 import html
 import re
@@ -15,16 +14,9 @@ from ..messages import die, warn
 from . import parser
 
 if t.TYPE_CHECKING:
-    ElementPredT: t.TypeAlias = t.Callable[[t.ElementT], bool]
+    type ElementPredT = t.Callable[[t.ElementT], bool]
+    type FlattenListT = t.Iterable[t.NodeT | FlattenListT]
     from .parser import StartTag
-
-
-def flatten(arr: t.Iterable) -> t.Iterator:
-    for el in arr:
-        if isinstance(el, collections.abc.Iterable) and not isinstance(el, str) and not etree.iselement(el):
-            yield from flatten(el)
-        else:
-            yield el
 
 
 def unescape(string: str) -> str:
@@ -139,13 +131,11 @@ def innerHTML(el: t.ElementT | None) -> str:
     return (el.text or "") + "".join(lxml.html.tostring(x, encoding="unicode") for x in el)
 
 
-def outerHTML(el: t.NodesT | None, literal: bool = False, with_tail: bool = False) -> str:
+def outerHTML(el: t.NodeT | None, literal: bool = False, with_tail: bool = False) -> str:
     if el is None:
         return ""
     if isinstance(el, str):
         return el
-    if isinstance(el, list):
-        return "".join(outerHTML(x) for x in el)
     if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax") or ""
     return t.cast(str, lxml.html.tostring(el, with_tail=with_tail, encoding="unicode"))
@@ -298,7 +288,7 @@ def safeBikeshedHtml(
     return parser.parseText(text, config, context, startLine)
 
 
-def parseHTML(text: t.SafeHtmlStr) -> list[t.ElementT | str]:
+def parseHTML(text: t.SafeHtmlStr) -> list[t.NodeT]:
     # container = parser.parseFragment(text)
     container = lxml.html.fragment_fromstring(text, create_parent="div")
     return list(childNodes(container, clear=True))
@@ -398,26 +388,26 @@ def nextSiblingElement(el: t.ElementT) -> t.ElementT | None:
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
+def appendChild(parent: t.ElementT, *els: t.NodeT, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool) -> t.ElementT | None: ...
+def appendChild(parent: t.ElementT, *els: t.NodeT, allowEmpty: bool) -> t.ElementT | None: ...
 
 
-def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) -> t.ElementT | None:
+def appendChild(parent: t.ElementT, *children: t.NodeT, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
-    child: t.NodeT | None = None
     parentLen = len(parent)
-    for child in flatten(els):
-        assert child is not None
+    if len(children) == 0 and not allowEmpty:
+        msg = "Empty child list appended without allowEmpty=True"
+        raise Exception(msg)
+    for child in children:
         if isinstance(child, str):
             if parentLen > 0:
                 parent[-1].tail = (parent[-1].tail or "") + child
             else:
                 parent.text = (parent.text or "") + child
         else:
-            parentLen += 1
             if parentLen == 0 and parent.text is not None:
                 # LXML "helpfully" assumes you meant to insert it before the text,
                 # and so moves the text into the element's tail when you append.
@@ -429,18 +419,16 @@ def appendChild(parent: t.ElementT, *els: t.NodesT, allowEmpty: bool = False) ->
                 # when the parent already has children; the last child's tail
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
-    if child is None and not allowEmpty:
-        msg = "Empty child list appended without allowEmpty=True"
-        raise Exception(msg)
-    if isElement(child):
-        return child
+            parentLen += 1
+    if len(children) > 0 and isElement(children[-1]):
+        return children[-1]
     else:
         return None
 
 
-def prependChild(parent: t.ElementT, *children: t.NodesT) -> None:
+def prependChild(parent: t.ElementT, *children: t.NodeT) -> None:
     # Prepends either text or an element to the parent.
-    for child in reversed(list(flatten(children))):
+    for child in reversed(children):
         if isinstance(child, str):
             if parent.text is None:
                 parent.text = child
@@ -454,12 +442,12 @@ def prependChild(parent: t.ElementT, *children: t.NodesT) -> None:
                 parent.text = None
 
 
-def insertBefore(target: t.ElementT, *els: t.NodesT) -> t.ElementT:
+def insertBefore(target: t.ElementT, *els: t.NodeT) -> t.ElementT:
     parent = target.getparent()
     assert parent is not None
     index = parent.index(target)
     prevSibling = parent[index - 1] if index > 0 else None
-    for el in flatten(els):
+    for el in els:
         if isinstance(el, str):
             if prevSibling is not None:
                 prevSibling.tail = (prevSibling.tail or "") + el
@@ -472,10 +460,10 @@ def insertBefore(target: t.ElementT, *els: t.NodesT) -> t.ElementT:
     return target
 
 
-def insertAfter(target: t.ElementT, *els: t.NodesT) -> t.ElementT:
+def insertAfter(target: t.ElementT, *els: t.NodeT) -> t.ElementT:
     parent = target.getparent()
     assert parent is not None
-    for el in flatten(els):
+    for el in els:
         if isinstance(el, str):
             target.tail = (target.tail or "") + el
         else:
@@ -504,7 +492,7 @@ def removeNode(node: t.ElementT) -> t.ElementT:
     return node
 
 
-def replaceNode(node: t.ElementT, *replacements: t.NodesT) -> t.NodesT | None:
+def replaceNode(node: t.ElementT, *replacements: t.NodeT) -> t.NodeT | None:
     if len(replacements) == 1 and node == replacements[0]:
         # Sometimes we replace a node.... with itself
         return node
@@ -521,7 +509,7 @@ def transferAttributes(source: t.ElementT, target: t.ElementT) -> t.ElementT:
     return target
 
 
-def appendContents(el: t.ElementT, container: t.ElementT | t.Iterable[t.NodesT]) -> t.ElementT:
+def appendContents(el: t.ElementT, container: t.ElementT | t.NodeListT) -> t.ElementT:
     # Accepts either an iterable *or* a container element
     if isElement(container):
         container = childNodes(container, clear=True)
@@ -529,13 +517,13 @@ def appendContents(el: t.ElementT, container: t.ElementT | t.Iterable[t.NodesT])
     return el
 
 
-def replaceContents(el: t.ElementT, newElements: t.NodesT | t.Iterable[t.NodesT]) -> t.ElementT:
+def replaceContents(el: t.ElementT, newElements: t.ElementT | t.NodeListT) -> t.ElementT:
     clearContents(el)
     return appendContents(el, newElements)
 
 
-def replaceWithContents(el: t.ElementT) -> t.NodesT | None:
-    return replaceNode(el, childNodes(el, clear=True))
+def replaceWithContents(el: t.ElementT) -> t.NodeT | None:
+    return replaceNode(el, *childNodes(el, clear=True))
 
 
 def moveContents(toEl: t.ElementT, fromEl: t.ElementT) -> None:
@@ -653,7 +641,7 @@ def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.Elemen
 
 
 def childNodes(
-    parentEl: t.ElementishT,
+    parentEl: t.ElementT,
     clear: bool = False,
     skipOddNodes: bool = True,
     mergeText: bool = False,
@@ -695,23 +683,6 @@ def childNodes(
             nodes[-1] += node
         else:
             nodes.append(node)
-
-    if isinstance(parentEl, list):
-        for c in parentEl:
-            if isinstance(c, str):
-                append(ret, c)
-                continue
-            if skipOddNodes and isOddNode(c):
-                pass
-            else:
-                append(ret, c)
-            if not emptyText(c.tail, wsAllowed=False):
-                append(ret, t.cast(str, c.tail))
-                if clear:
-                    c.tail = None
-        if clear:
-            parentEl[:] = []
-        return ret
 
     if not emptyText(parentEl.text, wsAllowed=False):
         append(ret, t.cast(str, parentEl.text))
@@ -880,14 +851,6 @@ def isNode(node: t.Any) -> t.TypeIs[t.NodeT]:
     return isElement(node) or isinstance(node, str)
 
 
-def isNodes(nodes: t.Any) -> t.TypeIs[t.NodesT]:
-    if isNode(nodes):
-        return True
-    if not isinstance(nodes, list):
-        return False
-    return all(isNodes(child) for child in nodes)
-
-
 def isOddNode(node: t.Any) -> bool:
     # Something other than an element node or string.
     if isinstance(node, str):
@@ -1006,8 +969,8 @@ def replaceMacrosTextly(text: str, macros: t.Mapping[str, str], context: str) ->
     # Same as replaceMacros(), but does the substitution
     # directly on the text, rather than relying on the
     # html parser to have preparsed the macro syntax
-    def macroReplacer(match: re.Match) -> str:
-        fullText = t.cast(str, match.group(0))
+    def macroReplacer(match: t.Match) -> str:
+        fullText = match.group(0)
         innerText = match.group(2).lower() or ""
         optional = match.group(3) == "?"
         if fullText.startswith("\\"):
@@ -1183,12 +1146,16 @@ def collectSyntaxHighlightables(el: t.ElementT, els: list[t.ElementT] | None = N
     return els
 
 
-def createElement(tag: str, attrs: t.Mapping[str, str | None] | None = None, *children: t.NodesT | None) -> t.ElementT:
+def createElement(
+    tag: str,
+    attrs: t.Mapping[str, str | None] | None = None,
+    *children: t.NodeT | None,
+) -> t.ElementT:
     if attrs is None:
         attrs = {}
     el: t.ElementT = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
     if children:
-        appendChild(el, *(x for x in children if x is not None), allowEmpty=True)
+        appendChild(el, *[x for x in children if x is not None], allowEmpty=True)
     return el
 
 
@@ -1197,18 +1164,21 @@ if t.TYPE_CHECKING:
     class ElementCreatorFnT(t.Protocol):
         def __call__(
             self,
-            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
-            *children: t.NodesT | None,
+            attrsOrChild: t.Mapping[str, str | None] | t.NodeT | None = None,
+            *children: t.NodeT | None,
         ) -> t.ElementT: ...
 
 
 class ElementCreationHelper:
     def __getattr__(self, name: str) -> ElementCreatorFnT:
+        if name in ("inline", "block"):
+            name = "bs-" + name
+
         def _creater(
-            attrsOrChild: t.Mapping[str, str | None] | t.NodesT | None = None,
-            *children: t.NodesT | None,
+            attrsOrChild: t.Mapping[str, str | None] | t.NodeT | None = None,
+            *children: t.NodeT | None,
         ) -> t.ElementT:
-            if isNodes(attrsOrChild):
+            if isNode(attrsOrChild):
                 return createElement(name, None, attrsOrChild, *children)
             else:
                 assert isinstance(attrsOrChild, dict) or attrsOrChild is None

@@ -1,1 +1,1 @@
-from .caniuse import CanIUseManager, addCanIUsePanels
+from .caniuse import CIUData, addCanIUsePanels

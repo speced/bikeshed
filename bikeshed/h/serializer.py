@@ -7,17 +7,18 @@ from .. import t
 from . import dom
 
 if t.TYPE_CHECKING:
-    WriterFn: t.TypeAlias = t.Callable[[str], t.Any]
+    type WriterFn = t.Callable[[str], t.Any]
 
-    # more specific than t.NodesT, as nested lists can't happen
-    Nodes: t.TypeAlias = t.ElementT | list[str | t.ElementT]
-    Blocks: t.TypeAlias = list[Nodes]
+    # Allow for a list to be a temporary 'element' sometimes
+    type Nodes = t.ElementT | list[t.NodeT]
+    type Blocks = list[Nodes]
 
 
 class Serializer:
     inlineEls = frozenset(
         [
             "a",
+            "bs-inline",
             "em",
             "strong",
             "small",
@@ -127,7 +128,7 @@ class Serializer:
         return blocks
 
     def startTag(self, tag: str, el: Nodes, write: WriterFn) -> None:
-        if isinstance(el, list):
+        if isinstance(el, list) or self.isWrapper(tag):
             return
         if not dom.hasAttrs(el):
             write("<" + tag + ">")
@@ -155,8 +156,9 @@ class Serializer:
         write("".join(strs))
 
     def endTag(self, tag: str, write: WriterFn) -> None:
-        if tag != "[]":
-            write("</" + tag + ">")
+        if self.isWrapper(tag) or tag == "[]":
+            return
+        write("</" + tag + ">")
 
     def isElement(self, node: t.Any) -> t.TypeGuard[t.ElementT]:
         return dom.isElement(node)
@@ -182,10 +184,15 @@ class Serializer:
         return False
 
     def isInlineElement(self, tag: str) -> bool:
+        if tag == "bs-block":
+            return False
         return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
 
     def isBlockElement(self, tag: str) -> bool:
         return not self.isInlineElement(tag)
+
+    def isWrapper(self, tag: str) -> bool:
+        return tag in ("bs-inline", "bs-block")
 
     def needsEndTag(self, el: t.ElementT, nextEl: Nodes | None = None) -> bool:
         if el.tag not in self.omitEndTagEls:
@@ -198,7 +205,7 @@ class Serializer:
             return True
         return False
 
-    def justWS(self, block: t.NodesT) -> bool:
+    def justWS(self, block: Nodes) -> bool:
         if self.isElement(block):
             return False
         return len(block) == 1 and isinstance(block[0], str) and block[0].strip() == ""
@@ -248,7 +255,8 @@ class Serializer:
 
     def _writeInlineElement(self, tag: str, el: Nodes, write: WriterFn, inline: bool) -> None:
         self.startTag(tag, el, write)
-        for node in dom.childNodes(el, mergeText=True):
+        children = dom.childNodes(el, mergeText=True) if self.isElement(el) else el
+        for node in children:
             if self.isElement(node):
                 self._serializeEl(node, write, inline=inline)
             else:
@@ -271,7 +279,7 @@ class Serializer:
             return "empty", None
 
         # See if there are any block children
-        children = dom.childNodes(el, clear=True, mergeText=True)
+        children = dom.childNodes(el, clear=True, mergeText=True) if self.isElement(el) else el
         for child in children:
             if self.isElement(child) and self.isBlockElement(child.tag):
                 return "blocks", self._blocksFromChildren(children)

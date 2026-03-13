@@ -38,7 +38,7 @@ if t.TYPE_CHECKING:
     TagStream: t.TypeAlias = t.Generator[Tag, None, None]
 
 
-def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list:
+def mergeTrees(tree1: t.ElementT, tree2: t.ElementT) -> list[t.NodeT]:
     """
     Attempts to merge two HTML trees
     of the same text content.

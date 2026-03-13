@@ -29,7 +29,7 @@ from .main import (
     docPath,
     doEvery,
     englishFromList,
-    flatten,
+    flatIntersperse,
     groupFromKey,
     intersperse,
     processTextNodes,

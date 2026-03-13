@@ -5,6 +5,7 @@ import os
 import requests
 
 from .. import messages as m
+from .. import t
 
 
 def update(path: str, dryRun: bool = False) -> set[str] | None:
@@ -55,7 +56,11 @@ def update(path: str, dryRun: bool = False) -> set[str] | None:
     return {filePath}
 
 
-def collectPaths(pathListSoFar: list[str], pathTrie: dict[str, dict | str], pathPrefix: str) -> list[str]:
+if t.TYPE_CHECKING:
+    type PathTrie = dict[str, str | PathTrie]
+
+
+def collectPaths(pathListSoFar: list[str], pathTrie: PathTrie, pathPrefix: str) -> list[str]:
     for k, v in pathTrie.items():
         if isinstance(v, dict):
             collectPaths(pathListSoFar, v, f"{pathPrefix}{k}/")

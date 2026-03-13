@@ -5,7 +5,7 @@ import collections.abc
 from .. import t
 
 
-class BoolSet(collections.abc.MutableMapping):
+class BoolSet(collections.abc.MutableMapping[str, bool]):
     """
     Implements a "boolean set",
     where keys can be explicitly set to True or False,

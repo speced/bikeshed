@@ -310,8 +310,11 @@ def commonPrefix(line1: str | None, line2: str | None) -> str | None:
 def getWsPrefix(line: str) -> str | None:
     if line.strip() == "":
         return None
-    match = t.cast("re.Match", re.match(r"(\s*)", line))
-    return t.cast(str, match.group(1))
+    match = re.match(r"(\s*)", line)
+    if match:
+        return match.group(1)
+    else:
+        return None
 
 
 def parseTokens(tokens: list[TokenT], config: MarkdownConfig) -> list[l.Line]:

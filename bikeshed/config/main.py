@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import collections.abc
 import os
 import re
 import time
-
-import lxml
 
 from .. import messages, t
 
@@ -21,15 +18,10 @@ def englishFromList(items: t.Iterable[str], conjunction: str = "or") -> str:
     return "{0}, {2} {1}".format(", ".join(items[:-1]), items[-1], conjunction)
 
 
-if t.TYPE_CHECKING:
-    IntersperseU = t.TypeVar("IntersperseU")
-    IntersperseV = t.TypeVar("IntersperseV")
-
-
-def intersperse(
-    iterable: t.Iterable[IntersperseU],
-    delimiter: IntersperseV,
-) -> t.Generator[IntersperseU | IntersperseV, None, None]:
+def intersperse[IterT, DelimT](
+    iterable: t.Iterable[IterT],
+    delimiter: DelimT,
+) -> t.Iterator[IterT | DelimT]:
     first = True
     for x in iterable:
         if not first:
@@ -38,13 +30,25 @@ def intersperse(
         yield x
 
 
-if t.TYPE_CHECKING:
-    ProcessTextNodesU = t.TypeVar("ProcessTextNodesU")
+def flatIntersperse[IterT, DelimT](
+    iterable: t.Iterable[t.Iterable[IterT]],
+    delimiter: t.Iterable[DelimT],
+) -> t.Iterator[IterT | DelimT]:
+    first = True
+    for x in iterable:
+        if not first:
+            yield from delimiter
+        first = False
+        yield from x
 
 
-def processTextNodes(nodes: list[t.NodeT], regex: re.Pattern, replacer: t.Callable) -> list[t.NodeT]:
+def processTextNodes(
+    nodes: t.NodeListT,
+    regex: t.Pattern,
+    replacer: t.Callable[[t.Match], t.NodeT],
+) -> list[t.NodeT]:
     """
-    Takes an array of text/objects,
+    Takes an array of nodes,
     and flatmaps reSubObject over the text parts.
     """
     ret: list[t.NodeT] = []
@@ -56,27 +60,27 @@ def processTextNodes(nodes: list[t.NodeT], regex: re.Pattern, replacer: t.Callab
     return ret
 
 
-if t.TYPE_CHECKING:
-    ReSubObjectU = t.TypeVar("ReSubObjectU")
+@t.overload
+def reSubObject(
+    pattern: t.Pattern,
+    string: str,
+    repl: None = None,
+) -> list[str | t.Match]: ...
 
 
 @t.overload
-def reSubObject(pattern: re.Pattern, string: str, repl: None) -> list[str | re.Match]: ...
-
-
-@t.overload
-def reSubObject(
-    pattern: re.Pattern,
+def reSubObject[SubT](
+    pattern: t.Pattern,
     string: str,
-    repl: t.Callable[[re.Match], ReSubObjectU],
-) -> list[str | ReSubObjectU]: ...
+    repl: t.Callable[[t.Match], SubT],
+) -> list[str | SubT]: ...
 
 
-def reSubObject(
-    pattern: re.Pattern,
+def reSubObject[SubT](
+    pattern: t.Pattern,
     string: str,
-    repl: t.Callable[[re.Match], ReSubObjectU] | None = None,
-) -> list[str | re.Match] | list[str | ReSubObjectU] | list[str | re.Match | ReSubObjectU]:
+    repl: t.Callable[[t.Match], SubT] | None = None,
+) -> list[str | t.Match] | list[str | SubT] | list[str | t.Match | SubT]:
     """
     like re.sub, but replacements don't have to be text;
     returns an array of alternating unmatched text and match objects instead.
@@ -84,7 +88,7 @@ def reSubObject(
     and the result then shows up in the array instead.
     """
     lastEnd = 0
-    pieces: list[str | re.Match | ReSubObjectU] = []
+    pieces: list[str | t.Match | SubT] = []
     for match in pattern.finditer(string):
         pieces.append(string[lastEnd : match.start()])
         if repl:
@@ -150,14 +154,6 @@ _groupFromKeyCache: dict[str, str]
 _groupFromKeyCache = {}
 
 
-def flatten(arr: t.Iterable) -> t.Generator:
-    for el in arr:
-        if isinstance(el, collections.abc.Iterable) and not isinstance(el, str) and not lxml.etree.iselement(el):
-            yield from flatten(el)
-        else:
-            yield el
-
-
 def scriptPath(*pathSegs: str) -> str:
     startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     path = os.path.join(startPath, *pathSegs)
@@ -183,7 +179,7 @@ def chrootPath(rootPath: str, path: str) -> str:
         return path
 
 
-def doEvery(s: float, action: t.Callable, lastTime: float | None = None) -> float:
+def doEvery(s: float, action: t.Callable[[], t.Any], lastTime: float | None = None) -> float:
     # Takes an action every N seconds.
     # Pass it the duration and the last time it took the action;
     # it returns the time it last took the action
@@ -204,7 +200,19 @@ if t.TYPE_CHECKING:
     SafeIndexDefaultT = t.TypeVar("SafeIndexDefaultT")
 
 
-def safeIndex(coll: t.Sequence, needle: t.Any, default: SafeIndexDefaultT = None) -> int | SafeIndexDefaultT:  # type: ignore[assignment]
+@t.overload
+def safeIndex[ValT](coll: t.Sequence[ValT], needle: ValT) -> int | None: ...
+
+
+@t.overload
+def safeIndex[ValT, DefaultT](coll: t.Sequence[ValT], needle: ValT, default: DefaultT) -> int | DefaultT: ...
+
+
+def safeIndex[ValT, DefaultT](
+    coll: t.Sequence[ValT],
+    needle: ValT,
+    default: DefaultT | None = None,
+) -> int | DefaultT | None:
     try:
         return coll.index(needle)
     except ValueError:

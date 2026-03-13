@@ -51,23 +51,23 @@ def transformProductionGrammars(doc: t.SpecT) -> None:
 
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
-    def hashMultReplacer(match: re.Match) -> t.ElementT:
+    def hashMultReplacer(match: t.Match) -> t.ElementT:
         return h.E.a({"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0))
 
     multRe = re.compile(r"{\s*\d+\s*}")
 
-    def multReplacer(match: re.Match) -> t.ElementT:
+    def multReplacer(match: t.Match) -> t.ElementT:
         return h.E.a({"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0))
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
-    def multRangeReplacer(match: re.Match) -> t.ElementT:
+    def multRangeReplacer(match: t.Match) -> t.ElementT:
         return h.E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0))
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
 
-    def simpleReplacer(match: re.Match) -> t.ElementT:
+    def simpleReplacer(match: t.Match) -> t.ElementT:
         return h.E.a(
             {"data-link-type": "grammar", "data-lt": match.group(0), "for": ""},
             match.group(0),
@@ -77,7 +77,7 @@ def transformProductionGrammars(doc: t.SpecT) -> None:
 
     def transformElement(parentEl: t.ElementT) -> None:
         children = h.childNodes(parentEl, clear=True)
-        newChildren: list[t.NodesT] = []
+        newChildren: list[t.NodeT] = []
         for el in children:
             if isinstance(el, str):
                 newChildren.extend(transformText(el))
@@ -88,7 +88,7 @@ def transformProductionGrammars(doc: t.SpecT) -> None:
                 newChildren.append(el)
         h.appendChild(parentEl, *newChildren, allowEmpty=True)
 
-    def transformText(text: str) -> t.NodesT:
+    def transformText(text: str) -> list[t.NodeT]:
         nodes: list[t.NodeT] = [text]
         nodes = config.processTextNodes(nodes, hashMultRe, hashMultReplacer)
         nodes = config.processTextNodes(nodes, multRe, multReplacer)
@@ -120,8 +120,8 @@ strongRe = re.compile(
 )
 
 
-def strongReplacer(match: re.Match) -> t.NodeT:
-    text = t.cast(str, match.group(1)).replace("\\**", "**")
+def strongReplacer(match: t.Match) -> t.NodeT:
+    text = match.group(1).replace("\\**", "**")
     return h.E.strong({"bs-autolink-syntax": match.group(0)}, text)
 
 
@@ -138,15 +138,15 @@ emRe = re.compile(
 )
 
 
-def emReplacer(match: re.Match) -> t.NodeT:
-    text = t.cast(str, match.group(1)).replace("\\*", "*")
+def emReplacer(match: t.Match) -> t.NodeT:
+    text = match.group(1).replace("\\*", "*")
     return h.E.em({"bs-autolink-syntax": match.group(0)}, text)
 
 
 escapedRe = re.compile(r"\\\*")
 
 
-def escapedReplacer(match: re.Match) -> t.NodeT:  # pylint: disable=unused-argument
+def escapedReplacer(match: t.Match) -> t.NodeT:  # pylint: disable=unused-argument
     return "*"
 
 

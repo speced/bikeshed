@@ -27,7 +27,7 @@ def parse(string: str) -> rr.Diagram | None:
     lines = string.splitlines()
 
     # Strip off any common initial whitespace from lines.
-    initialIndent = t.cast(re.Match, re.match(r"(\s*)", lines[0])).group(1)
+    initialIndent = t.cast("t.Match", re.match(r"(\s*)", lines[0])).group(1)
     for i, line in enumerate(lines):
         if line.startswith(initialIndent):
             lines[i] = line[len(initialIndent) :]
