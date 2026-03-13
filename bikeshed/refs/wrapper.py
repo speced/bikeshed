@@ -94,7 +94,7 @@ class RefWrapper:
     def __hash__(self) -> int:
         return hash(frozenset(self._ref))
 
-    def __json__(self) -> t.JSONT:
+    def __json__(self) -> dict[str, bool | str | list[str]]:
         return {
             "text": self.text,
             "displayText": self.displayText,

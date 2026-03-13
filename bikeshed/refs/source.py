@@ -84,7 +84,11 @@ class RefSource:
             return list(self.refs.items())
 
         for file in self.dataFile.walkFiles("anchors"):
-            group = t.cast(re.Match, re.match(r"anchors-(.{2})", file)).group(1)
+            match = re.match(r"anchors-(.{2})", file)
+            if not match:
+                m.warn(f"Ignoring a data file in the /anchors folder with a weird name: '{file}'")
+                continue
+            group = match[1]
             if group in self._loadedAnchorGroups:
                 # Already loaded
                 continue
@@ -411,7 +415,7 @@ def decodeAnchors(linesIter: t.Iterator[str]) -> defaultdict[str, list[t.RefWrap
                 line = next(linesIter)
                 if line == "-\n":
                     break
-                t.cast("list", data["for_"]).append(line)
+                data["for_"].append(line)
             anchors[aText].append(wrapper.RefWrapper(aText, displayText, data))
     except StopIteration:
         return anchors

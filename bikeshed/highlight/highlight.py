@@ -14,9 +14,6 @@ from pygments.lexers import get_lexer_by_name
 from .. import h, lexers, t
 from .. import messages as m
 
-if t.TYPE_CHECKING:
-    T = t.TypeVar("T")
-
 
 def loadCSSLexer() -> lexers.CSSLexer:
     return lexers.CSSLexer()
@@ -305,7 +302,7 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
         return h.createElement("c-", {color: ""}, text)
 
     def colorizeEl(el: t.ElementT, coloredText: t.Deque[ColoredText]) -> t.ElementT:
-        newChildren: list[str | t.ElementT] = []
+        newChildren: list[t.NodeT] = []
         for node in h.childNodes(el, clear=True):
             if h.isElement(node):
                 newChildren.append(colorizeEl(node, coloredText))
@@ -313,7 +310,7 @@ def mergeHighlighting(el: t.ElementT, coloredText: t.Sequence[ColoredText]) -> N
                 assert isinstance(node, str)
                 newChildren.extend(colorizeText(node, coloredText))
         if newChildren:
-            h.appendChild(el, newChildren)
+            h.appendChild(el, *newChildren)
         return el
 
     def colorizeText(text: str, coloredText: t.Deque[ColoredText]) -> list[t.NodeT]:
@@ -465,7 +462,7 @@ def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) ->
         h.appendChild(
             el,
             h.E.span({"class": "line-no"}),
-            h.E.span({"class": "line"}, nodes),
+            h.E.span({"class": "line"}, *nodes),
         )
     # Number the lines
     lineNumber = options.startingLine
@@ -490,8 +487,8 @@ def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) ->
     return el
 
 
-def splitNodesByLinebreaks(nodes: t.NodesT) -> t.Generator[list[t.NodesT], None, None]:
-    line: list[t.NodesT] = []
+def splitNodesByLinebreaks(nodes: t.NodeListT) -> t.Iterator[list[t.NodeT]]:
+    line: list[t.NodeT] = []
     for node in nodes:
         if isinstance(node, str):
             while True:
@@ -526,7 +523,11 @@ def countInternalNewlines(el: t.ElementT) -> int:
     return count
 
 
-def grouper(iterable: t.Sequence[T], n: int, fillvalue: T | None = None) -> itertools.zip_longest[tuple[T | None, ...]]:
+def grouper[T](
+    iterable: t.Sequence[T],
+    n: int,
+    fillvalue: T | None = None,
+) -> itertools.zip_longest[tuple[T | None, ...]]:
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n

@@ -53,7 +53,7 @@ def fillAttributeInfoSpans(doc: t.SpecT) -> None:
         if info is None:
             continue
 
-        h.appendChild(el, htmlFromInfo(info))
+        h.appendChild(el, *htmlFromInfo(info))
 
 
 @dataclasses.dataclass
@@ -106,14 +106,14 @@ def getTargetInfo(doc: t.SpecT, el: t.ElementT) -> TargetInfo | None:
     return TargetInfo(type, nullable, readonly, default)
 
 
-def htmlFromInfo(info: TargetInfo) -> t.NodesT:
-    deco = []
+def htmlFromInfo(info: TargetInfo) -> list[t.NodeT]:
+    deco: list[t.NodeT] = []
     if re.match(r"\w+<\w+(\s*,\s*\w+)*>", info.type):
         # Simple higher-kinded types
         match = re.match(r"(\w+)<(\w+(?:\s*,\s*\w+)*)>", info.type)
         assert match is not None
         types = [h.E.a({"data-link-type": "idl-name"}, x.strip()) for x in match.group(2).split(",")]
-        deco.extend([" of type ", match.group(1), "<", config.intersperse(types, ", "), ">"])
+        deco.extend([" of type ", match[1], "<", *config.intersperse(types, ", "), ">"])
     elif "<" in info.type or "(" in info.type:
         # Unions or more-complex higher-kinded types
         # Currently just bail, but I need to address this at some point.

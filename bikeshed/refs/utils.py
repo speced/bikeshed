@@ -190,7 +190,7 @@ def linkTextVariations(str: str, linkType: str | None) -> t.Generator[str, None,
 
 
 if t.TYPE_CHECKING:
-    U = t.TypeVar("U", bound="t.MutableMapping|t.MutableSequence")
+    U = t.TypeVar("U", bound="dict[t.Any, t.Any]|list[t.Any]")
 
 
 def stripLineBreaks(obj: U) -> U:

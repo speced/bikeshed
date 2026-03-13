@@ -24,8 +24,11 @@ from .nodes import (
     minimalEscapeAttr,
 )
 from .preds import charRefs, isControl, isDigit, isWhitespace
-from .result import Err, Ok, OkT, ResultT, isErr, isOk
+from .result import Err, Ok, isErr, isOk
 from .stream import Stream
+
+if t.TYPE_CHECKING:
+    from .result import OkT, ResultT
 
 VOID_ELEMENTS = {
     "area",
@@ -2410,7 +2413,7 @@ def parseLinkInfo(
     innerStart: int,
     startSigil: str,
     endSigil: str,
-    infoRe: re.Pattern,
+    infoRe: t.Pattern,
 ) -> ResultT[LinkData]:
     start = innerStart - len(startSigil)
     match, innerEnd, _ = s.searchRe(innerStart, infoRe)
@@ -2518,11 +2521,11 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
     normative = match[1] == "!"
     lt = match[2]
     modifierSequence = match[3].strip()
-    attrs = {
-        "data-lt": lt,
-        "data-link-type": "biblio",
-        "data-biblio-type": "normative" if normative else "informative",
-        "bs-autolink-syntax": s.slice(nodeStart, innerEnd) + "]]",
+    attrs: t.SafeAttrDict = {
+        "data-lt": escapeAttr(lt),
+        "data-link-type": t.SafeAttrStr("biblio"),
+        "data-biblio-type": t.SafeAttrStr("normative" if normative else "informative"),
+        "bs-autolink-syntax": escapeAttr(s.slice(nodeStart, innerEnd) + "]]"),
     }
 
     failureStart = StartTag.fromStream(s, nodeStart, innerStart, "span")
@@ -2535,7 +2538,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
         for modifier in re.split(r"\s+", modifierSequence):
             if modifier in ("current", "snapshot"):
                 if "data-biblio-status" not in attrs:
-                    attrs["data-biblio-status"] = modifier
+                    attrs["data-biblio-status"] = t.SafeAttrStr(modifier)
                 else:
                     m.die(
                         f"Biblio shorthand [{lt} ...] contains multiple current/snapshot keywords. Please use only one.",
@@ -2544,7 +2547,7 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
                     return failureResult
             elif modifier in ("inline", "index", "direct"):
                 if "data-biblio-display" not in attrs:
-                    attrs["data-biblio-display"] = modifier
+                    attrs["data-biblio-display"] = t.SafeAttrStr(modifier)
                 else:
                     m.die(
                         f"Biblio shorthand [{lt} ...] contains multiple inline/index/direct keywords. Please use only one.",
@@ -2876,15 +2879,15 @@ def replaceMacrosInText(text: str, macros: dict[str, str], s: Stream, start: int
     msc = constants.macroStartChar
     mec = constants.macroEndChar
 
-    def doRep(match: re.Match) -> str:
+    def doRep(match: t.Match) -> str:
         escaped = match[1] == "\\"
         biblio = match[1] == "["
         macroName = match[2].lower()
         optional = match[3] == "?"
         if escaped:
-            return msc + "&#91;" + t.cast("str", match[0][2:-1]) + "&#93;" + mec
+            return msc + "&#91;" + match[0][2:-1] + "&#93;" + mec
         if biblio:
-            return msc + "&#91;&#91;" + t.cast("str", match[0][2:-1]) + "&#93;" + mec
+            return msc + "&#91;&#91;" + match[0][2:-1] + "&#93;" + mec
         if macroName in macros:
             return msc + macros[macroName] + mec
         if optional:
@@ -2893,7 +2896,7 @@ def replaceMacrosInText(text: str, macros: dict[str, str], s: Stream, start: int
             f"Found unmatched text macro {match[0]} in {context}. Correct the macro, or escape it by replacing the opening [ with &bs[;.",
             lineNum=s.loc(start),
         )
-        return msc + "&#91;" + t.cast("str", match[0][1:-1]) + "&#93;" + mec
+        return msc + "&#91;" + match[0][1:-1] + "&#93;" + mec
 
     text, count = MACRO_ATTRIBUTE_RE.subn(doRep, text)
     if count > 0:
@@ -3305,5 +3308,5 @@ def htmlifyMarkdownEscapes(val: str) -> str:
     return re.sub(MARKDOWN_ESCAPE_RE, markdownEscapeReplacer, val)
 
 
-def markdownEscapeReplacer(match: re.Match) -> str:
+def markdownEscapeReplacer(match: t.Match) -> str:
     return f"&#{ord(match[1])};"

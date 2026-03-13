@@ -152,7 +152,7 @@ def appendTestList(
                 "lang": titleLang,
                 "dir": titleDir,
             },
-            h.parseHTML(h.safeHtml(title, context="<wpt title>")),
+            *h.parseHTML(h.safeHtml(title, context="<wpt title>")),
         )
         h.appendChild(blockEl, titleEl)
     testListEl = h.E.ul({"class": "wpt-tests-list"})

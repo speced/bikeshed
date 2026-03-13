@@ -161,7 +161,7 @@ class MetadataManager:
         self.wptPathPrefix: str | None = None
         self.imgAutoSize: bool = True
 
-        self.otherMetadata: OrderedDict[str, list[t.NodesT]] = OrderedDict()
+        self.otherMetadata: OrderedDict[str, list[t.NodeT]] = OrderedDict()
 
         self.manuallySetKeys: set[str] = set()
 

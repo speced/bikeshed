@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections import OrderedDict
 from datetime import datetime
@@ -15,12 +16,9 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
     if not doc.md.includeCanIUsePanels:
         return []
 
-    canIUseData = CanIUseManager(dataFile=doc.dataFile)
+    canIUseData = CIUData(dataFile=doc.dataFile)
 
     lastUpdated = datetime.utcfromtimestamp(canIUseData.updated).date().isoformat()
-
-    # e.g. 'iOS Safari' -> 'ios_saf'
-    classFromBrowser = canIUseData.agents
 
     panels = []
     elements = h.findAll("[caniuse]", doc)
@@ -33,22 +31,20 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
             m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
             continue
 
-        featId = dfn.get("caniuse")
+        featId = dfn.get("caniuse", "").lower()
         if not featId:
             continue
-        if not canIUseData.hasFeature(featId):
+        feature = canIUseData.getFeature(featId)
+        if not feature:
             m.die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
             continue
         del dfn.attrib["caniuse"]
-        featId = featId.lower()
-        feature = canIUseData.getFeature(featId)
 
         h.addClass(doc, dfn, "caniuse-paneled")
         panel = canIUsePanelFor(
             id=featId,
-            data=feature,
+            feature=feature,
             update=lastUpdated,
-            classFromBrowser=classFromBrowser,
         )
         panel.set("data-anno-for", dfnId)
         h.appendChild(doc.body, panel)
@@ -60,21 +56,19 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
     return panels
 
 
-def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[str, str]) -> t.ElementT:
+def canIUsePanelFor(id: str, feature: CIUFeature, update: str) -> t.ElementT:
     panel = h.E.details(
         {"class": "caniuse-status unpositioned", "data-deco": ""},
         h.E.summary({}, "CanIUse"),
     )
     mainPara = h.E.p({"class": "support"}, h.E.b({}, _t("Support:")))
     h.appendChild(panel, mainPara)
-    for browser, support in data["support"].items():
-        statusCode = support[0]
-        if statusCode == "u":
+    for support in feature.support:
+        if support.status == "unsupported":
             continue
-        minVersion = support[2:]
         h.appendChild(
             mainPara,
-            browserCompatSpan(classFromBrowser[browser], browser, statusCode, minVersion),
+            browserCompatSpan(support),
         )
     h.appendChild(
         panel,
@@ -88,37 +82,25 @@ def canIUsePanelFor(id: str, data: t.JSONT, update: str, classFromBrowser: dict[
     return panel
 
 
-def browserCompatSpan(
-    browserCodeName: str,
-    browserFullName: str,
-    statusCode: str,
-    minVersion: str | None = None,
-) -> t.ElementT:
-    if statusCode == "n" or minVersion is None:
-        minVersion = "None"
-    elif minVersion == "all":
-        minVersion = "All"
-    else:
-        minVersion = minVersion + "+"
+def browserCompatSpan(support: CIUSupport) -> t.ElementT:
     # browserCodeName: e.g. and_chr, ios_saf, ie, etc...
     # browserFullName: e.g. "Chrome for Android"
-    statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
-    outer = h.E.span({"class": browserCodeName + " " + statusClass})
-    if statusCode == "a":
-        h.appendChild(outer, h.E.span({}, h.E.span({}, browserFullName, _t(" (limited)"))))
+    outer = h.E.span({"class": support.browserClass + " " + support.status})
+    if support.status == "partial":
+        h.appendChild(outer, h.E.span({}, h.E.span({}, support.browserName, _t(" (limited)"))))
     else:
-        h.appendChild(outer, h.E.span({}, browserFullName))
-    h.appendChild(outer, h.E.span({}, minVersion))
+        h.appendChild(outer, h.E.span({}, support.browserName))
+    h.appendChild(outer, h.E.span({}, support.minVersion))
     return outer
 
 
-def validateCanIUseURLs(doc: t.SpecT, canIUseData: CanIUseManager, elements: list[t.ElementT]) -> None:
+def validateCanIUseURLs(doc: t.SpecT, canIUseData: CIUData, elements: list[t.ElementT]) -> None:
     # First, ensure that each Can I Use URL shows up at least once in the data;
     # otherwise, it's an error to be corrected somewhere.
     urlFeatures = set()
     for url in doc.md.canIUseURLs:
         sawTheURL = False
-        for featureID, featureUrl in canIUseData.urlFromFeature.items():
+        for featureID, featureUrl in canIUseData.urlFromFeatureName.items():
             if featureUrl.startswith(url):
                 sawTheURL = True
                 urlFeatures.add(featureID)
@@ -147,29 +129,81 @@ def validateCanIUseURLs(doc: t.SpecT, canIUseData: CanIUseManager, elements: lis
         )
 
 
-class CanIUseManager:
+class CIUData:
     def __init__(self, dataFile: t.DataFileRequester) -> None:
         self.dataFile = dataFile
         data = json.loads(
             self.dataFile.fetch("caniuse", "data.json", str=True),
             object_pairs_hook=OrderedDict,
         )
-        self.updated = data["updated"]
-        self.agents = data["agents"]
-        self.urlFromFeature = data["features"]
-        self.features: t.JSONT = {}
+        self.updated = t.cast(int, data["updated"])
+        self.classFromBrowser = t.cast("dict[str, str]", data["agents"])
+        self.urlFromFeatureName = t.cast("dict[str, str]", data["features"])
+        self.features: dict[str, CIUFeature] = {}
 
     def hasFeature(self, featureName: str) -> bool:
-        return featureName in self.urlFromFeature
+        return featureName in self.urlFromFeatureName
 
-    def getFeature(self, featureName: str) -> t.JSONT:
+    def getFeature(self, featureName: str) -> CIUFeature | None:
         if featureName in self.features:
-            return t.cast("t.JSONT", self.features[featureName])
+            return self.features[featureName]
         if not self.hasFeature(featureName):
-            return {}
-        data = json.loads(
-            self.dataFile.fetch("caniuse", f"feature-{featureName}.json", str=True),
-            object_pairs_hook=OrderedDict,
+            return None
+        data = CIUFeature.fromJSON(
+            self,
+            json.loads(
+                self.dataFile.fetch("caniuse", f"feature-{featureName}.json", str=True),
+                object_pairs_hook=OrderedDict,
+            ),
         )
         self.features[featureName] = data
-        return t.cast("t.JSONT", data)
+        return data
+
+
+@dataclasses.dataclass
+class CIUFeature:
+    notes: str
+    url: str
+    support: list[CIUSupport]
+
+    @classmethod
+    def fromJSON(cls, data: CIUData, j: t.JSONObject) -> t.Self:
+        return cls(
+            notes=t.cast(str, j["notes"]),
+            url=t.cast(str, j["url"]),
+            support=[
+                CIUSupport.fromJSON(data, name, unparsed)
+                for name, unparsed in t.cast("dict[str, str]", j["support"]).items()
+            ],
+        )
+
+
+@dataclasses.dataclass
+class CIUSupport:
+    browserName: str
+    browserClass: str
+    status: str
+    minVersion: str
+
+    @classmethod
+    def fromJSON(cls, data: CIUData, browserName: str, unparsed: str) -> t.Self:
+        code = unparsed[0]
+        if code == "y":
+            status = "yes"
+        elif code == "n":
+            status = "no"
+        elif code == "a":
+            status = "partial"
+        else:
+            status = "unsupported"
+        minVersion = unparsed[2:]
+        if code == "no" or not minVersion:
+            # has to come first, "n all" should output as "none"
+            minVersion = "None"
+        elif minVersion == "all":
+            minVersion = "All"
+        else:
+            # numeric
+            minVersion += "+"
+        browserClass = data.classFromBrowser[browserName]
+        return cls(browserName, browserClass, status, minVersion)

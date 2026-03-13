@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import get_args
 
 import cddlparser
 
 from . import config, h, t
 from . import messages as m
+
+
+@dataclasses.dataclass
+class CDDLTerm:
+    type: str
+    name: str
+    dfnFor: str | None
 
 
 class CDDLMarker(cddlparser.ast.Marker):
@@ -20,7 +28,7 @@ class CDDLMarker(cddlparser.ast.Marker):
     currentParameters: list[str]
 
     # List of all CDDL terms defined so far to track and report duplicates
-    defined: list
+    defined: list[CDDLTerm]
 
     def __init__(self) -> None:
         self.currentRule = None
@@ -29,7 +37,7 @@ class CDDLMarker(cddlparser.ast.Marker):
 
     def _recordDefinition(self, type: str, name: str, dfnFor: str | None = None) -> bool:
         for term in self.defined:
-            if term["type"] == type and term["name"] == name and term["dfnFor"] == dfnFor:
+            if term.type == type and term.name == name and term.dfnFor == dfnFor:
                 forText = "" if dfnFor is None else f' defined in type "{dfnFor}"'
                 m.die(
                     f"CDDL {type} {name}{forText} creates a duplicate and cannot be referenced.\nPlease create additional CDDL types to disambiguate.",
@@ -37,13 +45,13 @@ class CDDLMarker(cddlparser.ast.Marker):
                 return False
         if type != "parameter":
             for term in self.defined:
-                if term["type"] != "parameter" and term["name"] == name and term["dfnFor"] == dfnFor:
+                if term.type != "parameter" and term.name == name and term.dfnFor == dfnFor:
                     forText = "" if dfnFor is None else f' defined in type "{dfnFor}"'
                     m.warn(
-                        f"CDDL {type} {name}{forText} creates a duplicate with a CDDL {term['type']}.\nLink type needs to be specified to reference the term.\nConsider creating additional CDDL types to disambiguate.",
+                        f"CDDL {type} {name}{forText} creates a duplicate with a CDDL {term.type}.\nLink type needs to be specified to reference the term.\nConsider creating additional CDDL types to disambiguate.",
                     )
                     break
-        term = {"type": type, "name": name, "dfnFor": dfnFor}
+        term = CDDLTerm(type=type, name=name, dfnFor=dfnFor)
         self.defined.append(term)
         return True
 

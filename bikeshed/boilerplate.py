@@ -14,17 +14,17 @@ from . import refs as r
 from .translate import _t
 
 if t.TYPE_CHECKING:
-    MetadataValueT: t.TypeAlias = str | t.NodesT | None
-    MetadataT: t.TypeAlias = t.Mapping[str, t.Sequence[MetadataValueT]]
+    type MetadataValueT = t.NodeT | None
+    type MetadataT = t.Mapping[str, list[MetadataValueT]]
 
 
-def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> t.NodesT:
+def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> list[t.NodeT]:
     htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context), context=context)
     # FIXME: Here I'm having to pass a value that's already an EarlyParsedHtmlStr
     # (and thus should be safe for parsing into a doc) back thru h.safeHtml(),
     # because h.parseHTML() is still using the lxml parser, not my SimpleParser,
     # so the virtualLinebreak chars don't get handled unless I do it myself.
-    bp = h.E.div({}, h.parseHTML(h.safeHtml(htmlString)))
+    bp = h.E.div({}, *h.parseHTML(h.safeHtml(htmlString)))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
 
@@ -134,7 +134,7 @@ def addHeaderFooter(doc: t.SpecT) -> None:
     )
 
 
-def fillWith(tag: str, newElements: t.NodesT, doc: t.SpecT) -> None:
+def fillWith(tag: str, newElements: t.Sequence[t.NodeT], doc: t.SpecT) -> None:
     for el in doc.fillContainers[tag]:
         h.replaceContents(el, newElements)
 
@@ -519,8 +519,11 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
     if not doc.externalRefsUsed.hasRefs():
         return
 
-    def makeEntry(ref: t.RefWrapper, contents: t.NodesT) -> t.ElementT:
-        return h.E.span({"id": h.uniqueID("external-term", ref.url, ref.text)}, contents)
+    def makeEntry(ref: t.RefWrapper, contents: t.NodeListT) -> t.ElementT:
+        return h.E.span(
+            {"id": h.uniqueID("external-term", ref.url, ref.text)},
+            *contents,
+        )
 
     ul = h.E.ul({"class": "index"})
 
@@ -1085,7 +1088,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
     # and upgrade html-text values into real elements
     otherMd: OrderedDict[str, list[MetadataValueT]] = OrderedDict()
     for k, vs in doc.md.otherMetadata.items():
-        parsed: list[t.NodesT] = []
+        parsed: list[t.NodeT | None] = []
         for v in vs:
             if isinstance(v, str):
                 if v == "":
@@ -1095,24 +1098,22 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                     h.ParseConfig.fromSpec(doc, context=f"!{k} metadata"),
                     context=f"!{k} metadata",
                 )
-                parsed.append(h.parseHTML(htmlText))
+                parsed.append(h.E.inline({}, *h.parseHTML(htmlText)))
             else:
                 parsed.append(v)
         if k in md:
             md[k].extend(parsed)
         else:
-            otherMd[k] = t.cast("list[t.NodesT|None]", parsed)
+            otherMd[k] = parsed
 
-    el = [htmlFromMd(md, otherMd, doc)]
-
-    fillWith("spec-metadata", el, doc=doc)
+    fillWith("spec-metadata", [htmlFromMd(md, otherMd, doc)], doc=doc)
 
 
-def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT) -> t.NodesT:
+def createMdEntry(key: str, dirtyVals: t.Sequence[MetadataValueT], doc: t.SpecT) -> list[t.ElementT]:
     # Turns a metadata key/vals pair
     # into a list of dt/dd elements.
 
-    vals: list[t.NodesT] = [x for x in dirtyVals if x is not None]
+    vals: list[t.NodeT] = [x for x in dirtyVals if x is not None]
     if not vals:
         return []
     # Convert the canonical key to a display version
@@ -1214,7 +1215,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
                     "[" + formatBiblioTerm(ref.linkText) + "]",
                 ),
             )
-            h.appendChild(dl, h.E.dd(*ref.toHTML()))
+            h.appendChild(dl, h.E.dd({}, ref.toHTML()))
 
     informRefs = [
         x
@@ -1239,7 +1240,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
                     "[" + formatBiblioTerm(ref.linkText) + "]",
                 ),
             )
-            h.appendChild(dl, h.E.dd(*ref.toHTML()))
+            h.appendChild(dl, h.E.dd({}, ref.toHTML()))
 
 
 def addIssuesSection(doc: t.SpecT) -> None:

@@ -53,7 +53,7 @@ def fixManualDefTables(doc: t.SpecT) -> None:
         cell = h.find("tr:first-child > :nth-child(2)", table)
         if cell is not None:
             names = [x.strip() for x in h.textContent(cell).split(",")]
-            newContents = config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", ")
+            newContents = list(config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", "))
             h.replaceContents(cell, newContents)
 
 
@@ -594,7 +594,7 @@ def determineLinkText(el: t.ElementT) -> str:
         # Remove arguments from CSS function autolinks,
         # as they should always be defined argument-less
         # (and this allows filled-in examples to still autolink).
-        linkText = t.cast(re.Match, re.match(r"^([\w-]+)\(.*\)$", contents)).group(1) + "()"
+        linkText = t.cast("t.Match", re.match(r"^([\w-]+)\(.*\)$", contents)).group(1) + "()"
     else:
         linkText = contents
     linkText = h.foldWhitespace(linkText)
@@ -1323,6 +1323,7 @@ def formatArgumentdefTables(doc: t.SpecT) -> None:
             arg = t.cast("widlparser.Argument", method.find_argument(argName))
             if arg:
                 h.appendChild(typeCell, idl.nodesFromType(arg.type))
+                # print(h.printNodeTree(idl.nodesFromType(arg.type)))
                 if str(arg.type).strip().endswith("?"):
                     h.appendChild(nullCell, h.E.span({"class": "yes"}, "✔"))
                 else:
