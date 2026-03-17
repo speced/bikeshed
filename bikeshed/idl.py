@@ -271,6 +271,9 @@ class IDLMarker(widlparser.protocols.Marker):
             "Promise": "interface",
             "FrozenArray": "interface",
             "ObservableArray": "interface",
+            "iterable": "dfn",
+            "maplike": "dfn",
+            "setlike": "dfn",
         }
         if text in builtinTypes:
             return (
