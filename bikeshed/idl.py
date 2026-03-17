@@ -192,11 +192,6 @@ class IDLMarker(widlparser.protocols.Marker):
     def markup_type_name(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         # Fires for non-defining type names, such as arg types.
 
-        # The names in [Exposed=Foo] are [Global] tokens, not interface names.
-        # Since I don't track globals as a link target yet, don't link them at all.
-        if construct.idl_type == "extended-attribute" and construct.name == "Exposed":
-            return (None, None)
-
         # The name in [PutForwards=foo] is an attribute of the same interface.
         if construct.idl_type == "extended-attribute" and construct.name == "PutForwards":
             # In [PutForwards=value] attribute DOMString foo
