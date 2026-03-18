@@ -1,4 +1,4 @@
-FROM python:3.9-bullseye as base
+FROM python:3.12-bullseye as base
 
 # Get the latest spec-data, then cache it so we don't have to redo this on every rebuild
 from base as specdata
