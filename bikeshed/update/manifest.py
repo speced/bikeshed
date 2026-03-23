@@ -269,7 +269,7 @@ if t.TYPE_CHECKING:
 
 @dataclasses.dataclass
 class Manifest:
-    dt: datetime = dataclasses.field(default_factory=lambda: dtNow())
+    dt: datetime = dataclasses.field(default_factory=dtNow)
     entries: dict[ManifestRelPath, ManifestFileHash] = dataclasses.field(default_factory=dict)
     # Bump this version manually whenever you update the datafiles
     version: int = 1

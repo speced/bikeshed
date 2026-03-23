@@ -1638,7 +1638,7 @@ def parseRangeComponent(s: Stream, i: int, val: str) -> tuple[str | None, float 
     match = re.match(r"(\d+)([\w-]*)", val)
     if match is None:
         return None, 0
-    (digits, unit) = match.groups()
+    digits, unit = match.groups()
     num = int(digits) * signVal
     val = str(num)
 
