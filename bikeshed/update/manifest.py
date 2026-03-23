@@ -43,6 +43,15 @@ knownFolders = [
 
 ghPrefix = "https://raw.githubusercontent.com/speced/bikeshed-data/main/data/"
 
+
+def dtNow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def dtZero() -> datetime:
+    return datetime(1970, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+
 # To avoid 'Event loop is closed' RuntimeError due to compatibility issue with aiohttp
 if sys.platform.startswith("win") and sys.version_info >= (3, 8):
     try:
@@ -380,14 +389,6 @@ def getDatafilePaths(basePath: str) -> t.Generator[tuple[str, str], None, None]:
                 continue
             filePath = os.path.join(root, filename)
             yield filePath, os.path.relpath(filePath, basePath)
-
-
-def dtNow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def dtZero() -> datetime:
-    return datetime(1970, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def printDt(dt: datetime) -> str:
