@@ -473,7 +473,7 @@ def parseNode(
     if first2 == "—\n" or first3 == "--\n":
         match, i, _ = s.matchRe(start, emdashRe)
         if match is not None:
-            # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+            # Fix line-ending em dashes, or --, by moving the previous line up with an extra space.
             node = RawText.fromStream(s, start, i, "— ")
             return Ok(node, i)
 
