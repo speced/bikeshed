@@ -474,7 +474,7 @@ def parseNode(
         match, i, _ = s.matchRe(start, emdashRe)
         if match is not None:
             # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-            node = RawText.fromStream(s, start, i, "—\u200b")
+            node = RawText.fromStream(s, start, i, "— ")
             return Ok(node, i)
 
     if first1 in ("<", "&"):
