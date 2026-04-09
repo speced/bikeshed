@@ -1,7 +1,7 @@
 FROM python:3.12-bullseye as base
 
 # Get the latest spec-data, then cache it so we don't have to redo this on every rebuild
-from base as specdata
+FROM base as specdata
 RUN mkdir /bikeshed-main
 WORKDIR /bikeshed-main
 RUN git clone --depth=1 --branch=main https://github.com/speced/bikeshed.git /bikeshed-main
@@ -25,8 +25,9 @@ COPY --from=specdata /bikeshed-main/bikeshed/spec-data /app/bikeshed/spec-data
 # setup.py opens README.md, semver.txt and requirements.txt so they must be copied.
 COPY setup.py README.md requirements.txt /app/
 COPY bikeshed/semver.txt /app/bikeshed/
+COPY bikeshed /app/bikeshed
+COPY bikeshed.py /app/
+
 RUN pip install --editable .
 
 COPY .git /app/.git
-COPY bikeshed.py /app/
-COPY bikeshed /app/bikeshed
