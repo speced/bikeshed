@@ -133,11 +133,15 @@ class ReferenceManager:
             self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
 
         initFors()
-        if doc and doc.inputSource and doc.inputSource.hasDirectory():
+
+        def initLinkDefaults() -> None:
             ldData = self.dataFile.fetch("link-defaults.infotree").read()
             dummyEl = h.E.pre()
             datablocks.transformInfo(ldData, dummyEl, doc=doc)
 
+        initLinkDefaults()
+
+        if doc and doc.inputSource and doc.inputSource.hasDirectory():
             # Get local anchor data
             shouldGetLocalAnchorData = doc.md.externalInfotrees["anchors.bsdata"]
             if not shouldGetLocalAnchorData and doc.inputSource.cheaplyExists("anchors.bsdata"):
