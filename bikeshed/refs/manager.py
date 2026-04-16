@@ -136,8 +136,7 @@ class ReferenceManager:
 
         def initLinkDefaults() -> None:
             ldData = self.dataFile.fetch("link-defaults.infotree").read()
-            dummyEl = h.E.pre()
-            datablocks.transformInfo(ldData, dummyEl, doc=doc)
+            datablocks.transformInfo(ldData, None, doc=doc)
 
         initLinkDefaults()
 
@@ -158,7 +157,7 @@ class ReferenceManager:
                     if not anchorFile:
                         raise OSError
                     anchorData = anchorFile.read().content
-                    datablocks.transformAnchors(anchorData, dummyEl, doc=doc)
+                    datablocks.transformAnchors(anchorData, None, doc=doc)
                 except OSError:
                     m.warn("anchors.bsdata not found despite being listed in the External Infotrees metadata.")
 
@@ -178,7 +177,7 @@ class ReferenceManager:
                     if not ldFile:
                         raise OSError
                     ldData = ldFile.read().content
-                    datablocks.transformInfo(ldData, dummyEl, doc=doc)
+                    datablocks.transformInfo(ldData, None, doc=doc)
                 except OSError:
                     m.warn("link-defaults.infotree not found despite being listed in the External Infotrees metadata.")
 

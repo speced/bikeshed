@@ -384,9 +384,7 @@ def parseDefBlock(
     # Returns a dict of the (bs-parsed) key and value.
     # Concatenates values (with a newline) from lines with the same key
     vals: OrderedDict[str, tuple[int, str]] = OrderedDict()
-    startLine = h.parseLineNumber(el)
-    if startLine is None:
-        startLine = 1
+    startLine = h.parseLineNumber(el) or 1
     lines = data.split("\n")
     if lines[0].strip() == "":
         lines = lines[1:]
@@ -517,7 +515,7 @@ def transformRailroad(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | N
     return None
 
 
-def transformBiblio(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+def transformBiblio(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
     storage: t.BiblioStorageT = defaultdict(list)
     biblio.processSpecrefBiblioFile(data, storage, order=1)
     for k, vs in storage.items():
@@ -526,8 +524,8 @@ def transformBiblio(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | Non
     return None
 
 
-def transformAnchors(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    lineNum = h.parseLineNumber(el)
+def transformAnchors(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
+    lineNum = h.parseLineNumber(el) if el is not None else 1
     anchors = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
     processAnchors(anchors, doc, lineNum)
     return None
@@ -631,8 +629,8 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
             doc.refs.anchorBlockRefs.addMethodVariants(anchor["text"][0], anchor.get("for", []), doc.md.shortname)
 
 
-def transformLinkDefaults(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    lineNum = h.parseLineNumber(el)
+def transformLinkDefaults(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
+    lineNum = h.parseLineNumber(el) if el is not None else 1
     lds = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
     processLinkDefaults(lds, doc, lineNum)
     return None
@@ -669,9 +667,10 @@ def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None
             doc.md.linkDefaults[text].append((spec, type, status, None))
 
 
-def transformIgnoredSpecs(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    specs = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
-    processIgnoredSpecs(specs, doc, h.parseLineNumber(el))
+def transformIgnoredSpecs(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
+    lineNum = h.parseLineNumber(el) if el is not None else 1
+    specs = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
+    processIgnoredSpecs(specs, doc, lineNum)
     return None
 
 
@@ -698,12 +697,13 @@ def processIgnoredSpecs(specs: InfoTreeT, doc: t.SpecT, lineNum: int | None = No
                 doc.refs.ignoredSpecs.add(specName)
 
 
-def transformInfo(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
+def transformInfo(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
-    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
-    processInfo(infos, doc, h.parseLineNumber(el))
+    lineNum = h.parseLineNumber(el) if el is not None else 1
+    infos = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
+    processInfo(infos, doc, lineNum)
     return None
 
 
