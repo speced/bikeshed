@@ -599,7 +599,7 @@ def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -
             else:
                 m.lint("Line starts with spaces, but document is tab-indented", lineNum=line.i)
         if re.match(r"(\t+ +\t)|( +\t)", line.text):
-            m.lint(f"Line's indent contains tabs after spaces.", lineNum=line.i)
+            m.lint("Line's indent contains tabs after spaces.", lineNum=line.i)
 
 
 def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
