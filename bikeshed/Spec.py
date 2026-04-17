@@ -213,11 +213,11 @@ class Spec:
         self.initMetadata(self.inputContent)
         self.recordDependencies(self.inputSource)
 
+        self.lines = self.earlyParse(self.inputContent)
+
         if "mixed-indents" in self.md.complainAbout:
             if self.md.indentInfo and self.md.indentInfo.char:
-                checkForMixedIndents(self.inputContent.lines, self.md.indentInfo)
-
-        self.lines = self.earlyParse(self.inputContent)
+                checkForMixedIndents(self.lines, self.md.indentInfo)
 
         extensions.load(self)
 
@@ -599,7 +599,7 @@ def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -
             else:
                 m.lint("Line starts with spaces, but document is tab-indented", lineNum=line.i)
         if re.match(r"(\t+ +\t)|( +\t)", line.text):
-            m.lint(f"Line {line.i}'s indent contains tabs after spaces.")
+            m.lint(f"Line's indent contains tabs after spaces.", lineNum=line.i)
 
 
 def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
