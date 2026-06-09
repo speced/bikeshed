@@ -135,8 +135,11 @@ def retrieveBoilerplateFile(
 
     searchLocally = allowLocal and doc.md.localBoilerplate[name]
 
-    def boilerplatePath(*segs: str) -> str:
-        return dataFile.path("boilerplate", *segs)
+    def boilerplatePaths(*segs: str) -> list[str]:
+        paths = [dataFile.path("boilerplate", *segs)]
+        if dataFile.fallback:
+            paths.append(dataFile.fallback.path("boilerplate", *segs))
+        return paths
 
     filenames = []
     if statusName:
@@ -165,16 +168,23 @@ def retrieveBoilerplateFile(
     # 2: Look in the group's folder
     if groupName and orgName:
         sources.extend(
-            InputSource.FileInputSource(boilerplatePath("org-" + orgName, groupName, fn), chroot=False)
+            InputSource.FileInputSource(p, chroot=False)
             for fn in filenames
+            for p in boilerplatePaths("org-" + orgName, groupName, fn)
         )
     # 3: Look in the org's folder
     if orgName:
         sources.extend(
-            InputSource.FileInputSource(boilerplatePath("org-" + orgName, fn), chroot=False) for fn in filenames
+            InputSource.FileInputSource(p, chroot=False)
+            for fn in filenames
+            for p in boilerplatePaths("org-" + orgName, fn)
         )
     # 4: Look in the generic defaults
-    sources.extend(InputSource.FileInputSource(boilerplatePath("default", fn), chroot=False) for fn in filenames)
+    sources.extend(
+        InputSource.FileInputSource(p, chroot=False)
+        for fn in filenames
+        for p in boilerplatePaths("default", fn)
+    )
 
     # Watch all the possible sources, not just the one that got used, because if
     # an earlier one appears, we want to rebuild.
