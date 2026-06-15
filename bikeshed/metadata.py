@@ -805,7 +805,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
     # markdown is an alias for markdown-inline.
     # TODO: convert all specs to use markdown-inline, and then turn markdown
     # into a shorthand for markdown-*.
-    if ret.hasExplicit("markdown") and "markdown" in ret:
+    if ret.explicitTrue("markdown"):
         ret["markdown-inline"] = True
         del ret["markdown"]
     return ret

@@ -7,11 +7,9 @@ from .. import t
 
 class BoolSet(collections.abc.MutableMapping[str, bool]):
     """
-    Implements a "boolean set",
-    where keys can be explicitly set to True or False,
-    but interacted with like a normal set
-    (similar to Counter, but with bools).
-    Can also set whether the default should consider unset values to be True or False by default.
+    Like a defaultdict specialized to bools.
+    Plus, it implements `in` like a set,
+    returning True if the dict (or the default) would return True.
     """
 
     def __init__(self, values: t.Any = None, default: bool = False) -> None:
@@ -58,7 +56,15 @@ class BoolSet(collections.abc.MutableMapping[str, bool]):
         return f"BoolSet({vrepr}, default={self.default})"
 
     def hasExplicit(self, key: t.Any) -> bool:
+        # True if the value was explicitly set (to True *or* False);
+        # False if it's relying on the default.
         return key in self._internal
+
+    def explicitTrue(self, key: t.Any) -> bool:
+        return key in self._internal and self._internal[key]
+
+    def explicitFalse(self, key: t.Any) -> bool:
+        return key in self._internal and not self._internal[key]
 
     @t.overload
     def update(self, __other: t.SupportsKeysAndGetItem[t.Any, t.Any], **kwargs: bool) -> None: ...
