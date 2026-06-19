@@ -756,7 +756,10 @@ def parseBoolishList(
             m.die(f"{key} metadata pieces are a label and a boolean. Got:\n{v}", lineNum=lineNum)
             continue
         if validLabels and name not in validLabels:
-            m.die(f"Unknown {key} label '{name}'.", lineNum=lineNum)
+            m.die(
+                f"Unknown {key} label '{name}'. Valid values are:\n{config.englishFromList(validLabels, "or")}",
+                lineNum=lineNum,
+            )
             continue
         if boolstring in extraValues:
             boolset[name] = extraValues[boolstring]
@@ -795,6 +798,7 @@ def parseMarkupShorthands(key: str, val: str, lineNum: str | int | None) -> conf
             "macros-in-autolinks",
             "markdown",
             "markdown-block",
+            "markdown-blockquotes",
             "markdown-inline",
             "markdown-escapes",
             "markup",

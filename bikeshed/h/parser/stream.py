@@ -24,6 +24,7 @@ class ParseConfig:
     idl: bool = False
     macrosInAutolinks: bool = False
     markdownBlock: bool = False
+    markdownBlockquotes: bool = False
     markdownInline: bool = False
     markdownEscapes: bool = False
     markup: bool = False

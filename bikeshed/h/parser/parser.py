@@ -58,7 +58,7 @@ BRACKET_AUTOLINK_CHARS = "=$:[]^"
 # start of unconsumed text.
 # (Adding more just means parseAnything will break text into
 #  smaller chunks; it doesn't affect correctness.)
-POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS + constants.bqStart + constants.bqEnd
+POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS + constants.bqChar
 
 
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
@@ -260,16 +260,9 @@ def parseNode(
     inA = s.inTagContext("a")
     inDfn = s.inTagContext("dfn")
 
-    if first1 == constants.bqStart:
-        nodes = [
-            StartTag.fromStream(s, start, start + 1, "blockquote"),
-            RawText.fromStream(s, start, start + 1, "\n\n"),
-        ]
-        return Ok(nodes, start + 1)
-
-    if first1 == constants.bqEnd:
-        nodes = [RawText.fromStream(s, start, start + 1, "\n\n"), EndTag.fromStream(s, start, start + 1, "blockquote")]
-        return Ok(nodes, start + 1)
+    if first1 == constants.bqChar:
+        node = RawText.fromStream(s, start, start + 1, ">")
+        return Ok(node, start + 1)
 
     if first1 == "&":
         ch, i, _ = parseCharRef(s, start, context=CharRefContext.NonAttr)
@@ -811,7 +804,6 @@ def isDatablockClass(text: str) -> bool:
 def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) -> None:
     # Prepare a datablock, which might have content that'll confuse the markdown parser,
     # by instead shoving the contents into an attribute, after linebreaks are removed.
-    # Then add blank lines back, to keep the line counts correct.
 
     # If this is from text that's been re-parsed, don't overwrite an already-smuggled value.
     if "bs-datablock-data" in el.startTag.attrs:
@@ -827,6 +819,11 @@ def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) ->
     # Make the element single-line,
     el.data = ""
     singleLineText = text.replace("\n", constants.virtualLineBreak)
+    if constants.bqChar in singleLineText:
+        # These elements won't see the markdown parser, so any bqChar
+        # would pass thru to the final doc, which is definitely wrong.
+        # Return them to > chars.
+        singleLineText = singleLineText.replace(constants.bqChar, ">")
     el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
     el.startTag.attrs["bs-datablock-data"] = escapeAttr(singleLineText)
     # Note, because el remembers its original start/end line number,
@@ -899,7 +896,12 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     # If I can, guess at what the 'garbage' is so I can display it.
     # Only look at next 20 chars, tho, so I don't spam the console.
     next20 = s.slice(i, i + 20)
-    if ">" in next20 or " " in next20:
+    if bqCharPreviouslyOnLine(s, i):
+        m.die(
+            f"Failed to parse a <{tagname}> (starting on {s.loc(start)}) start tag that appears to be split across the lines of a markdown blockquote. You might need to reformat the tag, or switch to the <blockquote> element.\n  See <https://speced.github.io/bikeshed/#md-blockquote>",
+            lineNum=s.loc(i),
+        )
+    elif ">" in next20 or " " in next20:
         garbageEnd = min(config.safeIndex(next20, ">", 20), config.safeIndex(next20, " ", 20))
         m.die(
             f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff ({next20[:garbageEnd]}).",
@@ -908,6 +910,14 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     else:
         m.die(f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff.", lineNum=s.loc(i))
     return Err(start)
+
+
+def bqCharPreviouslyOnLine(s: Stream, i: int) -> bool:
+    while i >= 0 and s[i] != "\n":
+        if s[i] == constants.bqChar:
+            return True
+        i -= 1
+    return False
 
 
 def parseTagName(s: Stream, start: int) -> ResultT[str]:
@@ -920,7 +930,7 @@ def parseTagName(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
-    _, i, _ = parseWhitespace(s, start)
+    _, i, _ = parseWhitespaceOrBq(s, start)
     attr = None
     attrs: dict[str, str] = {}
     while True:
@@ -962,7 +972,7 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
         else:
             break
 
-        ws, i, _ = parseWhitespace(s, i)
+        ws, i, _ = parseWhitespaceOrBq(s, i)
         if ws is None:
             # We're definitely done, just see if it should be an error nor not.
             if s.eof(i):
@@ -1198,6 +1208,16 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str 
 def parseWhitespace(s: Stream, start: int) -> ResultT[bool]:
     i = start
     while preds.isWhitespace(s[i]):
+        i += 1
+    if i != start:
+        return Ok(True, i)
+    else:
+        return Err(start)
+
+
+def parseWhitespaceOrBq(s: Stream, start: int) -> ResultT[bool]:
+    i = start
+    while preds.isWhitespace(s[i]) or s[i] == constants.bqChar:
         i += 1
     if i != start:
         return Ok(True, i)
@@ -2338,7 +2358,7 @@ def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[Par
     return Ok([startCode, startTag, middleText, endTag, endCode], nodeEnd)
 
 
-SHORTHAND_VARIABLE_RE = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
+SHORTHAND_VARIABLE_RE = re.compile(r"\|(\w(?:[\w\s" + constants.bqChar + r"-]*\w)?)\|")
 
 
 def parseShorthandVariable(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
@@ -2445,17 +2465,20 @@ def parseLinkInfo(
 
     linkFor = None
     linkType = None
+    # If you break an autolink across lines inside a markdown blockquote,
+    # the > (turned into a bqChar) is there but should be ignored as whitespace.
+    wsPattern = r"[\s" + constants.bqChar + "]+"
     if "/" in lt:
         linkFor, _, lt = lt.rpartition("/")
         if linkFor == "":
             linkFor = "/"
         linkFor = linkFor.strip()
-        linkFor = re.sub(r"\s+", " ", linkFor)
+        linkFor = re.sub(wsPattern, " ", linkFor)
     if "!!" in lt:
         lt, _, linkType = lt.partition("!!")
         linkType = linkType.strip()
     lt = lt.strip()
-    lt = re.sub(r"\s+", " ", lt)
+    lt = re.sub(wsPattern, " ", lt)
 
     # Even tho you no longer *need* to escape [[..]] in links
     # (used for WebIDL private slots), the parser still *allows*

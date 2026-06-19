@@ -13,6 +13,8 @@ from .. import messages as m
 class MarkdownConfig:
     indent: int
     headings: bool = True
+    blockquotes: bool = True
+    explicitBlockquotes: bool = True
     blockElements: list[str] = field(default_factory=list)
 
     @staticmethod
@@ -20,6 +22,8 @@ class MarkdownConfig:
         return MarkdownConfig(
             indent=doc.md.indent,
             headings=True,
+            blockquotes=not doc.md.markupShorthands.explicitFalse("markdown-blockquotes"),
+            explicitBlockquotes=doc.md.markupShorthands.explicitTrue("markdown-blockquotes"),
             blockElements=doc.md.blockElements + doc.md.opaqueElements,
         )
 
@@ -137,8 +141,10 @@ def tokenizeLines(lines: list[l.Line], config: MarkdownConfig) -> list[TokenT]:
         return False
 
     tokens: list[TokenT] = []
+    blockquoteWarned = False
 
-    for i, line in enumerate(lines):
+    for line in lines:
+        i = line.i
         lineText = line.text.strip()
         # Skip lines that are entirely a censored comment.
         if lineText == constants.bsComment:
@@ -199,8 +205,14 @@ def tokenizeLines(lines: list[l.Line], config: MarkdownConfig) -> list[TokenT]:
             assert match is not None
             type = "dt" if len(match.group(1)) == 1 else "dd"
             token = {"type": type, "text": ""}
-        elif re.match(r">", lineText):
-            match = re.match(r">\s?(.*)", lineText)
+        elif config.blockquotes and (lineText.startswith(">") or lineText.startswith(constants.bqChar)):
+            if not blockquoteWarned and not config.explicitBlockquotes:
+                blockquoteWarned = True
+                m.warn(
+                    f"Line {i} looks like the start of a markdown blockquote.\nIf this is intended, please set `Markup Shorthands: markdown-blockquotes yes`; if not, set it to `no`.\nSee https://speced.github.io/bikeshed/#md-blockquote for details.",
+                )
+            charClass = "[>" + constants.bqChar + "]"
+            match = re.match(charClass + r"\s?(.*)", lineText)
             assert match is not None
             token = {"type": "blockquote", "text": match.group(1)}
         elif re.match(r"<", lineText):
