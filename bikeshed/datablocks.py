@@ -49,13 +49,43 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
             m.die(f"Unknown datablock type '{blockType}'.", el=el)
             continue
         transformer = blockTypes[blockType]
-        blockData = blockData.replace(constants.virtualLineBreak, "\n")
+        blockData = reformatBlockData(blockData, el)
         newEl = transformer(blockData, el, doc)
         if newEl is not None:
             h.replaceNode(el, newEl)
             transformDataBlocks(doc, newEl)
         else:
             h.removeNode(el)
+
+
+def reformatBlockData(data: str, el: t.ElementT) -> str:
+    # Undo the various things we might have had to do to the blockData
+    # to get it through the parsing process.
+
+    # Newlines are turned into virtualLineBreak so the attribute
+    # doesn't break across lines when serialized.
+    data = data.replace(constants.virtualLineBreak, "\n")
+
+    # If in a markdown blockquote, the element will have spare > characters at the start.
+    bqLevel = countMdBlockquoteAncestors(el)
+    if bqLevel > 0:
+        lines = data.split("\n")
+        pattern = rf"\s*(> ?){{{bqLevel}}}(.*)"
+        for i,line in enumerate(lines):
+            match = re.match(pattern, line)
+            if not match:
+                continue
+            lines[i] = match[2]
+        data = "\n".join(lines)
+    return data
+
+
+def countMdBlockquoteAncestors(el: t.ElementT) -> int:
+    count = 0
+    while (el := h.parentElement(el)) is not None:
+        if el.tag == "blockquote" and h.hasAttr(el, "data-md"):
+            count += 1
+    return count
 
 
 def transformPre(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:

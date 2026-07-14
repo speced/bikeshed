@@ -669,7 +669,7 @@ def parseBlockquote(stream: TokenStream) -> list[l.Line]:
             lines.append(lineFromStream(stream, stream.currtext() + "\n"))
         else:
             break
-    return [l.Line(i, startTag("blockquote", i))] + parse(lines, stream.config) + [l.Line(-1, "</blockquote>\n")]
+    return [l.Line(i, startTag("blockquote", i, {"data-md":""}))] + parse(lines, stream.config) + [l.Line(-1, "</blockquote>\n")]
 
 
 class TokenStream:
