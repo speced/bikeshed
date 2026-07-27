@@ -189,8 +189,10 @@ class Spec:
         m.retroactivelyCheckErrorLevel()
 
     def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
-        text = FIXMEreplaceMarkdownBlockquotes(inputContent.content)
-        nodes = h.initialDocumentParse(text, h.ParseConfig.fromSpec(self))
+        lines = inputContent.rawLines
+        if not self.md.markupShorthands.explicitFalse("markdown-blockquotes"):
+            lines = replaceMarkdownBlockquotes(inputContent.rawLines)
+        nodes = h.initialDocumentParse("".join(lines), h.ParseConfig.fromSpec(self))
         if self.debugPrint == "early-parse":
             h.debugNodes(nodes)
         text = h.strFromNodes(nodes, withIlcc=True)
@@ -602,33 +604,51 @@ def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -
             m.lint("Line's indent contains tabs after spaces.", lineNum=line.i)
 
 
-def FIXMEreplaceMarkdownBlockquotes(text: str) -> str:
-    # Temporary hack to make the early HTML pass not be broken
-    # by Markdown blockquotes.
-    # * finds sequences of lines that share a ws + angle bracket prefix
-    # * replaces first such > with a blockquote-open PUA
-    # * replaces subsequent > with a space
-    # * adds a blockquote-close PUA to the end of last line
-    # * the HTML parser recognizes those PUAs and emits the correct start/end tags.
+def replaceMarkdownBlockquotes(lines: list[str]) -> list[str]:
+    # Does a slightly hacky fixup of Markdown blockquotes,
+    # so they'll pass thru the HTML parser more safely.
 
-    lines = text.split("\n")
+    # * If `Markup Shorthands: markdown-blockquotes` is set off,
+    #   does nothing.
+    # * If it's *unset*, we warn you to set it one way or the other (but treat it as on).
+    # * If it's set to on, we make the replacements without a warning.
+
+    # If a line starts with any > characters (and whitespace), they're replaced by
+    # bqChar PUAs. These are then observed in a few spots in the HTML parser,
+    # and sometimes ignored (treated as whitespace).
+    # If they survive to the Markdown parser, they're treated equivalently to
+    # normal blockquote chars.
+
+    def startsBq(s: str) -> bool:
+        return bool(re.match(r"\s*>", s))
+
+    # Otherwise, it was explicitly set to on, so transform the lines.
     i = 0
+    numLines = len(lines)
     while True:
-        if i >= len(lines):
+        # Hit the end
+        if i >= numLines:
             break
-        match = re.match(r"\s*>\s?", lines[i])
-        if not match:
+        if not startsBq(lines[i]):
             i += 1
             continue
-        if i + 1 < len(lines) and re.match(r"\s*>\s?", lines[i + 1]):
-            lines[i] = constants.bqStart + lines[i][len(match[0]) :]
+        # If it's a *lone* blockquote line, leave it be.
+        # It might be the end of a tag, or a single > in an opaque element,
+        # which'll get caught safely by the HTML parser.
+        # If it is just one line of blockquote, it'll survive to the Markdown parser
+        # and get transformed there.
+        if (i + 1 < numLines and not startsBq(lines[i + 1])) or i + 1 == numLines:
             i += 1
-            while i < len(lines) and re.match(r"\s*>\s?", lines[i]):
-                match = re.match(r"\s*>\s?", lines[i])
-                assert match is not None
-                lines[i] = lines[i][len(match[0]) :]
-                i += 1
-            lines[i - 1] += constants.bqEnd
-        else:
+            continue
+        # Otherwise there's at least two lines in a row, which is *very likely*
+        # to be a blockquote.
+        # Transform the > into bqChar, so the HTML parser can handle them more intelligently.
+        # If this happens to hit inside an opaque element, it'll be reversed back to >
+        # by smuggleDatablock().
+        while i < numLines and (match := re.match(r"([>\s]*)(.*)", lines[i], re.DOTALL)):
+            assert match is not None
+            prefix, rest = match.groups()
+            prefix = prefix.replace(">", constants.bqChar)
+            lines[i] = prefix + rest
             i += 1
-    return "\n".join(lines)
+    return lines
