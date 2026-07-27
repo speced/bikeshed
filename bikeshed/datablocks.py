@@ -71,7 +71,7 @@ def reformatBlockData(data: str, el: t.ElementT) -> str:
     if bqLevel > 0:
         lines = data.split("\n")
         pattern = rf"\s*(> ?){{{bqLevel}}}(.*)"
-        for i,line in enumerate(lines):
+        for i, line in enumerate(lines):
             match = re.match(pattern, line)
             if not match:
                 continue
