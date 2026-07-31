@@ -12,6 +12,19 @@ from . import config, metadata, retrieve, t
 from . import messages as m
 from .Spec import Spec
 
+
+def _getTestTitle() -> str:
+    try:
+        from .h.parser import preds_wrapper
+        # Check if we're using the Rust implementation
+        if hasattr(preds_wrapper, 'isASCII'):
+            module = getattr(preds_wrapper.isASCII, '__module__', '')
+            if 'bikeshed_rust' in module:
+                return "Running tests [R]"
+    except Exception:
+        pass
+    return "Running tests"
+
 if t.TYPE_CHECKING:
     import argparse
 
@@ -101,7 +114,7 @@ def run(
     numPassed = 0
     total = 0
     fails = []
-    pathProgress = alive_it(paths, dual_line=True, length=20)
+    pathProgress = alive_it(paths, dual_line=True, length=20, title=_getTestTitle())
     try:
         for path in pathProgress:
             testName = testNameForPath(path)
@@ -149,7 +162,7 @@ def rebase(
     if len(paths) == 0:
         m.p("No tests were found.")
         return True
-    pathProgress = alive_it(paths, dual_line=True, length=20)
+    pathProgress = alive_it(paths, dual_line=True, length=20, title=_getTestTitle())
     try:
         for path in pathProgress:
             testName = testNameForPath(path)

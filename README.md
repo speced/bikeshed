@@ -67,6 +67,13 @@ though most such specs have switched their source file extensions to `.bs` now.
 Using `.src.html` in most text editors will display the file with HTML source formatting,
 which isn't generally what you want.)
 
+Rust
+-----------
+
+Bikeshed includes optional Rust extensions, in an effort to port some or all of the code into Rust.
+
+To enable: `export BIKESHED_USE_RUST=1`
+
 License
 -------
 
