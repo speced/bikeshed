@@ -1307,6 +1307,7 @@ def formatArgumentdefTables(doc: t.SpecT) -> None:
     for table in h.findAll("table.argumentdef", doc):
         forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for", ""))
         method = doc.widl.find(table.get("data-dfn-for", ""))
+        print(method)
         if not method:
             m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
