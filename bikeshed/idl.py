@@ -141,6 +141,12 @@ class DebugMarker(widlparser.protocols.Marker):
 
 
 class IDLMarker(widlparser.protocols.Marker):
+    errors: list[str]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.errors = []
+
     def markup_construct(
         self,
         text: str,
@@ -295,7 +301,7 @@ class IDLMarker(widlparser.protocols.Marker):
         if idlType == "constructor":
             # one of the constructor extended attr, now deprecated
             if text == "Constructor":
-                m.die(
+                self.errors.append(
                     f"The [Constructor] extended attribute (on {construct.parent.name}) is deprecated, please switch to a constructor() method.",
                 )
                 return (None, None)
@@ -327,7 +333,7 @@ class IDLMarker(widlparser.protocols.Marker):
             elif hasattr(member, "attribute"):
                 rest = member.attribute
             else:
-                m.die(f"Can't figure out how to construct attribute-info from:\n  {construct}")
+                self.errors.append(f"Can't figure out how to construct attribute-info from:\n  {construct}")
                 return (None, None)
             if rest.readonly is not None:
                 attrs["data-readonly"] = ""
@@ -434,6 +440,9 @@ def markupIDL(doc: t.SpecT) -> None:
             widl = widlparser.parser.Parser(text, ui=IDLUI.fromEl(el), symbol_table=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
             markedUp = str(widl.markup(marker)).lstrip()
+            if isinstance(marker, IDLMarker) and marker.errors:
+                for error in marker.errors:
+                    m.die(error, el=el)
             parsed = list(h.parseHTML(h.safeHtml(markedUp, startLine=lineNum)))
             h.replaceContents(el, parsed)
             # Parse a second time with the global one, which collects all data in the doc.
