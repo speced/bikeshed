@@ -7,6 +7,7 @@ from collections import Counter, defaultdict, namedtuple
 from urllib import parse
 
 import requests
+import widlparser
 from PIL import Image
 
 from . import biblio, cddl, config, dfnpanels, h, idl, printjson, repository, t
@@ -14,8 +15,6 @@ from . import messages as m
 from .translate import _t
 
 if t.TYPE_CHECKING:
-    import widlparser  # pylint: disable=unused-import
-
     from . import refs
     from .line import Line
 
@@ -1305,12 +1304,22 @@ def formatElementdefTables(doc: t.SpecT) -> None:
 
 def formatArgumentdefTables(doc: t.SpecT) -> None:
     for table in h.findAll("table.argumentdef", doc):
-        forMethod = doc.widl.normalized_method_names(table.get("data-dfn-for", ""))
-        method = doc.widl.find(table.get("data-dfn-for", ""))
-        print(method)
-        if not method:
+        forMethod = table.get("data-dfn-for", "")
+        if not forMethod:
+            continue
+        methods = find_webidl_methods(doc.widl, forMethod)
+        if len(methods) > 1:
+            methodOptions = "\n".join("  " + method.full_name for method in methods if method.full_name)
+            m.die(
+                f"Multiple methods matching the argument signature '{forMethod}'. Switch to one of the following to disambiguate:\n{methodOptions}",
+                el=table,
+            )
+            continue
+        elif not methods:
             m.die(f"Can't find method '{forMethod}'.", el=table)
             continue
+        else:
+            method = methods[0]
         for i, tr in enumerate(h.findAll("tbody > tr", table)):
             try:
                 argCell, typeCell, nullCell, optCell, _ = h.findAll("td", tr)
@@ -1339,6 +1348,56 @@ def formatArgumentdefTables(doc: t.SpecT) -> None:
                     el=table,
                 )
                 continue
+
+
+def find_webidl_methods(parser: widlparser.Parser, method_text: str) -> list[widlparser.Construct]:
+    # Until https://github.com/plinss/widlparser/pull/98 is merged,
+    # this copies the function over manually.
+    # Once merged/updated, switch to `doc.widl.find_methods()` and delete this.
+    match = re.match(r"(?:([^./(]+)[./])?([^./(]+)(?:\((.*)\))?", method_text)
+    if not match:
+        return []
+    interface_name, name, arg_text = match.groups()
+
+    empty_args = False  # Empty args might indicate explicitly zero arguments, or just args not passed
+    if arg_text is not None:
+        tokens = widlparser.Tokenizer(arg_text)
+        if widlparser.productions.ArgumentList.peek(tokens):
+            arguments = widlparser.productions.ArgumentList(tokens, None)
+            arg_text = arguments.argument_names[0]
+        argument_names = [argument.strip() for argument in arg_text.split(",") if argument.strip() != ""]
+        if len(argument_names) == 0:
+            empty_args = True
+    else:
+        argument_names = None
+
+    if interface_name:
+        interface = parser.find(interface_name)
+        if interface:
+            methods = interface.find_methods(name, argument_names)
+            if not methods and empty_args:
+                methods = interface.find_methods(name)
+            methods.reverse()
+            return methods
+        return []
+
+    result = []
+    construct: widlparser.Construct | None
+    for construct in parser.constructs:
+        methods = construct.find_methods(name, argument_names)
+        if not methods and empty_args:
+            methods = construct.find_methods(name)
+        if methods:
+            result.extend(methods)
+    if result:
+        result.reverse()
+        return result
+
+    construct = parser.find(name)
+    if construct and (construct.idl_type == "method"):
+        return [construct]
+
+    return []
 
 
 def inlineRemoteIssues(doc: t.SpecT) -> None:
