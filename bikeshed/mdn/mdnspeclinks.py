@@ -16,16 +16,62 @@ if t.TYPE_CHECKING:
         slug: str
         summary: str
         mdn_url: str
-        support: dict[str, t.Any]
+        support: dict[str, MdnSupportEntry | list[MdnSupportEntry] | t.Literal["mirror"]]
         # the support values are wild
 
+    class MdnSupportEntry(t.TypedDict, total=False):
+        version_added: bool | str
+        version_removed: str
+        prefix: str
+        alternative_name: str
+        partial_implementation: t.Literal[True]
+        flags: t.Any
+
     MdnDataT: t.TypeAlias = dict[str, list[MdnFeatureT]]
+
+BROWSER_DATA = {
+    "current": ["firefox", "safari", "chrome"],
+    "borrowed": ["opera", "edge_blink"],
+    "retired": ["edge", "ie"],
+    "mobile": [
+        "firefox_android",
+        "safari_ios",
+        "chrome_android",
+        "webview_android",
+        "samsunginternet_android",
+        "opera_android",
+    ],
+    "cell_order": [
+        "firefox",
+        "safari",
+        "chrome",  # current
+        "opera",
+        "edge_blink",  # borrowed
+        "edge",
+        "ie",  # retired
+        "firefox_android",
+        "safari_ios",
+        "chrome_android",
+        "webview_android",
+        "samsunginternet_android",
+        "opera_android",  # mobile
+        "nodejs",  # JS
+    ],
+}
 
 
 def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
     if not doc.md.includeMdnPanels:
         return []
 
+    data = loadMdnData(doc)
+    panels = panelsFromData(doc, data)
+    if panels:
+        doc.extraJC.addMdn()
+    return panels
+
+
+def loadMdnData(doc: t.SpecT) -> MdnDataT:
     try:
         filename = f"{doc.md.vshortname}.json"
         datafile = doc.dataFile.fetch("mdn", filename, str=True)
@@ -36,119 +82,67 @@ def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
         except OSError:
             if doc.md.includeMdnPanels == "maybe":
                 # if "maybe", failure is fine, don't complain
-                pass
+                return {}
             else:
                 m.die(f"Couldn't find the MDN data for '{doc.md.vshortname}' nor '{doc.md.shortname}'.")
-            return []
+                return {}
     try:
         data = t.cast("MdnDataT", json.loads(datafile, object_pairs_hook=OrderedDict))
+        return data
     except Exception as e:
-        m.die(f"Couldn't load MDN Spec Links data for this spec.\n{e}")
-        return []
-
-    panels = panelsFromData(doc, data)
-    if panels:
-        doc.extraJC.addMdn()
-
-    return panels
+        m.die(f"Couldn't parse MDN data for this spec.\n{e}")
+        return {}
 
 
-def createAnno(className: str, mdnButton: t.ElementT, featureDivs: list[t.ElementT]) -> t.ElementT:
-    return h.E.div({"class": className}, mdnButton, *featureDivs)
+# MDN annotation panels do not ship their body as markup. Each panel carries a compact
+# "data-mdn" attribute instead, and <https://resources.whatwg.org/standard-mdn-annos.js>
+# builds the support table from it the first time the reader opens the panel. That script
+# owns the browser labels, the engine-support strings and the render grouping; what is
+# shared between it and the code below is only this wire format:
+#
+#   data-mdn = "v1|" feature ("~" feature)*
+#   feature  = slug "|" level "|" cells ["|" caniuse-feature "," caniuse-title]
+#   level    = "" no remark | "0" no engines | "1" one engine | "9" all engines
+#            | "s"/"S" one/some engines under another name
+#            | "v"/"V" one/some engines prefixed
+#            | "p"/"P" one/some engines partially
+#   cells    = cell ("," cell)*  one per entry of MDNBrowserSlots, in that order. An
+#                               empty cell means "no row for this browser", and trailing
+#                               empty cells may be left out entirely.
+#   cell     = [caveat] body
+#   caveat   = "*" partial | "^" needs a flag | "$" needs a prefix or alternative name
+#   body     = "?" unknown | "-" unsupported | "!" supported, version unknown
+#            | "=" version           supported since exactly this version, no trailing "+"
+#            | version "-" version   supported over a range, rendered with an en dash
+#            | version               supported since this version, rendered with a "+"
+#
+# None of "|" and "~" occurs in any field of the current data, so no escaping is needed;
+# the two free-text fields are squashed defensively rather than escaped.
+#
+# New browsers must be APPENDED to MDNBrowserSlots and never inserted. Archived commit
+# snapshots keep loading the script above forever, and older copies of it simply ignore
+# the cells they do not know about, which only works while the order is append-only.
+# Anything that this scheme cannot express needs a new version prefix, not a redefinition
+# of "v1".
 
 
 def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
-    mdnBaseUrl = "https://developer.mozilla.org/en-US/docs/Web/"
-
-    browsersProvidingCurrentEngines = ["firefox", "safari", "chrome"]
-    browsersWithBorrowedEngines = ["opera", "edge_blink"]
-    browsersWithRetiredEngines = ["edge", "ie"]
-    browsersForMobileDevices = [
-        "firefox_android",
-        "safari_ios",
-        "chrome_android",
-        "webview_android",
-        "samsunginternet_android",
-        "opera_android",
-    ]
-
-    # BCD/mdn-spec-links shortnames to full names
-    nameFromCodeName = {
-        "chrome": "Chrome",
-        "chrome_android": "Chrome for Android",
-        "edge": "Edge (Legacy)",
-        "edge_blink": "Edge",
-        "firefox": "Firefox",
-        "firefox_android": "Firefox for Android",
-        "ie": "IE",
-        "nodejs": "Node.js",
-        "opera": "Opera",
-        "opera_android": "Opera Mobile",
-        "safari": "Safari",
-        "samsunginternet_android": "Samsung Internet",
-        "safari_ios": "iOS Safari",
-        "webview_android": "Android WebView",
-    }
-
     panels = []
     missingIds = []
     docIds = h.collectIds(doc.body)
     for elementId, features in data.items():
-        lessThanTwoEngines = 0
-        onlyTwoEngines = 0
-        allEngines = 0
-        featureDivs = []
         targetElement = docIds.get(elementId)
         if targetElement is None and elementId not in doc.md.ignoreMDNFailure:
             missingIds.append(elementId)
             continue
 
-        for feature in features:
-            if "engines" in feature:
-                engines = len(feature["engines"])
-                if engines < 2:
-                    lessThanTwoEngines = lessThanTwoEngines + 1
-                elif engines == 2:
-                    onlyTwoEngines = onlyTwoEngines + 1
-                elif engines >= len(browsersProvidingCurrentEngines):
-                    allEngines = allEngines + 1
-            featureDivs.append(
-                mdnPanelFor(
-                    feature,
-                    mdnBaseUrl,
-                    nameFromCodeName,
-                    browsersProvidingCurrentEngines,
-                    browsersWithBorrowedEngines,
-                    browsersWithRetiredEngines,
-                    browsersForMobileDevices,
-                ),
-            )
+        featureCode = encodeFeatureData(features)
 
-        summary = h.E.summary()
-        if lessThanTwoEngines > 0:
-            h.appendChild(
-                summary,
-                h.E.b(
-                    {
-                        "class": "less-than-two-engines-flag",
-                        "title": _t("This feature is in less than two current engines."),
-                    },
-                    "\u26a0",
-                ),
-            )
-        elif allEngines > 0 and lessThanTwoEngines == 0 and onlyTwoEngines == 0:
-            h.appendChild(
-                summary,
-                h.E.b(
-                    {
-                        "class": "all-engines-flag",
-                        "title": _t("This feature is in all current engines."),
-                    },
-                    "\u2714",
-                ),
-            )
-        h.appendChild(summary, h.E.span("MDN"))
-        anno = h.E.details({"class": "mdn-anno unpositioned", "data-anno-for": elementId}, summary, *featureDivs)
+        summary = buildSummary(features, numEngines=len(BROWSER_DATA["current"]))
+        anno = h.E.details(
+            {"class": "mdn-anno unpositioned", "data-anno-for": elementId, "data-mdn": featureCode},
+            summary,
+        )
         panels.append(anno)
         h.appendChild(doc.body, anno)
 
@@ -160,148 +154,150 @@ def panelsFromData(doc: t.SpecT, data: MdnDataT) -> list[t.ElementT]:
     return panels
 
 
-def addSupportRow(
+def encodeFeatureData(features: list[MdnFeatureT]) -> str:
+    fullCode = "v1|" + ("~".join(codeFromFeature(x) for x in features))
+    return fullCode
+
+
+def codeFromFeature(feature: MdnFeatureT) -> str:
+    #   feature  = slug "|" level "|" cells ["|" caniuse-feature "," caniuse-title]
+    code = cleanCodeText(feature["slug"]) + "|"
+    code += levelFromFeature(feature) + "|"
+    code += cellsFromFeature(feature)
+    return code
+
+
+def levelFromFeature(feature: MdnFeatureT) -> str:
+    #   level    = "" no remark | "0" no engines | "1" one engine | "9" all engines
+    #            | "s"/"S" one/some engines under another name
+    #            | "v"/"V" one/some engines prefixed
+    #            | "p"/"P" one/some engines partially
+    if "engines" in feature:
+        numEngines = len(feature["engines"])
+        if numEngines == 0:
+            return "0"
+        elif numEngines == 1:
+            return "1"
+        elif numEngines >= len(BROWSER_DATA["current"]):
+            return "9"
+    return ""
+
+
+def cellsFromFeature(feature: MdnFeatureT) -> str:
+    #   cells    = cell ("," cell)*  one per entry of BROWSER_DATA["cell_order], in that order. An
+    #                               empty cell means "no row for this browser", and trailing
+    #                               empty cells may be left out entirely.
+    cells = []
+    for browserCode in BROWSER_DATA["cell_order"]:
+        cells.append(cellFromFeature(feature, browserCode))
+    return ",".join(cells)
+
+
+def cleanCodeText(text: str) -> str:
+    # | and ~ are used in the data-mdn code as separators, so can't appear in the code's contents.
+    # They're not used in the text of *any* current features, so just defensively blank them out
+    # in case they ever do appear.
+    return text.replace("|", " ").replace("~", " ")
+
+
+def buildSummary(features: list[MdnFeatureT], numEngines: int) -> t.ElementT:
+    lessThanTwoEngines = 0
+    onlyTwoEngines = 0
+    allEngines = 0
+    for feature in features:
+        if "engines" in feature:
+            engines = len(feature["engines"])
+            if engines < 2:
+                lessThanTwoEngines = lessThanTwoEngines + 1
+            elif engines == 2:
+                onlyTwoEngines = onlyTwoEngines + 1
+            elif engines >= numEngines:
+                allEngines = allEngines + 1
+
+    summary = h.E.summary()
+    if lessThanTwoEngines > 0:
+        h.appendChild(
+            summary,
+            h.E.b(
+                {
+                    "class": "less-than-two-engines-flag",
+                    "title": _t("This feature is in less than two current engines."),
+                },
+                "\u26a0",
+            ),
+        )
+    elif allEngines > 0 and lessThanTwoEngines == 0 and onlyTwoEngines == 0:
+        h.appendChild(
+            summary,
+            h.E.b(
+                {
+                    "class": "all-engines-flag",
+                    "title": _t("This feature is in all current engines."),
+                },
+                "\u2714",
+            ),
+        )
+    h.appendChild(summary, h.E.span("MDN"))
+    return summary
+
+
+def cellFromFeature(
+    feature: MdnFeatureT,
     browserCodeName: str,
-    nameFromCodeName: dict[str, str],
-    support: dict[str, t.Any],
-    supportData: t.ElementT,
-) -> None:
-    if browserCodeName not in support:
-        return
-    isEdgeLegacy = browserCodeName == "edge"
-    isIE = browserCodeName == "ie"
-    needsFlag = False
+) -> str:
+    #   cell     = [caveat] body
+    #   caveat   = "*" partial | "^" needs a flag | "$" needs a prefix or alternative name | "@" mirrored
+    #   body     = "?" unknown | "-" unsupported | "!" supported, version unknown
+    #            | "=" version           supported since exactly this version, no trailing "+"
+    #            | version "-" version   supported over a range, rendered with an en dash
+    #            | version               supported since this version, rendered with a "+"
+
+    # Documentation for the "support" data:
+    # https://github.com/mdn/browser-compat-data/blob/main/schemas/compat-data-schema.md
+    support = feature["support"].get(browserCodeName)
+    if support is None:
+        return ""
     versionAdded = None
     versionRemoved = None
-    thisBrowserSupport = support[browserCodeName]
-    if isinstance(thisBrowserSupport, dict):
-        if "version_added" in thisBrowserSupport:
-            versionAdded = thisBrowserSupport["version_added"]
-            if "flags" in thisBrowserSupport:
-                needsFlag = True
-            if (
-                "prefix" in thisBrowserSupport
-                or "alternative_name" in thisBrowserSupport
-                or "partial_implementation" in thisBrowserSupport
-            ):
-                versionAdded = False
-        if "version_removed" in thisBrowserSupport:
-            versionRemoved = thisBrowserSupport["version_removed"]
-    if isinstance(thisBrowserSupport, list):
-        for versionDetails in thisBrowserSupport:
+    caveat = ""
+    if isinstance(support, dict):
+        if "version_added" in support:
+            versionAdded = support["version_added"]
+            if "prefix" in support or "alternative_name" in support:
+                caveat = "$"
+            elif "partial_implementation" in support:
+                caveat = "*"
+            elif "flags" in support:
+                caveat = "^"
+        if "version_removed" in support:
+            versionRemoved = support["version_removed"]
+    elif isinstance(support, list):
+        # List of support objects, documenting different levels of support over time.
+        # Ordered recent-first, so stop when I hit the first version_added
+        for versionDetails in support:
             if "version_removed" in versionDetails:
                 versionRemoved = versionDetails["version_removed"]
-                continue
             if "version_added" in versionDetails:
-                if versionDetails["version_added"] is False:
-                    versionAdded = False
-                    continue
-                if versionDetails["version_added"] is None:
-                    versionAdded = None
-                    continue
-                if (
-                    "prefix" in versionDetails
-                    or "alternative_name" in versionDetails
-                    or "partial_implementation" in versionDetails
-                ):
-                    continue
-                if "flags" in thisBrowserSupport:
-                    needsFlag = True
                 versionAdded = versionDetails["version_added"]
-                versionRemoved = None
+                if "prefix" in support or "alternative_name" in support:
+                    caveat = "$"
+                elif "partial_implementation" in support:
+                    caveat = "*"
+                elif "flags" in support:
+                    caveat = "^"
                 break
-    statusCode = "n"
-    if versionAdded is None:
-        minVersion = "?"
-    elif versionAdded is False:
-        minVersion = "None"
+    elif support == "mirror":
+        # A derived browser whose support matches the "upstream" one.
+        # Not handled here, and newer BCD data normalizes it away.
+        caveat = "@"
+
+    versionCode = "?"
+    if versionAdded is False:
+        versionCode = "-"
     elif versionAdded is True:
-        minVersion = "Yes"
-        statusCode = "y"
-    else:
-        if versionRemoved is None:
-            statusCode = "y"
-            minVersion = versionAdded + "+"
-            if isEdgeLegacy and versionAdded == "18":
-                minVersion = "18"
-            if isIE and versionAdded == "11":
-                minVersion = "11"
-        else:
-            statusCode = "n"
-            if versionAdded is not None:
-                minVersion = versionAdded + "\u2013" + versionRemoved
-            else:
-                minVersion = "None"
-    browserFullName = nameFromCodeName[browserCodeName]
-    h.appendChild(
-        supportData,
-        browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion, needsFlag),
-    )
-
-
-def mdnPanelFor(
-    feature: MdnFeatureT,
-    mdnBaseUrl: str,
-    nameFromCodeName: dict[str, str],
-    browsersProvidingCurrentEngines: list[str],
-    browsersWithBorrowedEngines: list[str],
-    browsersWithRetiredEngines: list[str],
-    browsersForMobileDevices: list[str],
-) -> t.ElementT:
-    featureDiv = h.E.div({"class": "feature"})
-    if "slug" in feature:
-        slug = feature["slug"]
-        displaySlug = slug.split("/", 1)[1]
-        title = feature.get("summary", "")
-        mdnURL = mdnBaseUrl + slug
-        h.appendChild(featureDiv, h.E.p({}, h.E.a({"href": mdnURL, "title": title}, displaySlug)))
-    if "engines" in feature:
-        engines = len(feature["engines"])
-        enginesPara = None
-        if engines == 0:
-            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, _t("In no current engines."))
-        elif engines == 1:
-            enginesPara = h.E.p({"class": "less-than-two-engines-text"}, _t("In only one current engine."))
-        elif engines >= len(browsersProvidingCurrentEngines):
-            enginesPara = h.E.p({"class": "all-engines-text"}, _t("In all current engines."))
-        if enginesPara is not None:
-            h.appendChild(featureDiv, enginesPara)
-    supportData = h.E.div({"class": "support"})
-    h.appendChild(featureDiv, supportData)
-    support = feature["support"]
-    for browserCodeName in browsersProvidingCurrentEngines:
-        addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    h.appendChild(supportData, h.E.hr())
-    for browserCodeName in browsersWithBorrowedEngines:
-        addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    h.appendChild(supportData, h.E.hr())
-    for browserCodeName in browsersWithRetiredEngines:
-        addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    h.appendChild(supportData, h.E.hr())
-    for browserCodeName in browsersForMobileDevices:
-        addSupportRow(browserCodeName, nameFromCodeName, support, supportData)
-    if "nodejs" in support:
-        h.appendChild(supportData, h.E.hr())
-        addSupportRow("nodejs", nameFromCodeName, support, supportData)
-    return featureDiv
-
-
-def browserCompatSpan(
-    browserCodeName: str,
-    browserFullName: str,
-    statusCode: str,
-    minVersion: str,
-    needsFlag: bool,
-) -> t.ElementT:
-    # browserCodeName: e.g. "chrome"
-    # browserFullName: e.g. "Chrome for Android"
-    minVersionAttributes = {}
-    flagSymbol = ""
-    if needsFlag:
-        flagSymbol = "\U0001f530 "
-        minVersionAttributes["title"] = _t("Requires setting a user preference or runtime flag.")
-    statusClass = {"y": "yes", "n": "no"}[statusCode]
-    outer = h.E.span({"class": browserCodeName + " " + statusClass})
-    h.appendChild(outer, h.E.span({}, browserFullName))
-    h.appendChild(outer, h.E.span(minVersionAttributes, flagSymbol + minVersion))
-    return outer
+        versionCode = "!"
+    elif versionAdded:
+        versionCode = versionAdded
+        if versionRemoved:
+            versionCode += "-" + versionRemoved
+    return caveat + versionCode

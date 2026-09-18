@@ -24,8 +24,9 @@ class JCManager:
         for script in self.scripts.values():
             if not script.insertable(allowList):
                 continue
-            if script.style and script.style.insertable(allowList):
-                styles[script.style.name] = script.style
+            for style in script.styles:
+                if style.insertable(allowList):
+                    styles[style.name] = style
         return sorted(styles.values(), key=lambda x: x.name)
 
     def getScripts(self, allowList: t.BoolSet) -> list[Library | Script]:
@@ -34,8 +35,9 @@ class JCManager:
         for style in self.styles.values():
             if not style.insertable(allowList):
                 continue
-            if style.script and style.script.insertable(allowList):
-                scripts[style.script.name] = style.script
+            for script in style.scripts:
+                if script.insertable(allowList):
+                    scripts[script.name] = script
         for script in self.scripts.values():
             if not script.insertable(allowList):
                 continue
@@ -76,13 +78,16 @@ class JCManager:
 
     def addMdn(self) -> None:
         style = self._addCSS("mdn-anno", "mdn")
-        if not style.script:
-            style.script = Script("position-annos", Path(config.scriptPath("stylescript/position-annos.js")))
+        if not style.scripts:
+            style.scripts = [
+                Script("mdn-anno", Path(config.scriptPath("mdn/mdn-anno.js"))),
+                Script("position-annos", Path(config.scriptPath("stylescript/position-annos.js"))),
+            ]
 
     def addCiu(self) -> None:
         style = self._addCSS("caniuse-panel", "caniuse")
-        if not style.script:
-            style.script = Script("position-annos", Path(config.scriptPath("stylescript/position-annos.js")))
+        if not style.scripts:
+            style.scripts = [Script("position-annos", Path(config.scriptPath("stylescript/position-annos.js")))]
 
     def addDomintro(self) -> None:
         self._addCSS("domintro")
@@ -104,16 +109,18 @@ class JCManager:
 
     def addVarClickHighlighting(self) -> None:
         script = self._addJS("var-click-highlighting")
-        if not script.style:
-            script.style = Style(
-                "var-click-highlighting",
-                Path(config.scriptPath("stylescript/var-click-highlighting.css")),
-            )
+        if not script.styles:
+            script.styles = [
+                Style(
+                    "var-click-highlighting",
+                    Path(config.scriptPath("stylescript/var-click-highlighting.css")),
+                ),
+            ]
 
     def addRefHints(self) -> dict[str, t.Any]:
         script = self._addJS("ref-hints", "refs")
-        if not script.style:
-            script.style = Style("ref-hints", Path(config.scriptPath("refs/ref-hints.css")))
+        if not script.styles:
+            script.styles = [Style("ref-hints", Path(config.scriptPath("refs/ref-hints.css")))]
         if "dom-helper" not in script.libraries:
             script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
         if not script.data:
@@ -140,8 +147,8 @@ class JCManager:
 
     def addWpt(self, paths: list[str] | None) -> None:
         script = self._addJS("wpt", "wpt")
-        if not script.style:
-            script.style = Style("wpt", Path(config.scriptPath("wpt/wpt.css")))
+        if not script.styles:
+            script.styles = [Style("wpt", Path(config.scriptPath("wpt/wpt.css")))]
         if "dom-helper" not in script.libraries:
             script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
         if not script.data:
@@ -151,8 +158,8 @@ class JCManager:
 
     def addDfnPanels(self) -> dict[str, t.Any]:
         script = self._addJS("dfn-panel", "dfnpanels")
-        if not script.style:
-            script.style = Style("dfn-panel", Path(config.scriptPath("dfnpanels/dfn-panel.css")))
+        if not script.styles:
+            script.styles = [Style("dfn-panel", Path(config.scriptPath("dfnpanels/dfn-panel.css")))]
         if "dom-helper" not in script.libraries:
             script.libraries["dom-helper"] = Library("dom-helper", Path(config.scriptPath("stylescript/dom-helper.js")))
         if not script.data:
@@ -177,7 +184,7 @@ class JCResource(metaclass=ABCMeta):
 class Script(JCResource):
     path: Path
     libraries: dict[str, Library] = dataclasses.field(default_factory=dict)
-    style: Style | None = None
+    styles: list[Style] = dataclasses.field(default_factory=list)
     data: tuple[str, dict[str, t.Any]] | None = None
 
     def insertable(self, allowList: t.BoolSet) -> bool:
@@ -224,7 +231,7 @@ class Library(JCResource):
 @dataclasses.dataclass
 class Style(JCResource):
     textPath: Path
-    script: Script | None = None
+    scripts: list[Script] = dataclasses.field(default_factory=list)
 
     def insertable(self, allowList: t.BoolSet) -> bool:
         return f"style-{self.name}" in allowList
