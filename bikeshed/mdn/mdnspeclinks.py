@@ -31,16 +31,7 @@ if t.TYPE_CHECKING:
 
 BROWSER_DATA = {
     "current": ["firefox", "safari", "chrome"],
-    "borrowed": ["opera", "edge_blink"],
-    "retired": ["edge", "ie"],
-    "mobile": [
-        "firefox_android",
-        "safari_ios",
-        "chrome_android",
-        "webview_android",
-        "samsunginternet_android",
-        "opera_android",
-    ],
+    "retired": {"edge":"18", "ie":"11"},
     "cell_order": [
         "firefox",
         "safari",
@@ -57,6 +48,15 @@ BROWSER_DATA = {
         "opera_android",  # mobile
         "nodejs",  # JS
     ],
+    "mirrors": {
+        "chrome_android": "chrome",
+        "webview_android": "chrome",
+        "samsunginternet_android": "chrome_android",
+        "opera": "chrome",
+        "opera_android": "chrome_android",
+        "firefox_android": "firefox",
+        "safari_ios": "safari",
+    },
 }
 
 
@@ -184,12 +184,12 @@ def levelFromFeature(feature: MdnFeatureT) -> str:
 
 
 def cellsFromFeature(feature: MdnFeatureT) -> str:
-    #   cells    = cell ("," cell)*  one per entry of BROWSER_DATA["cell_order], in that order. An
-    #                               empty cell means "no row for this browser", and trailing
-    #                               empty cells may be left out entirely.
+    #   cells    = cell ("," cell)*  one per entry of BROWSER_DATA["cell_order"], in that order. An
+    #                                empty cell means "no row for this browser", and trailing
+    #                                empty cells may be left out entirely.
     cells = []
-    for browserCode in BROWSER_DATA["cell_order"]:
-        cells.append(cellFromFeature(feature, browserCode))
+    for browserCodeName in BROWSER_DATA["cell_order"]:
+        cells.append(cellFromFeature(feature, browserCodeName))
     return ",".join(cells)
 
 
@@ -254,24 +254,38 @@ def cellFromFeature(
 
     # Documentation for the "support" data:
     # https://github.com/mdn/browser-compat-data/blob/main/schemas/compat-data-schema.md
-    support = feature["support"].get(browserCodeName)
-    if support is None:
+    # Documentation misses:
+    # * apparently feature.support can be `null`
+    # * apparently feature.support.version_removed can be `true`
+
+    if feature["support"] is None or browserCodeName not in feature["support"]:
         return ""
+    support = feature["support"][browserCodeName]
+
+    if support == "mirror":
+        sourceCodeName, support = followMirrors(feature, browserCodeName)
+        if sourceCodeName is None:
+            return "@?"
+        _, version = distillSupport(support, sourceCodeName)
+        if version in "?-!":
+            return "@" + version
+        else:
+            return "@!"
+
+    caveat, version = distillSupport(support, browserCodeName)
+    return caveat+version
+
+def distillSupport(support: MdnSupportEntry | list[MdnSupportEntry], browserCodeName: str): -> tuple[str, str]
     versionAdded = None
     versionRemoved = None
     caveat = ""
     if isinstance(support, dict):
         if "version_added" in support:
             versionAdded = support["version_added"]
-            if "prefix" in support or "alternative_name" in support:
-                caveat = "$"
-            elif "partial_implementation" in support:
-                caveat = "*"
-            elif "flags" in support:
-                caveat = "^"
+            caveat = getCaveat(support)
         if "version_removed" in support:
             versionRemoved = support["version_removed"]
-    elif isinstance(support, list):
+    else isinstance(support, list):
         # List of support objects, documenting different levels of support over time.
         # Ordered recent-first, so stop when I hit the first version_added
         for versionDetails in support:
@@ -279,25 +293,47 @@ def cellFromFeature(
                 versionRemoved = versionDetails["version_removed"]
             if "version_added" in versionDetails:
                 versionAdded = versionDetails["version_added"]
-                if "prefix" in support or "alternative_name" in support:
-                    caveat = "$"
-                elif "partial_implementation" in support:
-                    caveat = "*"
-                elif "flags" in support:
-                    caveat = "^"
+                caveat = getCaveat(versionDetails)
                 break
-    elif support == "mirror":
-        # A derived browser whose support matches the "upstream" one.
-        # Not handled here, and newer BCD data normalizes it away.
-        caveat = "@"
 
-    versionCode = "?"
+    version = getVersionString(versionAdded, versionRemoved, browserCodeName)
+
+    return caveat, version
+
+
+def followMirrors(feature: MdnFeatureT, browserCodeName: str, ) -> tuple[str, MdnSupportEntry | list[MdnSupportEntry]] | tuple[None, None]:
+    if browserCodeName not in BROWSER_DATA["mirrors"]:
+        return None, None
+    mirroredBrowser = BROWSER_DATA["mirrors"]
+    if mirroredBrowser not in feature["support"]:
+        return None, None
+    support = feature["support"][mirroredBrowser]
+    if support == "mirror":
+        return followMirrors(feature, mirroredBrowser)
+    return mirroredBrowser, support
+
+
+def getCaveat(supportEntry: MdnSupportEntry) -> str:
+    if "flags" in support:
+        return "^"
+    if "prefix" in support or "alternative_name" in support:
+        return "$"
+    if "partial_implementation" in support:
+        return "*"
+    return ""
+
+
+def getVersionString(versionAdded: str | bool | None, versionRemoved: str | bool | None, browserCodeName: str) -> str:
     if versionAdded is False:
-        versionCode = "-"
+        return "-"
     elif versionAdded is True:
-        versionCode = "!"
+        return "!"
+    elif versionRemoved is True:
+        return "-"
+    elif browserCodeName in BROWSER_DATA["retired"] and versionAdded == BROWSER_DATA["retired"][browserCodeName]:
+        return "=" + versionAdded
     elif versionAdded:
-        versionCode = versionAdded
         if versionRemoved:
-            versionCode += "-" + versionRemoved
-    return caveat + versionCode
+            return versionAdded + "-" + versionRemoved
+        return versionAdded
+    return "?"
