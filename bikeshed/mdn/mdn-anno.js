@@ -1,5 +1,5 @@
 'use strict';
-// File copied from Wattsi.
+// File copied from https://github.com/whatwg/whatwg.org/blob/main/resources.whatwg.org/standard-mdn-annos.js
 
 // Builds MDN annotation panels on demand from the compact `data-mdn` attribute written by
 // the spec generator (wattsi's EncodeMDNAnnotations; Bikeshed's mdnspeclinks.py builds its
