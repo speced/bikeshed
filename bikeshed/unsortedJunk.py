@@ -831,6 +831,9 @@ def processAutolinks(doc: t.SpecT) -> None:
                     del el.attrib["data-link-type"]
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
+            elif el.get("bs-unwrap-on-link-fail") is not None:
+                # Optional link that found nothing: leave the text as if it had never been a link.
+                h.replaceWithContents(el)
 
     h.dedupIDs(doc)
 
