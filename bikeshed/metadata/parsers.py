@@ -17,6 +17,8 @@ if t.TYPE_CHECKING:
     class ParseFunc(t.Protocol):
         def __call__(self, key: str, val: str, lineNum: str | int | None) -> t.Any: ...
 
+    from ..stringEnum import StringEnum
+
 
 def parseLiteral(key: str, val: str, lineNum: str | int | None) -> str:
     return val
@@ -34,6 +36,27 @@ def parseLiteralCaseless(key: str, val: str, lineNum: str | int | None) -> str:
 
 def parseLiteralList(key: str, val: str, lineNum: str | int | None) -> list[str]:
     return [val]
+
+
+def parseFixedList(key: str, val: str, validValues: list[str], lineNum: str | int | None) -> str | None:
+    val = val.lower()
+    if val in validValues:
+        return val
+    printableValues = config.englishFromList(f"'{x}'" for x in validValues)
+    m.die(
+        f"{key} metadata only accepts the values {printableValues}. Got '{val}'.",
+        lineNum=lineNum,
+    )
+    return None
+
+
+def parseStringEnum(key: str, val: str, enum: StringEnum, lineNum: str | int | None) -> str | None:
+    val = val.strip().lower()
+    if val in enum:
+        return val
+    printableValues = config.englishFromList(f"'{x}'" for x in list(enum))
+    m.die(f"'{key}' must be {printableValues}. Got '{val}'", lineNum=lineNum)
+    return None
 
 
 def parseDate(key: str, val: str, lineNum: str | int | None) -> date | None:
@@ -89,6 +112,45 @@ def parseSoftBoolean(key: str, val: str, lineNum: str | int | None) -> bool | t.
         return "maybe"
     m.die(f"The {key} field must be boolish, or 'maybe'. Got '{val}' instead.", lineNum=lineNum)
     return None
+
+
+def parseBoolishList(
+    key: str,
+    val: str,
+    default: bool,
+    validLabels: t.AbstractSet[str] | None = None,
+    extraValues: dict[str, bool] | None = None,
+    lineNum: str | int | None = None,
+) -> config.BoolSet:
+    # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
+    # Supply a list of valid labels if you want to have them checked,
+    # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
+    boolset = config.BoolSet(default=default)
+
+    if extraValues is None:
+        extraValues = {}
+    vals = [v.strip() for v in val.split(",")]
+    for v in vals:
+        name, _, boolstring = v.strip().rpartition(" ")
+        if not name or not boolstring:
+            m.die(f"{key} metadata pieces are a label and a boolean. Got:\n{v}", lineNum=lineNum)
+            continue
+        if validLabels and name not in validLabels:
+            m.die(
+                f"Unknown {key} label '{name}'. Valid values are:\n{config.englishFromList(validLabels, "or")}",
+                lineNum=lineNum,
+            )
+            continue
+        if boolstring in extraValues:
+            boolset[name] = extraValues[boolstring]
+        else:
+            onoff = boolish(boolstring)
+            if isinstance(onoff, bool):
+                boolset[name] = onoff
+            else:
+                m.die(f"{key} metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
+                continue
+    return boolset
 
 
 def boolish(val: str) -> bool | None:
@@ -272,22 +334,14 @@ def parseBoilerplate(key: str, val: str, lineNum: str | int | None) -> config.Bo
 
 
 def parseBiblioDisplay(key: str, val: str, lineNum: str | int | None) -> str:
-    val = val.strip().lower()
-    if val in constants.biblioDisplay:
-        return val
-    m.die(f"'{key}' must be either 'inline', 'index', or 'direct'. Got '{val}'", lineNum=lineNum)
-    return constants.biblioDisplay.index
+    return parseStringEnum(key, val, constants.biblioDisplay, lineNum) or constants.biblioDisplay.index
 
 
 def parseRefStatus(key: str, val: str, lineNum: str | int | None) -> str:
-    val = val.strip().lower()
-    if val == "dated":
-        # Legacy term that used to be allowed
-        val = "snapshot"
-    if val in constants.refStatus:
-        return val
-    m.die(f"'{key}' must be either 'current' or 'snapshot'. Got '{val}'", lineNum=lineNum)
-    return constants.refStatus.current
+    # Legacy term that used to be allowed
+    if val.strip().lower() == "dated":
+        return "snapshot"
+    return parseStringEnum(key, val, constants.refStatus, lineNum) or constants.refStatus.current
 
 
 def parseComplainAbout(key: str, val: str, lineNum: str | int | None) -> config.BoolSet:
@@ -306,45 +360,6 @@ def parseExternalInfotrees(key: str, val: str, lineNum: str | int | None) -> con
         validLabels=frozenset(["anchors.bsdata", "link-defaults.infotree"]),
         lineNum=lineNum,
     )
-
-
-def parseBoolishList(
-    key: str,
-    val: str,
-    default: bool,
-    validLabels: t.AbstractSet[str] | None = None,
-    extraValues: dict[str, bool] | None = None,
-    lineNum: str | int | None = None,
-) -> config.BoolSet:
-    # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
-    # Supply a list of valid labels if you want to have them checked,
-    # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
-    boolset = config.BoolSet(default=default)
-
-    if extraValues is None:
-        extraValues = {}
-    vals = [v.strip() for v in val.split(",")]
-    for v in vals:
-        name, _, boolstring = v.strip().rpartition(" ")
-        if not name or not boolstring:
-            m.die(f"{key} metadata pieces are a label and a boolean. Got:\n{v}", lineNum=lineNum)
-            continue
-        if validLabels and name not in validLabels:
-            m.die(
-                f"Unknown {key} label '{name}'. Valid values are:\n{config.englishFromList(validLabels, "or")}",
-                lineNum=lineNum,
-            )
-            continue
-        if boolstring in extraValues:
-            boolset[name] = extraValues[boolstring]
-        else:
-            onoff = boolish(boolstring)
-            if isinstance(onoff, bool):
-                boolset[name] = onoff
-            else:
-                m.die(f"{key} metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
-                continue
-    return boolset
 
 
 def parseLinkedText(key: str, val: str, lineNum: str | int | None) -> list[tuple[str, str]]:
@@ -417,24 +432,12 @@ def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> list[tuple[
 
 
 def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> str | None:
-    # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
-    val = val.strip().lower()
-    if val not in (
-        "completed",
-        "stable",
-        "testing",
-        "refining",
-        "revising",
-        "exploring",
-        "rewriting",
-        "abandoned",
-    ):
-        m.die(
-            f"Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{val}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.",
-            lineNum=lineNum,
-        )
-        return None
-    return val
+    return parseFixedList(
+        key,
+        val,
+        ["completed", "stable", "testing", "refining", "revising", "exploring", "rewriting", "abandoned"],
+        lineNum,
+    )
 
 
 def parseRepository(key: str, val: str, lineNum: str | int | None) -> repository.Repository | None:
@@ -585,14 +588,7 @@ def parseMetadataOrder(key: str, val: str, lineNum: str | int | None) -> list[st
 
 
 def parseWptDisplay(key: str, val: str, lineNum: str | int | None) -> str:
-    val = val.lower()
-    if val in ("none", "inline", "open", "closed"):
-        return val
-    m.die(
-        f"WPT Display metadata only accepts the values 'none', 'closed', 'open', or 'inline'. Got '{val}'.",
-        lineNum=lineNum,
-    )
-    return "none"
+    return parseFixedList(key, val, ["none", "inline", "open", "closed"], lineNum) or "none"
 
 
 def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str]]:
@@ -611,27 +607,11 @@ def parseInlineTagCommand(key: str, val: str, lineNum: str | int | None) -> dict
 
 
 def parseDieOn(key: str, val: str, lineNum: str | int | None) -> str:
-    val = val.strip()
-    if val in m.MESSAGE_LEVELS:
-        return val
-    choices = config.englishFromList(f"'{x}'" for x in m.MESSAGE_LEVELS)
-    m.die(
-        f"Die On metadata only accepts the values {choices}. Got '{val}'.",
-        lineNum=lineNum,
-    )
-    return "everything"
+    return parseFixedList(key, val, list(m.MESSAGE_LEVELS.keys()), lineNum) or "everything"
 
 
 def parseDieWhen(key: str, val: str, lineNum: str | int | None) -> str:
-    val = val.strip()
-    if val in m.DEATH_TIMING:
-        return val
-    choices = config.englishFromList(f"'{x}'" for x in m.DEATH_TIMING)
-    m.die(
-        f"Die When metadata only accepts the values {choices}. Got '{val}'.",
-        lineNum=lineNum,
-    )
-    return "late"
+    return parseFixedList(key, val, m.DEATH_TIMING, lineNum) or "late"
 
 
 def parseIgnoreMdnFailure(key: str, val: str, lineNum: str | int | None) -> list[str]:
@@ -660,15 +640,5 @@ def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> Li
     return LinkCheckerTimeout(each, total)
 
 
-CG_MATURITIES = ("draft", "transferred", "unmaintained")
-
-
 def parseCgMaturity(key: str, val: str, lineNum: str | int | None) -> str | None:
-    val = val.strip().lower()
-    if val not in CG_MATURITIES:
-        m.die(
-            f"CG Maturity must be one of ({', '.join(CG_MATURITIES)}). Got '{val}'.",
-            lineNum=lineNum,
-        )
-        return None
-    return val
+    return parseFixedList(key, val, ["draft", "transferred", "unmaintained"], lineNum)
