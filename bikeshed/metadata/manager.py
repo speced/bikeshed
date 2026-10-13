@@ -152,6 +152,7 @@ class MetadataManager:
         self.warning: str | None = None
         self.workStatus: str | None = None
         self.wptDisplay: str = "none"
+        self.wptErrors: str = "minimal"
         self.wptPathPrefix: str | None = None
         self.imgAutoSize: bool = True
 

@@ -241,5 +241,6 @@ KNOWN_KEYS = {
     "Warning": Metadata("Warning", "warning", joins.joinValue, parsers.parseWarning),
     "Work Status": Metadata("Work Status", "workStatus", joins.joinValue, parsers.parseWorkStatus),
     "Wpt Display": Metadata("Wpt Display", "wptDisplay", joins.joinValue, parsers.parseWptDisplay),
+    "Wpt Errors": Metadata("Wpt Errors", "wptErrors", joins.joinValue, parsers.parseWptErrors),
     "Wpt Path Prefix": Metadata("Wpt Path Prefix", "wptPathPrefix", joins.joinValue, parsers.parseLiteral),
 }

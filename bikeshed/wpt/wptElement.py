@@ -76,7 +76,7 @@ def processWptElements(doc: t.SpecT) -> None:
         if pathPrefix:
             if testData is None:
                 testData = loadTestData(doc)
-            checkForOmittedTests(pathPrefix, testData, seenTestNames)
+            checkForOmittedTests(pathPrefix, testData, seenTestNames, doc)
 
     if atLeastOneVisibleTest:
         if pathPrefix and pathPrefix.startswith("https:"):
@@ -302,7 +302,7 @@ def normalizePathSegment(pathSeg: str | None) -> str | None:
     return pathSeg
 
 
-def checkForOmittedTests(pathPrefix: str, testData: dict[str, str], seenTestNames: set[str]) -> None:
+def checkForOmittedTests(pathPrefix: str, testData: dict[str, str], seenTestNames: set[str], doc: t.SpecT) -> None:
     unseenTests = []
     for testPath in testData:
         if ".tentative." in testPath:
@@ -312,10 +312,15 @@ def checkForOmittedTests(pathPrefix: str, testData: dict[str, str], seenTestName
                 unseenTests.append(testPath)
     if unseenTests:
         numTests = len(unseenTests)
-        m.warn(
-            f"There are {numTests} WPT tests underneath your path prefix '{pathPrefix}' that aren't in your document and must be added. (Use a <wpt hidden> if you don't actually want them in your document.)\n"
-            + "\n".join("  " + path for path in sorted(unseenTests)),
-        )
+        if doc.md.wptErrors == "verbose":
+            m.warn(
+                f"There are {numTests} WPT tests underneath your path prefix '{pathPrefix}' that aren't in your document and must be added. (Use a <wpt hidden> if you don't actually want them in your document.)\n"
+                + "\n".join("  " + path for path in sorted(unseenTests)),
+            )
+        elif doc.md.wptErrors == "minimal":
+            m.warn(
+                f"There are {numTests} WPT tests underneath your path prefix that aren't in your document. (Use `WPT Errors: verbose` to see more details.)",
+            )
 
 
 def loadTestData(doc: t.SpecT) -> dict[str, str]:

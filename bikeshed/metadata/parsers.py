@@ -591,6 +591,10 @@ def parseWptDisplay(key: str, val: str, lineNum: str | int | None) -> str:
     return parseFixedList(key, val, ["none", "inline", "open", "closed"], lineNum) or "none"
 
 
+def parseWptErrors(key: str, val: str, lineNum: str | int | None) -> str:
+    return parseFixedList(key, val, ["minimal", "verbose"], lineNum) or "minimal"
+
+
 def parsePreviousVersion(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str]]:
     biblioMatch = re.match(r"from biblio(\s+\S+)?", val.lower())
     if biblioMatch:
