@@ -157,6 +157,8 @@ class MetadataManager:
         self.versionHistory: list[str] = []
         self.warning: str | None = None
         self.workStatus: str | None = None
+        self.cgMaturity: str | None = None
+        self.cgTransferredTo: str | None = None
         self.wptDisplay: str = "none"
         self.wptPathPrefix: str | None = None
         self.imgAutoSize: bool = True
@@ -332,6 +334,19 @@ class MetadataManager:
             macros["status"] = doc.doctype.status.name
         if self.workStatus:
             macros["workstatus"] = self.workStatus
+        if doc.doctype.status.name in ("CG-LIVING", "CG-SNAPSHOT"):
+            maturity = self.cgMaturity or "draft"
+            macros["cg-maturity"] = maturity
+            macros["cg-maturity-label"] = maturity.capitalize()
+            if maturity == "transferred" and not self.cgTransferredTo:
+                m.warn("CG Maturity is 'transferred' but CG Transferred To is not set; the notice will not name an organization.")
+            macros["cg-transferred-to"] = self.cgTransferredTo or "Another organization"
+            shortname = self.displayShortname or ""
+            group = doc.doctype.group.name.lower()
+            macros["cg-snapshots-index"] = f"https://incubation.w3.org/groups/{group}/specs/#{shortname}"
+            macros["cg-snapshot-address"] = (
+                f"https://incubation.w3.org/specs/{shortname}-{self.date.strftime('%Y%m%d')}/"
+            )
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
@@ -840,6 +855,20 @@ def parseTextMacro(key: str, val: str, lineNum: str | int | None) -> list[tuple[
         m.die(f"Text Macro names must be all-caps and alphanumeric. Got '{name}'", lineNum=lineNum)
         return []
     return [(name, text)]
+
+
+CG_MATURITIES = ("draft", "transferred", "unmaintained")
+
+
+def parseCgMaturity(key: str, val: str, lineNum: str | int | None) -> str | None:
+    val = val.strip().lower()
+    if val not in CG_MATURITIES:
+        m.die(
+            f"CG Maturity must be one of ({', '.join(CG_MATURITIES)}). Got '{val}'.",
+            lineNum=lineNum,
+        )
+        return None
+    return val
 
 
 def parseWorkStatus(key: str, val: str, lineNum: str | int | None) -> str | None:
@@ -1532,6 +1561,8 @@ KNOWN_KEYS = {
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
     "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus),
+    "Cg Maturity": Metadata("Cg Maturity", "cgMaturity", joinValue, parseCgMaturity),
+    "Cg Transferred To": Metadata("Cg Transferred To", "cgTransferredTo", joinValue, parseLiteral),
     "Wpt Display": Metadata("Wpt Display", "wptDisplay", joinValue, parseWptDisplay),
     "Wpt Path Prefix": Metadata("Wpt Path Prefix", "wptPathPrefix", joinValue, parseLiteral),
 }
