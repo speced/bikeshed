@@ -29,35 +29,45 @@ if t.TYPE_CHECKING:
 
     MdnDataT: t.TypeAlias = dict[str, list[MdnFeatureT]]
 
-BROWSER_DATA = {
-    "current": ["firefox", "safari", "chrome"],
-    "retired": {"edge":"18", "ie":"11"},
-    "cell_order": [
-        "firefox",
-        "safari",
-        "chrome",  # current
-        "opera",
-        "edge_blink",  # borrowed
-        "edge",
-        "ie",  # retired
-        "firefox_android",
-        "safari_ios",
-        "chrome_android",
-        "webview_android",
-        "samsunginternet_android",
-        "opera_android",  # mobile
-        "nodejs",  # JS
-    ],
-    "mirrors": {
-        "chrome_android": "chrome",
-        "webview_android": "chrome",
-        "samsunginternet_android": "chrome_android",
-        "opera": "chrome",
-        "opera_android": "chrome_android",
-        "firefox_android": "firefox",
-        "safari_ios": "safari",
+
+class BrowserData(t.TypedDict):
+    current: list[str]
+    retired: dict[str, str]
+    cell_order: list[str]
+    mirrors: dict[str, str]
+
+
+BROWSER_DATA = BrowserData(
+    {
+        "current": ["firefox", "safari", "chrome"],
+        "retired": {"edge": "18", "ie": "11"},
+        "cell_order": [
+            "firefox",
+            "safari",
+            "chrome",  # current
+            "opera",
+            "edge_blink",  # borrowed
+            "edge",
+            "ie",  # retired
+            "firefox_android",
+            "safari_ios",
+            "chrome_android",
+            "webview_android",
+            "samsunginternet_android",
+            "opera_android",  # mobile
+            "nodejs",  # JS
+        ],
+        "mirrors": {
+            "chrome_android": "chrome",
+            "webview_android": "chrome",
+            "samsunginternet_android": "chrome_android",
+            "opera": "chrome",
+            "opera_android": "chrome_android",
+            "firefox_android": "firefox",
+            "safari_ios": "safari",
+        },
     },
-}
+)
 
 
 def addMdnPanels(doc: t.SpecT) -> list[t.ElementT]:
@@ -264,18 +274,21 @@ def cellFromFeature(
 
     if support == "mirror":
         sourceCodeName, support = followMirrors(feature, browserCodeName)
-        if sourceCodeName is None:
+        if sourceCodeName is None or support is None:
             return "@?"
         _, version = distillSupport(support, sourceCodeName)
         if version in "?-!":
             return "@" + version
         else:
             return "@!"
+    if support is None:
+        return "?"
 
     caveat, version = distillSupport(support, browserCodeName)
-    return caveat+version
+    return caveat + version
 
-def distillSupport(support: MdnSupportEntry | list[MdnSupportEntry], browserCodeName: str): -> tuple[str, str]
+
+def distillSupport(support: MdnSupportEntry | list[MdnSupportEntry], browserCodeName: str) -> tuple[str, str]:
     versionAdded = None
     versionRemoved = None
     caveat = ""
@@ -285,7 +298,7 @@ def distillSupport(support: MdnSupportEntry | list[MdnSupportEntry], browserCode
             caveat = getCaveat(support)
         if "version_removed" in support:
             versionRemoved = support["version_removed"]
-    else isinstance(support, list):
+    else:
         # List of support objects, documenting different levels of support over time.
         # Ordered recent-first, so stop when I hit the first version_added
         for versionDetails in support:
@@ -301,10 +314,13 @@ def distillSupport(support: MdnSupportEntry | list[MdnSupportEntry], browserCode
     return caveat, version
 
 
-def followMirrors(feature: MdnFeatureT, browserCodeName: str, ) -> tuple[str, MdnSupportEntry | list[MdnSupportEntry]] | tuple[None, None]:
+def followMirrors(
+    feature: MdnFeatureT,
+    browserCodeName: str,
+) -> tuple[str, MdnSupportEntry | list[MdnSupportEntry]] | tuple[None, None]:
     if browserCodeName not in BROWSER_DATA["mirrors"]:
         return None, None
-    mirroredBrowser = BROWSER_DATA["mirrors"]
+    mirroredBrowser = BROWSER_DATA["mirrors"][browserCodeName]
     if mirroredBrowser not in feature["support"]:
         return None, None
     support = feature["support"][mirroredBrowser]
@@ -313,7 +329,7 @@ def followMirrors(feature: MdnFeatureT, browserCodeName: str, ) -> tuple[str, Md
     return mirroredBrowser, support
 
 
-def getCaveat(supportEntry: MdnSupportEntry) -> str:
+def getCaveat(support: MdnSupportEntry) -> str:
     if "flags" in support:
         return "^"
     if "prefix" in support or "alternative_name" in support:
@@ -330,7 +346,7 @@ def getVersionString(versionAdded: str | bool | None, versionRemoved: str | bool
         return "!"
     elif versionRemoved is True:
         return "-"
-    elif browserCodeName in BROWSER_DATA["retired"] and versionAdded == BROWSER_DATA["retired"][browserCodeName]:
+    elif versionAdded == BROWSER_DATA["retired"].get(browserCodeName, "???"):
         return "=" + versionAdded
     elif versionAdded:
         if versionRemoved:
