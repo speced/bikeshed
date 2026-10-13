@@ -269,6 +269,28 @@ class IDLMarker(widlparser.protocols.Marker):
                 ),
                 endTag("idl"),
             )
+        if text in ("getter", "setter", "deleter") and construct.idl_type == "method":
+            # An unnamed special operation gets the pretend name __getter__ etc,
+            # so the keyword stands in for the name.
+            # Link it to the method dfn if the spec has one;
+            # most specs don't define these, so fail silently otherwise.
+            if construct.name == f"__{text}__":
+                parentName = construct.parent.full_name
+                assert parentName is not None
+                return (
+                    startTag(
+                        "a",
+                        {
+                            "data-link-type": "method",
+                            "data-link-for": parentName,
+                            "data-lt": t.cast(str, construct.normal_name),
+                            "data-okay-to-fail": "",
+                            "bs-unwrap-on-link-fail": "",
+                        },
+                    ),
+                    endTag("a"),
+                )
+            return (None, None)
         # The remaining built-in types that aren't covered by a more specific function.
         builtinTypes = {
             "any": "interface",
