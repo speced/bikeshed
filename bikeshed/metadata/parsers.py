@@ -654,3 +654,17 @@ def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> Li
         m.die(f"Link Checker Timeout metadata needs exactly two numbers. Got: '{val}'.", lineNum=lineNum)
         return LinkCheckerTimeout()
     return LinkCheckerTimeout(each, total)
+
+
+CG_MATURITIES = ("draft", "transferred", "unmaintained")
+
+
+def parseCgMaturity(key: str, val: str, lineNum: str | int | None) -> str | None:
+    val = val.strip().lower()
+    if val not in CG_MATURITIES:
+        m.die(
+            f"CG Maturity must be one of ({', '.join(CG_MATURITIES)}). Got '{val}'.",
+            lineNum=lineNum,
+        )
+        return None
+    return val

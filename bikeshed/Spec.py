@@ -264,6 +264,11 @@ class Spec:
         boilerplate.addFavicon(self)
         boilerplate.addSpecVersion(self)
         boilerplate.addStatusSection(self)
+        boilerplate.addCGHeader(self)
+        if boilerplate.isCGRedesign(self):
+            self.fillContainers = u.locateFillContainers(self)
+            boilerplate.addCGStatusBlocks(self)
+            boilerplate.addCGFoot(self)
         boilerplate.addLogo(self)
         boilerplate.addCopyright(self)
         boilerplate.addSpecMetadataSection(self)
@@ -336,6 +341,7 @@ class Spec:
 
         # Any final HTML cleanups
         u.cleanupHTML(self)
+        boilerplate.addCGAssets(self)
         if self.md.prepTR:
             # Don't try and override the W3C's icon.
             for el in h.findAll("[rel ~= 'icon']", self):

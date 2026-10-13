@@ -58,6 +58,8 @@ class MetadataManager:
         self.boilerplate: config.BoolSet = config.BoolSet(default=True)
         self.canIUseURLs: list[str] = []
         self.canonicalURL: str | None = None
+        self.cgMaturity: str | None = None
+        self.cgTransferredTo: str | None = None
         self.complainAbout: config.BoolSet = config.BoolSet(["mixed-indents"])
         self.customTextMacros: list[tuple[str, str]] = []
         self.customWarningText: list[str] = []
@@ -323,6 +325,21 @@ class MetadataManager:
             macros["status"] = doc.doctype.status.name
         if self.workStatus:
             macros["workstatus"] = self.workStatus
+        if doc.doctype.status.name in ("CG-LIVING", "CG-SNAPSHOT"):
+            maturity = self.cgMaturity or "draft"
+            macros["cg-maturity"] = maturity
+            macros["cg-maturity-label"] = maturity.capitalize()
+            if maturity == "transferred" and not self.cgTransferredTo:
+                m.warn(
+                    "CG Maturity is 'transferred' but CG Transferred To is not set; the notice will not name an organization.",
+                )
+            macros["cg-transferred-to"] = self.cgTransferredTo or "Another organization"
+            shortname = self.displayShortname or ""
+            group = doc.doctype.group.name.lower()
+            macros["cg-snapshots-index"] = f"https://incubation.w3.org/groups/{group}/specs/#{shortname}"
+            macros["cg-snapshot-address"] = (
+                f"https://incubation.w3.org/specs/{shortname}-{self.date.strftime('%Y%m%d')}/"
+            )
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:

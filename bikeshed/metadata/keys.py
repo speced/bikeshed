@@ -27,6 +27,8 @@ KNOWN_KEYS = {
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joins.joinBoolSet, parsers.parseBoilerplate),
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joins.joinList, parsers.parseLiteralList),
     "Canonical Url": Metadata("Canonical URL", "canonicalURL", joins.joinValue, parsers.parseLiteral),
+    "Cg Maturity": Metadata("CG Maturity", "cgMaturity", joins.joinValue, parsers.parseCgMaturity),
+    "Cg Transferred To": Metadata("CG Transferred To", "cgTransferredTo", joins.joinValue, parsers.parseLiteral),
     "Complain About": Metadata("Complain About", "complainAbout", joins.joinBoolSet, parsers.parseComplainAbout),
     "Custom Warning Text": Metadata(
         "Custom Warning Text",

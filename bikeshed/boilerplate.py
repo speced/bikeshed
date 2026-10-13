@@ -189,6 +189,52 @@ def addStatusSection(doc: t.SpecT) -> None:
     loadBoilerplate(doc, "status")
 
 
+# The cg-assets style sheets and scripts
+CG_ASSETS_BASE = "https://w3c.github.io/cg-assets/"
+CG_ASSETS_STYLES = ("css/base.css", "css/cg-spec.css", "css/dark.css")
+CG_ASSETS_SCRIPTS = ("js/cg-fixup.js", "js/dark.js", "js/cg-metadata.js")
+
+
+def isCGRedesign(doc: t.SpecT) -> bool:
+    return doc.doctype.status.name in ("CG-LIVING", "CG-SNAPSHOT")
+
+
+def addCGAssets(doc: t.SpecT) -> None:
+    if not isCGRedesign(doc):
+        return
+    for path in CG_ASSETS_STYLES:
+        attrs = {"rel": "stylesheet", "href": CG_ASSETS_BASE + path}
+        if path.endswith("dark.css"):
+            attrs["class"] = "dark-mode"
+            attrs["media"] = "(prefers-color-scheme: dark)"
+        h.appendChild(doc.head, h.E.link(attrs))
+    for path in CG_ASSETS_SCRIPTS:
+        h.appendChild(doc.head, h.E.script({"src": CG_ASSETS_BASE + path, "defer": ""}))
+
+
+def addCGStatusBlocks(doc: t.SpecT) -> None:
+    if doc.doctype.status.name != "CG-LIVING":
+        # A snapshot's notice is fixed, and lives in its header box.
+        return
+    maturity = doc.md.cgMaturity or "draft"
+    loadBoilerplate(doc, f"cg-status-blocks-{maturity}", "cg-status-blocks")
+
+
+def addCGFoot(doc: t.SpecT) -> None:
+    # "Get involved" and "Usage guidance"
+    if not isCGRedesign(doc):
+        return
+    variant = "snapshot" if doc.doctype.status.name == "CG-SNAPSHOT" else (doc.md.cgMaturity or "draft")
+    loadBoilerplate(doc, f"cg-foot-{variant}", "cg-foot")
+
+
+def addCGHeader(doc: t.SpecT) -> None:
+    # The header box of a Community Group specification
+    if not isCGRedesign(doc):
+        return
+    loadBoilerplate(doc, f"cg-header-{doc.doctype.status.name}", "cg-header")
+
+
 def addExpiryNotice(doc: t.SpecT) -> None:
     if doc.md.expires is None:
         return
