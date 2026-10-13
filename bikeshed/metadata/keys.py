@@ -1,0 +1,243 @@
+from __future__ import annotations
+
+import dataclasses
+from functools import partial
+
+from .. import t
+from . import joins, parsers
+
+
+@dataclasses.dataclass
+class Metadata:
+    humanName: str
+    attrName: str
+    join: t.Callable[[t.Any, t.Any], t.Any]
+    parse: parsers.ParseFunc
+    multiline: bool = False
+
+
+KNOWN_KEYS = {
+    "Abstract": Metadata("Abstract", "abstract", joins.joinList, parsers.parseLiteralList, multiline=True),
+    "Advisement Class": Metadata("Advisement Class", "advisementClass", joins.joinValue, parsers.parseLiteral),
+    "Assertion Class": Metadata("Assertion Class", "assertionClass", joins.joinValue, parsers.parseLiteral),
+    "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joins.joinValue, parsers.parseBoolean),
+    "At Risk": Metadata("At Risk", "atRisk", joins.joinList, parsers.parseLiteralList),
+    "Audience": Metadata("Audience", "audience", joins.joinList, parsers.parseAudience),
+    "Block Elements": Metadata("Block Elements", "blockElements", joins.joinList, parsers.parseCommaSeparated),
+    "Boilerplate": Metadata("Boilerplate", "boilerplate", joins.joinBoolSet, parsers.parseBoilerplate),
+    "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joins.joinList, parsers.parseLiteralList),
+    "Canonical Url": Metadata("Canonical URL", "canonicalURL", joins.joinValue, parsers.parseLiteral),
+    "Complain About": Metadata("Complain About", "complainAbout", joins.joinBoolSet, parsers.parseComplainAbout),
+    "Custom Warning Text": Metadata(
+        "Custom Warning Text",
+        "customWarningText",
+        joins.joinList,
+        parsers.parseLiteralList,
+        multiline=True,
+    ),
+    "Custom Warning Title": Metadata(
+        "Custom Warning Title",
+        "customWarningTitle",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Dark Mode": Metadata("Dark Mode", "darkMode", joins.joinValue, parsers.parseBoolean),
+    "Date": Metadata("Date", "date", joins.joinValue, parsers.parseDate),
+    "Deadline": Metadata("Deadline", "deadline", joins.joinValue, parsers.parseDate),
+    "Default Biblio Display": Metadata(
+        "Default Biblio Display",
+        "defaultBiblioDisplay",
+        joins.joinValue,
+        parsers.parseBiblioDisplay,
+    ),
+    "Default Biblio Status": Metadata(
+        "Default Biblio Status",
+        "defaultRefStatus",
+        joins.joinValue,
+        parsers.parseRefStatus,
+    ),  # synonym of "Default Ref Status"
+    "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joins.joinValue, parsers.parseLiteral),
+    "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joins.joinValue, parsers.parseRefStatus),
+    "Die On": Metadata("Die On", "dieOn", joins.joinValue, parsers.parseDieOn),
+    "Die When": Metadata("Die When", "dieWhen", joins.joinValue, parsers.parseDieWhen),
+    "ED": Metadata("ED", "ED", joins.joinValue, parsers.parseLiteral),
+    "Editor": Metadata("Editor", "editors", joins.joinList, parsers.parseEditor),
+    "Editor Term": Metadata("Editor Term", "editorTerm", joins.joinValue, parsers.parseEditorTerm),
+    "Expires": Metadata("Expires", "expires", joins.joinValue, parsers.parseDateOrDuration),
+    "External Infotrees": Metadata(
+        "External Infotrees",
+        "externalInfotrees",
+        joins.joinBoolSet,
+        parsers.parseExternalInfotrees,
+    ),
+    "Favicon": Metadata("Favicon", "favicon", joins.joinValue, parsers.parseLiteral),
+    "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joins.joinValue, parsers.parseBoolean),
+    "Former Editor": Metadata("Former Editor", "previousEditors", joins.joinList, parsers.parseEditor),
+    "Group": Metadata("Group", "rawGroup", joins.joinValue, parsers.parseLiteral),
+    "H1": Metadata("H1", "h1", joins.joinValue, parsers.parseLiteral),
+    "Ignore Can I Use Url Failure": Metadata(
+        "Ignore Can I Use Url Failure",
+        "ignoreCanIUseUrlFailure",
+        joins.joinList,
+        parsers.parseLiteralList,
+    ),
+    "Ignore Mdn Failure": Metadata(
+        "Ignore MDN Failure",
+        "ignoreMDNFailure",
+        joins.joinList,
+        parsers.parseIgnoreMdnFailure,
+    ),
+    "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joins.joinList, parsers.parseCommaSeparated),
+    "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joins.joinList, parsers.parseCommaSeparated),
+    "Image Auto Size": Metadata("Image Auto Size", "imgAutoSize", joins.joinValue, parsers.parseBoolean),
+    "Implementation Report": Metadata(
+        "Implementation Report",
+        "implementationReport",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Include Can I Use Panels": Metadata(
+        "Include Can I Use Panels",
+        "includeCanIUsePanels",
+        joins.joinValue,
+        parsers.parseBoolean,
+    ),
+    "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joins.joinValue, parsers.parseSoftBoolean),
+    "Indent": Metadata("Indent", "indent", joins.joinValue, parsers.parseInteger),
+    "Indent Info": Metadata("Indent Info", "indentInfo", joins.joinValue, parsers.parseLiteral),
+    "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joins.joinValue, parsers.parseBoolean),
+    "Informative Classes": Metadata(
+        "Informative Classes",
+        "informativeClasses",
+        joins.joinList,
+        parsers.parseCommaSeparated,
+    ),
+    "Inline Github Issues": Metadata(
+        "Inline Github Issues",
+        "inlineGithubIssues",
+        joins.joinValue,
+        parsers.parseInlineGithubIssues,
+    ),
+    "Inline Tag Command": Metadata(
+        "Inline Tag Command",
+        "inlineTagCommands",
+        joins.joinDict,
+        parsers.parseInlineTagCommand,
+    ),
+    "Issue Class": Metadata("Issue Class", "issueClass", joins.joinValue, parsers.parseLiteral),
+    "Issue Tracker Template": Metadata(
+        "Issue Tracker Template",
+        "issueTrackerTemplate",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Issue Tracking": Metadata("Issue Tracking", "issues", joins.joinList, parsers.parseLinkedText),
+    "Level": Metadata("Level", "level", joins.joinValue, parsers.parseLevel),
+    "Line Numbers": Metadata("Line Numbers", "lineNumbers", joins.joinValue, parsers.parseBoolean),
+    "Link Checker Timeout": Metadata(
+        "Link Checker Timeout",
+        "linkCheckerTimeout",
+        joins.joinValue,
+        parsers.parseLinkCheckerTimeout,
+    ),
+    "Link Defaults": Metadata("Link Defaults", "linkDefaults", joins.joinDdList, parsers.parseLinkDefaults),
+    "Local Boilerplate": Metadata(
+        "Local Boilerplate",
+        "localBoilerplate",
+        joins.joinBoolSet,
+        partial(parsers.parseBoolishList, default=False),
+    ),
+    "Logo": Metadata("Logo", "logo", joins.joinValue, parsers.parseLiteral),
+    "Mailing List Archives": Metadata(
+        "Mailing List Archives",
+        "mailingListArchives",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Mailing List": Metadata("Mailing List", "mailingList", joins.joinValue, parsers.parseLiteral),
+    "Markup Shorthands": Metadata(
+        "Markup Shorthands",
+        "markupShorthands",
+        joins.joinBoolSet,
+        parsers.parseMarkupShorthands,
+    ),
+    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joins.joinValue, parsers.parseMaxToCDepth),
+    "Metadata Include": Metadata(
+        "Metadata Include",
+        "metadataInclude",
+        joins.joinBoolSet,
+        partial(parsers.parseBoolishList, default=True),
+    ),
+    "Metadata Order": Metadata("Metadata Order", "metadataOrder", joins.joinValue, parsers.parseMetadataOrder),
+    "No Abstract": Metadata("No Abstract", "noAbstract", joins.joinValue, parsers.parseBoolean),
+    "No Editor": Metadata("No Editor", "noEditor", joins.joinValue, parsers.parseBoolean),
+    "Note Class": Metadata("Note Class", "noteClass", joins.joinValue, parsers.parseLiteral),
+    "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joins.joinList, parsers.parseCommaSeparated),
+    "Org": Metadata("Org", "rawOrg", joins.joinValue, parsers.parseLiteral),
+    "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joins.joinValue, parsers.parseBoolean),
+    "Previous Version": Metadata("Previous Version", "previousVersions", joins.joinList, parsers.parsePreviousVersion),
+    "Remove Multiple Links": Metadata(
+        "Remove Multiple Links",
+        "removeMultipleLinks",
+        joins.joinValue,
+        parsers.parseBoolean,
+    ),
+    "Repository": Metadata("Repository", "repository", joins.joinValue, parsers.parseRepository),
+    "Required Ids": Metadata("Required Ids", "requiredIDs", joins.joinList, parsers.parseIdList),
+    "Revision": Metadata("Revision", "level", joins.joinValue, parsers.parseLevel),
+    "Shortname": Metadata("Shortname", "displayShortname", joins.joinValue, parsers.parseLiteral),
+    "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joins.joinValue, parsers.parseBoolean),
+    "Status Text": Metadata("Status Text", "statusText", joins.joinList, parsers.parseLiteralList, multiline=True),
+    "Status": Metadata("Status", "rawStatus", joins.joinValue, parsers.parseLiteral),
+    "Test Suite": Metadata("Test Suite", "testSuite", joins.joinValue, parsers.parseLiteral),
+    "Text Macro": Metadata("Text Macro", "customTextMacros", joins.joinList, parsers.parseTextMacro),
+    "Title": Metadata("Title", "title", joins.joinValue, parsers.parseLiteral),
+    "Toggle Diffs": Metadata("Toggle Diffs", "toggleDiffs", joins.joinValue, parsers.parseBoolean),
+    "TR": Metadata("TR", "TR", joins.joinValue, parsers.parseLiteral),
+    "Tracking Vector Class": Metadata(
+        "Tracking Vector Class",
+        "trackingVectorClass",
+        joins.joinValue,
+        parsers.parseLiteralOrNone,
+    ),
+    "Tracking Vector Image": Metadata(
+        "Tracking Vector Image",
+        "trackingVectorImage",
+        joins.joinValue,
+        parsers.parseLiteralOrNone,
+    ),
+    "Tracking Vector Image Width": Metadata(
+        "Tracking Vector Image Width",
+        "trackingVectorImageWidth",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Tracking Vector Image Height": Metadata(
+        "Tracking Vector Image Height",
+        "trackingVectorImageHeight",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Tracking Vector Alt Text": Metadata(
+        "Tracking Vector Alt Text",
+        "trackingVectorAltText",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Tracking Vector Title": Metadata(
+        "Tracking Vector Title",
+        "trackingVectorTitle",
+        joins.joinValue,
+        parsers.parseLiteral,
+    ),
+    "Translate Ids": Metadata("Translate Ids", "translateIDs", joins.joinDdList, parsers.parseTranslateIDs),
+    "Translation": Metadata("Translation", "translations", joins.joinList, parsers.parseTranslation),
+    "URL": Metadata("URL", "ED", joins.joinValue, parsers.parseLiteral),  # URL is a synonym for ED
+    "Use <I> Autolinks": Metadata("Use <I> Autolinks", "useIAutolinks", joins.joinValue, parsers.parseBoolean),
+    "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joins.joinValue, parsers.parseBoolean),
+    "Version History": Metadata("Version History", "versionHistory", joins.joinList, parsers.parseLiteralList),
+    "Warning": Metadata("Warning", "warning", joins.joinValue, parsers.parseWarning),
+    "Work Status": Metadata("Work Status", "workStatus", joins.joinValue, parsers.parseWorkStatus),
+    "Wpt Display": Metadata("Wpt Display", "wptDisplay", joins.joinValue, parsers.parseWptDisplay),
+    "Wpt Path Prefix": Metadata("Wpt Path Prefix", "wptPathPrefix", joins.joinValue, parsers.parseLiteral),
+}
