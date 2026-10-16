@@ -272,7 +272,7 @@ class ReferenceManager:
         for el in dfns:
             if h.hasClass(doc, el, "no-ref"):
                 continue
-            elId = el.get("id")
+            elId = h.dfnID(el)
             assert elId is not None
             try:
                 linkTexts = h.linkTextsFromElement(el)

@@ -546,6 +546,10 @@ def wrapContents(parentEl: t.ElementT, wrapperEl: t.ElementT) -> t.ElementT:
     return parentEl
 
 
+def isHeading(el: t.ElementT) -> bool:
+    return el.tag in ("h1", "h2", "h3", "h4", "h5", "h6")
+
+
 def headingLevelOfElement(el: t.ElementT) -> str | None:
     for heading in relevantHeadings(el, levels=[2, 3, 4, 5, 6]):
         if heading.get("data-level") is not None:
@@ -594,6 +598,9 @@ def collectLinksWithSectionNames(
     if root is None:
         root = doc.body
     for child in childElements(root):
+        if hasClass(doc, child, "self-link"):
+            # Self-links shouldn't be referenced by anything else.
+            continue
         if tagName(child) == "a":
             links[child] = name
             continue
@@ -1078,6 +1085,19 @@ def dedupIDs(doc: t.SpecT) -> None:
             warn(
                 f"Multiple elements have the same id '{dupeId}':\n  {', '.join(complaintDetails)}\nDeduping, but this ID may not be stable across revisions.",
             )
+
+
+def dfnID(el: t.ElementT) -> str | None:
+    if hasAttr(el, "bs-dfn-id"):
+        return el.get("bs-dfn-id")
+    # <dfn> elements can defer to another element sometimes
+    if (heading := closestAncestor(el, lambda x: isHeading(x))) is not None:
+        id = heading.get("id")
+    else:
+        id = el.get("id")
+    if id:
+        el.set("bs-dfn-id", id)
+    return id
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:

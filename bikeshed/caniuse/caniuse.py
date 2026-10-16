@@ -26,7 +26,7 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
         return []
     validateCanIUseURLs(doc, canIUseData, elements)
     for dfn in elements:
-        dfnId = dfn.get("id")
+        dfnId = h.dfnID(dfn)
         if not dfnId:
             m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
             continue

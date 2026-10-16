@@ -349,7 +349,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
 
     indexEntries = defaultdict(list)
     for el in h.findAll(config.dfnElementsSelector, doc):
-        dfnID = el.get("id")
+        dfnID = h.dfnID(el)
         dfnType = el.get("data-dfn-type")
         if dfnID is None or dfnType is None:
             continue
@@ -856,9 +856,11 @@ def addCDDLSection(doc: t.SpecT) -> None:
             h.appendContents(container, blockCopy)
             h.appendChild(container, "\n")
         for el in h.findAll("[id]", container):
+            id = h.dfnID(el)
+            assert id is not None
             if el.tag == "dfn":
                 el.tag = "a"
-                el.set("href", "#" + el.get("id", ""))
+                el.set("href", "#" + id)
             del el.attrib["id"]
         h.addClass(doc, container, "highlight")
 
@@ -949,7 +951,6 @@ def addTOCSection(doc: t.SpecT) -> None:
         el.tag = "span"
         if "href" in el.attrib:
             del el.attrib["href"]
-            el.set("data-debug", "Removed href due to being in the ToC")
     for el in h.findAll(".content [id]", container):
         del el.attrib["id"]
     for el in h.findAll("ol:empty", container):

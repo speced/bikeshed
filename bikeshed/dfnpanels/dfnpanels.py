@@ -21,7 +21,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         linksFromTargetId.setdefault(href[1:], []).append(a)
     panelsJSON = doc.extraJC.addDfnPanels()
     for dfn in dfns:
-        id = dfn.get("id")
+        id = h.dfnID(dfn)
         dfnText = h.textContent(dfn)
         if not id:
             # Something went wrong, bail.
