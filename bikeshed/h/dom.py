@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import html
 import re
@@ -471,6 +472,13 @@ def insertAfter(target: t.ElementT, *els: t.NodeT) -> t.ElementT:
             parent.insert(parent.index(target) + 1, el)
             target = el
     return target
+
+
+def copyNode(node: t.ElementT) -> t.ElementT:
+    c = copy.deepcopy(node)
+    for el in findAll("[bs-line-number]", c):
+        removeAttr(el, "bs-line-number")
+    return c
 
 
 def removeNode(node: t.ElementT) -> t.ElementT:

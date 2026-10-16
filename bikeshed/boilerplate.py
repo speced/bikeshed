@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import dataclasses
 import os
 import re
@@ -796,7 +795,7 @@ def addIDLSection(doc: t.SpecT) -> None:
     for block in idlBlocks:
         if h.hasClass(doc, block, "extract"):
             continue
-        blockCopy = copy.deepcopy(block)
+        blockCopy = h.copyNode(block)
         h.appendContents(container, blockCopy)
         h.appendChild(container, "\n")
     for el in h.findAll("[id]", container):
@@ -853,7 +852,7 @@ def addCDDLSection(doc: t.SpecT) -> None:
         for block in cddlBlocks:
             if h.hasClass(doc, block, "extract"):
                 continue
-            blockCopy = copy.deepcopy(block)
+            blockCopy = h.copyNode(block)
             h.appendContents(container, blockCopy)
             h.appendChild(container, "\n")
         for el in h.findAll("[id]", container):
@@ -927,6 +926,8 @@ def addTOCSection(doc: t.SpecT) -> None:
 
         if addToTOC:
             assert container is not None
+            content = h.find(".content", header)
+            assert content is not None
             li = h.appendChild(
                 container,
                 h.E.li(
@@ -934,7 +935,7 @@ def addTOCSection(doc: t.SpecT) -> None:
                         {"href": "#" + header.get("id", "")},
                         h.E.span({"class": "secno"}, header.get("data-level", "")),
                         " ",
-                        copy.deepcopy(h.find(".content", header)),
+                        h.copyNode(content),
                     ),
                 ),
             )
@@ -948,6 +949,7 @@ def addTOCSection(doc: t.SpecT) -> None:
         el.tag = "span"
         if "href" in el.attrib:
             del el.attrib["href"]
+            el.set("data-debug", "Removed href due to being in the ToC")
     for el in h.findAll(".content [id]", container):
         del el.attrib["id"]
     for el in h.findAll("ol:empty", container):
@@ -1306,7 +1308,7 @@ def addIssuesSection(doc: t.SpecT) -> None:
     )
     container = h.appendChild(container, h.E.div({"style": "counter-reset:issue"}))
     for issue in issues:
-        el = copy.deepcopy(issue)
+        el = h.copyNode(issue)
         el.tail = None
         if el.tag not in ("pre", "xmp"):
             el.tag = "div"

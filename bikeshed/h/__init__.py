@@ -17,6 +17,7 @@ from .dom import (
     collectIds,
     collectLinksWithSectionNames,
     collectSyntaxHighlightables,
+    copyNode,
     createElement,
     dedupIDs,
     emptyText,
