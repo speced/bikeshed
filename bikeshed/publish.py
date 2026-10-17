@@ -64,7 +64,9 @@ def prepareTar(doc: t.SpecT, additionalDirectories: list[str] | None = None) -> 
         additionalDirectories = ["images", "diagrams", "examples"]
     with tempfile.NamedTemporaryFile() as f:
         with tarfile.open(fileobj=f, mode="w") as tar:
-            with tempfile.NamedTemporaryFile() as specOutput:
+            # The file gets reopened by name below, which Windows refuses
+            # while it's open with delete-on-close.
+            with tempfile.NamedTemporaryFile(delete_on_close=False) as specOutput:
                 doc.finish(outputFilename=specOutput.name)
                 tar.add(specOutput.name, arcname="Overview.html")
             # Loaded from .include files
