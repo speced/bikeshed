@@ -671,28 +671,29 @@ def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None
         if len(ld.get("type", [])) != 1:
             m.die(f"Every link default needs exactly one type. Got:\n{printjson.printjson(ld)}", lineNum=lineNum)
             continue
-
-        type = ld["type"][0]
+        type = ld["type"][0].strip().lower()
 
         if len(ld.get("spec", [])) != 1:
             m.die(f"Every link default needs exactly one spec. Got:\n{printjson.printjson(ld)}", lineNum=lineNum)
             continue
-
-        spec = ld["spec"][0]
+        spec = ld["spec"][0].strip().lower()
 
         if len(ld.get("text", [])) != 1:
             m.die(f"Every link default needs exactly one text. Got:\n{printjson.printjson(ld)}", lineNum=lineNum)
             continue
+        text = ld["text"][0].strip()
+        text = re.sub(r"\s+", " ", text)
+        if type in config.lowercaseTypes:
+            text = text.lower()
 
-        text = ld["text"][0]
         if "status" in ld:
-            status = ld["status"][0]
+            status = ld["status"][0].strip()
         else:
             status = None
 
         if "for" in ld:
             for _for in ld["for"]:
-                doc.md.linkDefaults[text].append((spec, type, status, _for))
+                doc.md.linkDefaults[text].append((spec, type, status, _for.strip()))
         else:
             doc.md.linkDefaults[text].append((spec, type, status, None))
 

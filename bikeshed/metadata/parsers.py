@@ -292,13 +292,16 @@ def parseLinkDefaults(key: str, val: str, lineNum: str | int | None) -> t.LinkDe
             re.X,
         )
         if match:
-            spec = match.group(1)
-            type = match.group(2)
+            spec = match.group(1).strip()
+            type = match.group(2).strip().lower()
             status = match.group(3)
             terms = match.group(4).split("/")
             dfnFor = None
             for term in terms:
-                defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
+                term = re.sub(r"\s+", " ", term.strip())
+                if type in config.lowercaseTypes:
+                    term = term.lower()
+                defaultSpecs[term].append((spec, type, status, dfnFor))
         else:
             m.die(
                 f"'{key}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{default}",

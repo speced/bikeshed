@@ -253,6 +253,9 @@ class ReferenceManager:
 
         for term, defaults in doc.md.linkDefaults.items():
             for default in defaults:
+                _spec, dfnType, _status, _dfnFor = default
+                if dfnType in config.lowercaseTypes:
+                    term = term.lower()
                 self.defaultSpecs[term].append(default)
 
         # Need to get a real versioned shortname,
@@ -463,6 +466,8 @@ class ReferenceManager:
         # Take defaults into account
         if not spec or not status or not linkFor:
             variedTexts = [v for v in utils.linkTextVariations(text, linkType) if v in self.defaultSpecs]
+            if not variedTexts and text.lower() != text:
+                variedTexts = [v for v in utils.linkTextVariations(text.lower(), linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
                     if not config.linkTypeIn(dfnType, linkType):
