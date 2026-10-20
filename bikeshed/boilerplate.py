@@ -949,7 +949,6 @@ def addTOCSection(doc: t.SpecT) -> None:
         el.tag = "span"
         if "href" in el.attrib:
             del el.attrib["href"]
-            el.set("data-debug", "Removed href due to being in the ToC")
     for el in h.findAll(".content [id]", container):
         del el.attrib["id"]
     for el in h.findAll("ol:empty", container):
