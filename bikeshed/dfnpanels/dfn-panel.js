@@ -54,6 +54,12 @@ function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
         refocusOnTarget(event);
     });
 
+    dfnPanel.addEventListener('toggle', event=>{
+        if(event.newState == "closed") {
+            unpinDfnPanel(dfnPanel);
+        }
+    });
+
     dfnPanel.dfn = dfn;
     dfn.dfnPanel = dfnPanel;
     dfn.after(dfnPanel);
@@ -71,6 +77,10 @@ function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
 function pinDfnPanel(dfnPanel) {
     // Switch it to "activated" state, which pins it.
     dfnPanel.classList.add("activated");
+}
+
+function unpinDfnPanel(dfnPanel) {
+    dfnPanel.classList.remove("activated");
 }
 
 function refocusOnTarget(event) {
