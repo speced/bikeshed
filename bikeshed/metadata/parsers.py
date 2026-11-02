@@ -118,6 +118,7 @@ def parseBoolishList(
     key: str,
     val: str,
     default: bool,
+    *,
     validLabels: t.AbstractSet[str] | None = None,
     extraValues: dict[str, bool] | None = None,
     lineNum: str | int | None = None,
@@ -194,7 +195,7 @@ def parseWarning(key: str, val: str, lineNum: str | int | None) -> tuple[str, ..
     return None
 
 
-def parseEditor(key: str, val: str, lineNum: None | str | int) -> list[dict[str, str | None]]:
+def parseEditor(key: str, val: str, lineNum: str | int | None) -> list[dict[str, str | None]]:
     pieces = [h.unescape(piece.strip()) for piece in val.split(",")]
 
     def looksLinkish(string: str) -> bool:

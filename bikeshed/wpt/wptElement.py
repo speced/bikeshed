@@ -40,10 +40,14 @@ def processWptElements(doc: t.SpecT) -> None:
             titleLang = el.get("lang")
             titleDir = el.get("dir")
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
-                appendTestList(prevEl, testNames, testData, title, titleLang, titleDir)
+                appendTestList(
+                    prevEl, testNames=testNames, testData=testData, title=title, titleLang=titleLang, titleDir=titleDir,
+                )
                 h.removeNode(el)
             else:
-                createHTML(doc, el, testNames, testData, title, titleLang, titleDir)
+                createHTML(
+                    doc, el, testNames=testNames, testData=testData, title=title, titleLang=titleLang, titleDir=titleDir,
+                )
                 prevEl = el
 
     # <wpt-rest> elements
@@ -68,7 +72,7 @@ def processWptElements(doc: t.SpecT) -> None:
                 return
             atLeastOneElement = True
             atLeastOneVisibleTest = True
-            createHTML(doc, wptRestElements[0], prefixedNames, testData)
+            createHTML(doc, wptRestElements[0], testNames=prefixedNames, testData=testData)
             m.warn(
                 "<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing.",
             )
@@ -113,6 +117,7 @@ def processWptElements(doc: t.SpecT) -> None:
 def createHTML(
     doc: t.SpecT,
     blockEl: t.ElementT,
+    *,
     testNames: list[str],
     testData: dict[str, str],
     title: str | None = None,
@@ -133,13 +138,16 @@ def createHTML(
         h.clearContents(blockEl)
         testSummaryEl = h.E.summary(_t("Tests"))
         h.appendChild(blockEl, testSummaryEl)
-        appendTestList(blockEl, testNames, testData, title, titleLang, titleDir)
+        appendTestList(
+            blockEl, testNames=testNames, testData=testData, title=title, titleLang=titleLang, titleDir=titleDir,
+        )
     else:
         m.die("Programming error, uncaught WPT Display value in createHTML.")
 
 
 def appendTestList(
     blockEl: t.ElementT,
+    *,
     testNames: list[str],
     testData: dict[str, str],
     title: str | None = None,

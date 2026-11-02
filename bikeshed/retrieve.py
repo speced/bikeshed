@@ -104,6 +104,7 @@ defaultRequester = DataFileRequester(fileType="latest", fallback=DataFileRequest
 def retrieveBoilerplateFile(
     doc: t.SpecT,
     name: str,
+    *,
     group: Group | None = None,
     status: Status | None = None,
     org: Org | None = None,

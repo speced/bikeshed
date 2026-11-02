@@ -53,6 +53,7 @@ class Spec:
     def __init__(
         self,
         inputFilename: str,
+        *,
         debug: bool = False,
         debugPrint: str | None = None,
         token: str | None = None,

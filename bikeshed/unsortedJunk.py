@@ -762,8 +762,8 @@ def processAutolinks(doc: t.SpecT) -> None:
         ignorable = linkText.lower() in doc.md.ignoredTerms
 
         ref = doc.refs.getRef(
-            linkType,
-            linkText,
+            text=linkText,
+            linkType=linkType,
             spec=el.get("data-link-spec"),
             status=status,
             linkFor=linkFors,

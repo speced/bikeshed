@@ -175,7 +175,7 @@ class StartTag(ParserNode):
         start: int,
         end: int,
         tag: str,
-        attrs: None | t.SafeAttrDict = None,
+        attrs: t.SafeAttrDict | None = None,
     ) -> t.Self:
         if attrs is None:
             attrs = {}
@@ -218,7 +218,7 @@ class SelfClosedTag(ParserNode):
         start: int,
         end: int,
         tag: str,
-        attrs: None | t.SafeAttrDict = None,
+        attrs: t.SafeAttrDict | None = None,
     ) -> t.Self:
         if attrs is None:
             attrs = {}

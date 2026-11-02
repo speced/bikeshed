@@ -338,6 +338,7 @@ class Serializer:
         self,
         el: Nodes,
         write: WriterFn,
+        *,
         indent: int = 0,
         pre: bool = False,
         inline: bool = False,

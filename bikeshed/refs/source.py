@@ -99,6 +99,7 @@ class RefSource:
 
     def queryRefs(
         self,
+        *,
         text: str | None = None,
         spec: str | None = None,
         linkType: str | None = None,
@@ -193,6 +194,7 @@ class RefSource:
 
     def _queryRefs(
         self,
+        *,
         text: str | None = None,
         spec: str | None = None,
         linkType: str | None = None,

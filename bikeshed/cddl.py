@@ -240,8 +240,8 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
                 linkFors = [None]
             for linkFor in linkFors:
                 ref = doc.refs.getRef(
-                    cddlType,
-                    cddlText,
+                    text=cddlText,
+                    linkType=cddlType,
                     linkFor=linkFor,
                     status="local",
                     el=el,

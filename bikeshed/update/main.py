@@ -24,6 +24,7 @@ from .mode import UpdateMode
 
 
 def update(
+    *,
     anchors: bool = False,
     backrefs: bool = False,
     biblio: bool = False,

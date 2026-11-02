@@ -526,8 +526,8 @@ def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
             linkFors = t.cast("list[str|None]", config.splitForValues(el.get("data-idl-for", ""))) or [None]
             for linkFor in linkFors:
                 ref = doc.refs.getRef(
-                    idlType,
-                    idlText,
+                    text=idlText,
+                    linkType=idlType,
                     linkFor=linkFor,
                     status="local",
                     el=el,

@@ -373,6 +373,7 @@ class ReferenceManager:
 
     def getRef(
         self,
+        *,
         linkType: str,
         text: str,
         spec: str | None = None,
@@ -633,7 +634,7 @@ class ReferenceManager:
             return errorFromFailureCategory(
                 failure,
                 oldRefs,
-                zeroRefsError,
+                zeroRefsError=zeroRefsError,
                 linkType=linkType,
                 text=text,
                 linkFor=linkFor,
@@ -669,6 +670,7 @@ class ReferenceManager:
     def getBiblioRef(
         self,
         text: str,
+        *,
         status: str | None = None,
         generateFakeRef: bool = False,
         allowObsolete: bool = False,
@@ -871,6 +873,7 @@ def refToText(ref: SimplifiedRef) -> str:
 
 def reportMultiplePossibleRefs(
     possibleRefs: t.Sequence[SimplifiedRef],
+    *,
     linkText: str,
     linkType: str,
     linkFor: str | list[str] | None,
@@ -927,6 +930,7 @@ def reportAmbiguousForlessLink(
 def errorFromFailureCategory(
     failure: LinkFailure,
     oldRefs: list[t.RefWrapper],
+    *,
     zeroRefsError: bool,
     linkType: str,
     text: str,

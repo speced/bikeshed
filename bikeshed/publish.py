@@ -15,6 +15,7 @@ from . import messages as m
 
 def publishEchidna(
     doc: t.SpecT,
+    *,
     username: str,
     password: str,
     decision: str,
