@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 
@@ -344,23 +345,7 @@ class Spec:
         u.cleanupHTML(self)
         boilerplate.addCGAssets(self)
         if self.md.prepTR:
-            # Don't try and override the W3C's icon.
-            for el in h.findAll("[rel ~= 'icon']", self):
-                h.removeNode(el)
-            # Make sure the W3C stylesheet is after all other styles.
-            for el in h.findAll("link", self):
-                if el.get("href", "").startswith("https://www.w3.org/StyleSheets/TR"):
-                    h.appendChild(self.head, el)
-            # Ensure that all W3C links are https.
-            for el in h.findAll("a", self):
-                href = el.get("href", "")
-                if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
-                    el.set("href", "https" + href[4:])
-                text = el.text or ""
-                if text.startswith("http://www.w3.org") or text.startswith("http://lists.w3.org"):
-                    el.text = "https" + text[4:]
-            # Loaded from .include files
-            extensions.BSPrepTR(self)  # type: ignore # pylint: disable=no-member
+            prepTR(self)
 
         return self
 
@@ -659,3 +644,30 @@ def replaceMarkdownBlockquotes(lines: list[str]) -> list[str]:
             lines[i] = prefix + rest
             i += 1
     return lines
+
+
+def prepTR(doc: t.SpecT) -> None:
+    # Don't try and override the W3C's icon.
+    for el in h.findAll("[rel ~= 'icon']", doc):
+        h.removeNode(el)
+    # Make sure the W3C stylesheet is after all other styles.
+    for el in h.findAll("link", doc):
+        if el.get("href", "").startswith("https://www.w3.org/StyleSheets/TR"):
+            h.appendChild(doc.head, el)
+    # Ensure that all W3C links are https.
+    for el in h.findAll("a", doc):
+        upgradeToHttpsDomain(el)
+    # Loaded from .include files
+    extensions.BSPrepTR(doc)  # type: ignore # pylint: disable=no-member
+
+
+def upgradeToHttpsDomain(el: t.ElementT) -> None:
+    href = el.get("href")
+    if not href:
+        return
+    parsed = urllib.parse.urlparse(href)
+    if parsed.scheme == "http":
+        hostname = parsed.hostname
+        assert hostname is not None
+        if hostname == "w3.org" or hostname.endswith("w3.org"):
+            el.set("href", parsed._replace(scheme="https").geturl())
