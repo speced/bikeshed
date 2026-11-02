@@ -41,12 +41,23 @@ def processWptElements(doc: t.SpecT) -> None:
             titleDir = el.get("dir")
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
                 appendTestList(
-                    prevEl, testNames=testNames, testData=testData, title=title, titleLang=titleLang, titleDir=titleDir,
+                    prevEl,
+                    testNames=testNames,
+                    testData=testData,
+                    title=title,
+                    titleLang=titleLang,
+                    titleDir=titleDir,
                 )
                 h.removeNode(el)
             else:
                 createHTML(
-                    doc, el, testNames=testNames, testData=testData, title=title, titleLang=titleLang, titleDir=titleDir,
+                    doc,
+                    el,
+                    testNames=testNames,
+                    testData=testData,
+                    title=title,
+                    titleLang=titleLang,
+                    titleDir=titleDir,
                 )
                 prevEl = el
 
@@ -139,7 +150,12 @@ def createHTML(
         testSummaryEl = h.E.summary(_t("Tests"))
         h.appendChild(blockEl, testSummaryEl)
         appendTestList(
-            blockEl, testNames=testNames, testData=testData, title=title, titleLang=titleLang, titleDir=titleDir,
+            blockEl,
+            testNames=testNames,
+            testData=testData,
+            title=title,
+            titleLang=titleLang,
+            titleDir=titleDir,
         )
     else:
         m.die("Programming error, uncaught WPT Display value in createHTML.")

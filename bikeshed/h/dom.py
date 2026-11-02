@@ -874,12 +874,7 @@ def isNormative(doc: t.SpecT, el: t.ElementT) -> bool:
     # Currently just tests whether the element is in a class=example or class=note block, or not.
     if el in doc.cachedNormativeEls:
         return doc.cachedNormativeEls[el]
-    informativeClasses = [
-        "note",
-        "example",
-        "non-normative",
-        "informative",
-    ] + doc.md.informativeClasses
+    informativeClasses = ["note", "example", "non-normative", "informative", *doc.md.informativeClasses]
     for cls in informativeClasses:
         if hasClass(doc, el, cls):
             doc.cachedNormativeEls[el] = False

@@ -87,7 +87,7 @@ def tokenizeLines(lines: list[l.Line], config: MarkdownConfig) -> list[TokenT]:
     # which'll be turned into MD blocks later.
     # Every token *must* have 'type', 'raw', and 'prefix' keys.
 
-    blockElements = config.blockElements + ["if-wrapper"]
+    blockElements = [*config.blockElements, "if-wrapper"]
 
     # Custom elements are assumed to be inline, unless they're passed in config.blockElements.
     # Non-custom elements are assumed to be block, unless they're on the list below.
@@ -669,11 +669,11 @@ def parseBlockquote(stream: TokenStream) -> list[l.Line]:
             lines.append(lineFromStream(stream, stream.currtext() + "\n"))
         else:
             break
-    return (
-        [l.Line(i, startTag("blockquote", i, {"bs-md": ""}))]
-        + parse(lines, stream.config)
-        + [l.Line(-1, "</blockquote>\n")]
-    )
+    return [
+        l.Line(i, startTag("blockquote", i, {"bs-md": ""})),
+        *parse(lines, stream.config),
+        l.Line(-1, "</blockquote>\n"),
+    ]
 
 
 class TokenStream:

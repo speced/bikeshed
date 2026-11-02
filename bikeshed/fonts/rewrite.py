@@ -30,7 +30,7 @@ def replaceComments(font: Font, inputFilename: str | None = None, outputFilename
             i = endLineI + 1
             continue
         textToEmbiggen = match.group(1).strip()
-        newtext = [match.group(0) + "\n", "\n"] + font.write(textToEmbiggen) + ["-->\n"]
+        newtext = [match.group(0) + "\n", "\n", *font.write(textToEmbiggen), "-->\n"]
         replacements.append((i, endLineI, newtext))
         i = endLineI + 1
     for i, endI, newLines in reversed(replacements):

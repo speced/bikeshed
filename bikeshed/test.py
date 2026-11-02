@@ -75,7 +75,7 @@ def splitPath(path: str) -> list[str]:
     [head, tail] = os.path.split(path)
     if head in ["", "/"]:
         return [tail]
-    return splitPath(head) + [tail]
+    return [*splitPath(head), tail]
 
 
 # The test name will be the path relative to the tests directory,
