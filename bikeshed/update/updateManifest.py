@@ -14,7 +14,7 @@ import tenacity
 
 from .. import messages as m
 from .. import t
-from ..result import Err, Ok, Result, isErr, isOk
+from ..bsresult import Err, Ok, Result, isErr, isOk
 from .manifest import Manifest
 from .mode import UpdateMode
 
