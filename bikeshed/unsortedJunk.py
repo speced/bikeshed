@@ -1375,13 +1375,14 @@ def find_webidl_methods(parser: widlparser.Parser, method_text: str) -> list[wid
         argument_names = None
 
     if interface_name:
-        interface = parser.find(interface_name)
-        if interface:
+        interfaces = parser.find_all(interface_name)
+        for interface in interfaces:
             methods = interface.find_methods(name, argument_names)
             if not methods and empty_args:
                 methods = interface.find_methods(name)
             methods.reverse()
-            return methods
+            if methods:
+                return methods
         return []
 
     result = []
