@@ -5,7 +5,7 @@ import dataclasses
 import json
 from collections import defaultdict
 
-from . import constants, h, t
+from . import config, constants, h, t
 from . import messages as m
 
 
@@ -493,3 +493,120 @@ def dedupBiblioReferences(doc: t.SpecT) -> None:
                 for refGroup in oldSpecData.refs.values():
                     for forVal, refWrapper in refGroup.valuesByFor.items():
                         newSpecData.addRef(refWrapper, forVal)
+
+
+def processBiblioLinks(doc: t.SpecT) -> None:
+    biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
+    for el in biblioLinks:
+        if el.get("data-lt"):
+            linkText = el.get("data-lt", "")
+        else:
+            linkText = h.textContent(el)
+        linkText = h.foldWhitespace(linkText)
+        if len(linkText) == 0:
+            m.die(f"Autolink {h.outerHTML(el)} has no linktext.", el=el)
+        if linkText[0] == "[" and linkText[-1] == "]":
+            linkText = linkText[1:-1]
+
+        refStatus = h.treeAttr(el, "data-biblio-status") or doc.md.defaultRefStatus
+
+        okayToFail = el.get("data-okay-to-fail") is not None
+
+        allowObsolete = el.get("data-biblio-obsolete") is not None
+
+        ref = doc.refs.getBiblioRef(
+            linkText,
+            status=refStatus,
+            allowObsolete=allowObsolete,
+            generateFakeRef=okayToFail,
+            quiet=okayToFail,
+            el=el,
+        )
+        if not ref:
+            if not okayToFail:
+                closeBiblios = findCloseBiblios(list(doc.refs.biblioKeys), linkText)
+                m.die(
+                    f"Couldn't find '{linkText}' in bibliography data. Did you mean:\n"
+                    + "\n".join("  " + b for b in sorted(closeBiblios)),
+                    el=el,
+                )
+            el.tag = "span"
+            continue
+
+        # Need to register that I have a preferred way to refer to this biblio,
+        # in case aliases show up - they all need to use my preferred key!
+        if ref.originalLinkText:
+            # Okay, so this particular ref has been reffed before...
+            if linkText == ref.linkText:
+                # Whew, and with the same name I'm using now. Ship it.
+                pass
+            else:
+                # Oh no! I'm using two different names to refer to the same biblio!
+                m.die(
+                    f"The biblio refs [[{linkText}]] and [[{ref.linkText}]] are both aliases of the same base reference [[{ref.originalLinkText}]]. Please choose one name and use it consistently.",
+                    el=el,
+                )
+                # I can keep going, tho - no need to skip this ref
+        else:
+            # This is the first time I've reffed this particular biblio.
+            # Register this as the preferred name...
+            doc.refs.preferredBiblioNames[ref.linkText] = linkText
+            # Use it on the current ref. Future ones will use the preferred name automatically.
+            ref.linkText = linkText
+        registerBiblioUsage(doc, ref, el=el, type=el.get("data-biblio-type"))
+
+        id = config.simplifyText(ref.linkText)
+        el.set("href", "#biblio-" + id)
+
+        biblioDisplay = el.get("data-biblio-display", doc.md.defaultBiblioDisplay)
+        if biblioDisplay == "inline":
+            if (
+                el.text == f"[{linkText}]"
+            ):  # False if it's already been replaced by an author supplied text using the [[FOOBAR inline|custom text]] syntax.
+                h.clearContents(el)
+                h.appendChild(el, h.E.cite(ref.title))
+        else:
+            if ref.title:
+                el.set("title", ref.title)
+        if biblioDisplay in ("inline", "direct"):
+            if ref.url:
+                el.set("href", ref.url)
+
+
+def verifyUsageOfAllLocalBiblios(doc: t.SpecT) -> None:
+    """
+    Verifies that all the locally-declared biblios
+    (those written inline in a <pre class=biblio> block,
+    and thus given order=1)
+    were used in the spec,
+    so you can remove entries when they're no longer necessary.
+    """
+    usedBiblioKeys = {x.upper() for x in list(doc.normativeRefs.keys()) + list(doc.informativeRefs.keys())}
+    localBiblios = [b.linkText.upper() for bs in doc.refs.biblios.values() for b in bs if b.order == 1]
+    unusedBiblioKeys = []
+    for b in localBiblios:
+        if b not in usedBiblioKeys:
+            unusedBiblioKeys.append(b)
+    if unusedBiblioKeys:
+        m.warn(
+            "The following locally-defined biblio entries are unused and can be removed:\n"
+            + "\n".join(f"  * {b}" for b in unusedBiblioKeys),
+        )
+
+
+def registerBiblioUsage(doc: t.SpecT, ref: BiblioEntry, el: t.ElementT, type: str | None = None) -> None:
+    if type is None:
+        if h.isNormative(doc, el):
+            type = "normative"
+        else:
+            type = "informative"
+    if type == "normative":
+        biblioStorage = doc.normativeRefs
+    elif type == "informative":
+        biblioStorage = doc.informativeRefs
+    else:
+        m.die(f"Unknown biblio type {type}.", el=el)
+        return
+    spec = ref.linkText.upper()
+    biblioStorage[spec] = ref
+    doc.externalRefsUsed.addBiblio(spec, ref)

@@ -13,10 +13,13 @@ from datetime import datetime
 
 from . import (
     InputSource,
+    admonitions,
+    algorithms,
     biblio,
     boilerplate,
     caniuse,
     cddl,
+    cleanup,
     conditional,
     constants,
     datablocks,
@@ -31,6 +34,7 @@ from . import (
     includes,
     inlineTags,
     language,
+    links,
     lint,
     markdown,
     mdn,
@@ -44,7 +48,6 @@ from . import (
 )
 from . import line as l
 from . import messages as m
-from . import unsortedJunk as u
 
 if t.TYPE_CHECKING:
     import widlparser
@@ -249,7 +252,7 @@ class Spec:
         if self.debugPrint == "datablocks":
             print(h.printNodeTree(self.document))  # noqa: T201
         self.refs.setSpecData(self)
-        u.correctFrontMatter(self)
+        boilerplate.correctFrontMatter(self)
         includes.processInclusions(self)
         metadata.parseDoc(self)
         return self
@@ -257,7 +260,7 @@ class Spec:
     def processDocument(self) -> Spec:
         # Fill in and clean up a bunch of data
         conditional.processConditionals(self)
-        self.fillContainers: t.FillContainersT = u.locateFillContainers(self)
+        self.fillContainers: t.FillContainersT = boilerplate.locateFillContainers(self)
         lint.exampleIDs(self)
         wpt.processWptElements(self)
 
@@ -268,7 +271,7 @@ class Spec:
         boilerplate.addStatusSection(self)
         boilerplate.addCGHeader(self)
         if boilerplate.isCGRedesign(self):
-            self.fillContainers = u.locateFillContainers(self)
+            self.fillContainers = boilerplate.locateFillContainers(self)
             boilerplate.addCGStatusBlocks(self)
             boilerplate.addCGFoot(self)
         boilerplate.addLogo(self)
@@ -278,31 +281,31 @@ class Spec:
         boilerplate.addExpiryNotice(self)
         boilerplate.addObsoletionNotice(self)
         boilerplate.addAtRisk(self)
-        u.addNoteHeaders(self)
+        admonitions.addNoteHeaders(self)
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.run(self)
         inlineTags.processTags(self)
-        u.canonicalizeShortcuts(self.body)
-        u.addImplicitAlgorithms(self)
-        u.fixManualDefTables(self)
+        cleanup.canonicalizeShortcuts(self.body)
+        algorithms.addImplicitAlgorithms(self)
+        datablocks.fixManualDefTables(self)
         headings.processHeadings(self)
-        u.checkVarHygiene(self)
-        u.processIssuesAndExamples(self)
+        algorithms.checkVarHygiene(self)
+        admonitions.processIssuesAndExamples(self)
         idl.markupIDL(self)
         cddl.markupCDDL(self)
-        u.inlineRemoteIssues(self)
-        u.addImageSize(self)
+        admonitions.inlineRemoteIssues(self)
+        cleanup.addImageSize(self)
 
         # Handle all the links
-        u.processBiblioLinks(self)
-        u.processDfns(self)
-        u.processIDL(self)
-        u.processCDDL(self)
+        biblio.processBiblioLinks(self)
+        dfns.processDfns(self)
+        idl.processIDL(self)
+        cddl.processCDDL(self)
         dfns.annotateDfns(self)
-        u.formatArgumentdefTables(self)
-        u.formatElementdefTables(self)
-        u.processAutolinks(self)
-        u.fixInterDocumentReferences(self)
+        datablocks.formatArgumentdefTables(self)
+        datablocks.formatElementdefTables(self)
+        links.processAutolinks(self)
+        links.fixInterDocumentReferences(self)
         biblio.dedupBiblioReferences(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
@@ -316,8 +319,8 @@ class Spec:
         headings.processHeadings(self, "all")  # again
         boilerplate.removeUnwantedBoilerplate(self)
         boilerplate.addTOCSection(self)
-        u.addSelfLinks(self)
-        u.processAutolinks(self)
+        links.addSelfLinks(self)
+        links.processAutolinks(self)
         boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
         mdn.addMdnPanels(self)
@@ -326,11 +329,11 @@ class Spec:
         boilerplate.addBikeshedBoilerplate(self)
         boilerplate.addDarkmodeIndicators(self)
         fingerprinting.addTrackingVector(self)
-        u.fixIntraDocumentReferences(self)
-        u.fixInterDocumentReferences(self)
-        u.verifyUsageOfAllLocalBiblios(self)
-        u.removeMultipleLinks(self)
-        u.forceCrossorigin(self)
+        links.fixIntraDocumentReferences(self)
+        links.fixInterDocumentReferences(self)
+        biblio.verifyUsageOfAllLocalBiblios(self)
+        links.removeMultipleLinks(self)
+        cleanup.forceCrossorigin(self)
         addDomintroStyles(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
@@ -342,7 +345,7 @@ class Spec:
             print(h.printNodeTree(self.document))  # noqa: T201
 
         # Any final HTML cleanups
-        u.cleanupHTML(self)
+        cleanup.cleanupHTML(self)
         boilerplate.addCGAssets(self)
         if self.md.prepTR:
             prepTR(self)
@@ -355,7 +358,6 @@ class Spec:
         except Exception as e:
             m.die(str(e))
             return None
-        rendered = u.finalHackyCleanup(rendered)
         return rendered
 
     def fixMissingOutputFilename(self, outputFilename: str | None) -> str:
@@ -393,15 +395,15 @@ class Spec:
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
         fatals = m.state.categoryCounts["fatal"]
-        links = m.state.categoryCounts["link-error"]
+        linkErrors = m.state.categoryCounts["link-error"]
         warnings = m.state.categoryCounts["warning"]
         if self.lineNumbers:
             m.warn("Because --line-numbers was used, no output was saved.")
         if fatals:
             m.success("Successfully generated, but fatal errors were suppressed")
             return
-        if links:
-            m.success(f"Successfully generated, with {links} linking errors")
+        if linkErrors:
+            m.success(f"Successfully generated, with {linkErrors} linking errors")
             return
         if warnings:
             m.success("Successfully generated, with warnings")

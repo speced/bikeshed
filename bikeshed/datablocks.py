@@ -5,10 +5,12 @@ import io
 import re
 from collections import OrderedDict, defaultdict
 
-from . import biblio, config, constants, h, printjson, railroadparser, refs, t
+from . import biblio, config, constants, h, idl, printjson, railroadparser, refs, t
 from . import messages as m
 
 if t.TYPE_CHECKING:
+    import widlparser
+
     InfoTreeT: t.TypeAlias = list[defaultdict[str, list[str]]]
 
     class TransformFuncT(t.Protocol):
@@ -1010,3 +1012,115 @@ def removeIndent(lines: list[str], tabSize: int) -> list[str]:
         if line.startswith(minIndent):
             lines[i] = line[minIndentSize:]
     return lines
+
+
+def fixManualDefTables(doc: t.SpecT) -> None:
+    # Def tables generated via datablocks are guaranteed correct,
+    # but manually-written ones often don't link up the names in the first row.
+    for table in h.findAll("table.propdef, table.descdef, table.elementdef", doc):
+        if h.hasClass(doc, table, "partial"):
+            tag = "a"
+            attr = "data-link-type"
+        else:
+            tag = "dfn"
+            attr = "data-dfn-type"
+        tag = "a" if h.hasClass(doc, table, "partial") else "dfn"
+        if h.hasClass(doc, table, "propdef"):
+            type = "property"
+        elif h.hasClass(doc, table, "descdef"):
+            type = "descriptor"
+        elif h.hasClass(doc, table, "elementdef"):
+            type = "element"
+        cell = h.find("tr:first-child > :nth-child(2)", table)
+        if cell is not None:
+            names = [x.strip() for x in h.textContent(cell).split(",")]
+            newContents = list(config.intersperse((h.createElement(tag, {attr: type}, name) for name in names), ", "))
+            h.replaceContents(cell, newContents)
+
+
+def formatElementdefTables(doc: t.SpecT) -> None:
+    for table in h.findAll("table.elementdef", doc):
+        elements = h.findAll("tr:first-child dfn", table)
+        elementsFor = " ".join(h.textContent(x) for x in elements)
+        for el in h.findAll("a[data-element-attr-group]", table):
+            groupName = h.textContent(el).strip()
+            groupAttrs = sorted(
+                doc.refs.queryAllRefs(linkType="element-attr", linkFor=groupName),
+                key=lambda x: x.text,
+            )
+            if len(groupAttrs) == 0:
+                m.die(
+                    f"The element-attr group '{groupName}' doesn't have any attributes defined for it.",
+                    el=el,
+                )
+                continue
+            el.tag = "details"
+            h.clearContents(el)
+            h.removeAttr(el, "data-element-attr-group", "data-dfn-type")
+            ul = h.appendChild(el, h.E.summary(h.E.a({"data-link-type": "dfn"}, groupName)), h.E.ul())
+            for ref in groupAttrs:
+                id = "element-attrdef-" + config.simplifyText(h.textContent(elements[0])) + "-" + ref.text
+                h.appendChild(
+                    ul,
+                    h.E.li(
+                        h.E.dfn(
+                            {
+                                "id": h.safeID(doc, id),
+                                "for": elementsFor,
+                                "data-dfn-type": "element-attr",
+                            },
+                            h.E.a(
+                                {"data-link-type": "element-attr", "for": groupName},
+                                ref.text.strip(),
+                            ),
+                        ),
+                    ),
+                )
+
+
+def formatArgumentdefTables(doc: t.SpecT) -> None:
+    for table in h.findAll("table.argumentdef", doc):
+        forMethod = table.get("data-dfn-for", "")
+        if not forMethod:
+            continue
+        methods = idl.find_webidl_methods(doc.widl, forMethod)
+        if len(methods) > 1:
+            methodOptions = "\n".join("  " + method.full_name for method in methods if method.full_name)
+            m.die(
+                f"Multiple methods matching the argument signature '{forMethod}'. Switch to one of the following to disambiguate:\n{methodOptions}",
+                el=table,
+            )
+            continue
+        elif not methods:
+            m.die(f"Can't find method '{forMethod}'.", el=table)
+            continue
+        else:
+            method = methods[0]
+        for i, tr in enumerate(h.findAll("tbody > tr", table)):
+            try:
+                argCell, typeCell, nullCell, optCell, _ = h.findAll("td", tr)
+            except ValueError:
+                m.die(
+                    f"In the argumentdef table for '{method.full_name}', row {i} is misformatted, with {len(h.findAll('td', tr))} cells instead of 5.",
+                    el=table,
+                )
+                continue
+            argName = h.textContent(argCell).strip()
+            arg: widlparser.Argument = t.cast("widlparser.Argument", method.find_argument(argName))
+            if arg:
+                h.appendChild(typeCell, idl.nodesFromType(arg.type))
+                # print(h.printNodeTree(idl.nodesFromType(arg.type)))
+                if str(arg.type).strip().endswith("?"):
+                    h.appendChild(nullCell, h.E.span({"class": "yes"}, "✔"))
+                else:
+                    h.appendChild(nullCell, h.E.span({"class": "no"}, "✘"))
+                if arg.optional:
+                    h.appendChild(optCell, h.E.span({"class": "yes"}, "✔"))
+                else:
+                    h.appendChild(optCell, h.E.span({"class": "no"}, "✘"))
+            else:
+                m.die(
+                    f"Can't find the '{argName}' argument of method '{method.full_name}' in the argumentdef block.",
+                    el=table,
+                )
+                continue

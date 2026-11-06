@@ -5,7 +5,7 @@ from typing import get_args
 
 import cddlparser
 
-from . import config, h, t
+from . import config, dfns, h, t
 from . import messages as m
 
 
@@ -293,3 +293,19 @@ def combineCDDLLinkingTexts(t1: str | None, t2: str | None) -> str:
         if lt not in t1s:
             t1s.append(lt)
     return "|".join(t1s)
+
+
+def processCDDL(doc: t.SpecT) -> None:
+    localDfns = set()
+    for pre in h.findAll("pre.cddl, xmp.cddl", doc):
+        if pre.get("data-no-cddl") is not None:
+            continue
+        if not h.isNormative(doc, pre):
+            continue
+        localDfns.update(markupCDDLBlock(pre, doc))
+
+    cddlDfns = h.findAll("pre.cddl:not([data-no-cddl]) dfn, xmp.cddl:not([data-no-cddl]) dfn", doc) + list(localDfns)
+    cddlDfns = sorted(cddlDfns, key=lambda x: (x.get("bs-line-number") or "", h.textContent(x)))
+    dfns.classifyDfns(doc, cddlDfns)
+    h.fixupIDs(doc, cddlDfns)
+    doc.refs.addLocalDfns(doc, (dfn for dfn in cddlDfns if dfn.get("id") is not None))

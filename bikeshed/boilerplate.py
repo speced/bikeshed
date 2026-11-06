@@ -1367,3 +1367,19 @@ def addDarkmodeIndicators(doc: t.SpecT) -> None:
                 },
             ),
         )
+
+
+def correctFrontMatter(doc: t.SpecT) -> None:
+    # Detect and move around some bits of information,
+    # if you provided them in your
+    # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
+    h1s = [h1 for h1 in h.findAll("h1", doc) if h.isNormative(doc, h1)]
+    if len(h1s) == 2:
+        h.replaceNode(h1s[0], h1s[1])
+
+
+def locateFillContainers(doc: t.SpecT) -> t.FillContainersT:
+    fillContainers = defaultdict(list)
+    for el in h.findAll("[data-fill-with]", doc):
+        fillContainers[t.cast(str, el.get("data-fill-with"))].append(el)
+    return fillContainers
