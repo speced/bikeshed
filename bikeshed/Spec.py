@@ -285,7 +285,6 @@ class Spec:
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.run(self)
         inlineTags.processTags(self)
-        cleanup.canonicalizeShortcuts(self.body)
         algorithms.addImplicitAlgorithms(self)
         datablocks.fixManualDefTables(self)
         headings.processHeadings(self)

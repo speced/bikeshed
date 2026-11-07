@@ -1079,7 +1079,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 doc.md.mailingList,
             ),
             " with subject line “",
-            h.E.kbd("[", mac["shortname"], "] ", h.E.i({"lt": ""}, "… message topic …")),
+            h.E.kbd("[", mac["shortname"], "] ", h.E.i({"data-lt": ""}, "… message topic …")),
             "”",
         )
         if doc.md.mailingListArchives:

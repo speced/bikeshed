@@ -52,24 +52,24 @@ def transformProductionGrammars(doc: t.SpecT) -> None:
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
 
     def hashMultReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a({"data-link-type": "grammar", "data-lt": "#", "for": ""}, match.group(0))
+        return h.E.a({"data-link-type": "grammar", "data-lt": "#", "data-link-for": ""}, match.group(0))
 
     multRe = re.compile(r"{\s*\d+\s*}")
 
     def multReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a({"data-link-type": "grammar", "data-lt": "{A}", "for": ""}, match.group(0))
+        return h.E.a({"data-link-type": "grammar", "data-lt": "{A}", "data-link-for": ""}, match.group(0))
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
 
     def multRangeReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "for": ""}, match.group(0))
+        return h.E.a({"data-link-type": "grammar", "data-lt": "{A,B}", "data-link-for": ""}, match.group(0))
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
 
     def simpleReplacer(match: t.Match) -> t.ElementT:
         return h.E.a(
-            {"data-link-type": "grammar", "data-lt": match.group(0), "for": ""},
+            {"data-link-type": "grammar", "data-lt": match.group(0), "data-link-for": ""},
             match.group(0),
         )
 

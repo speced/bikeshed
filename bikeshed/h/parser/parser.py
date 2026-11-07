@@ -866,10 +866,10 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     if s[i] == "/":
         if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
             el = SelfClosedTag.fromStream(s, start, i + 2, tagname, safeAttrs)
-            return Ok(el, i + 2)
+            return Ok(canonicalizeShortcuts(el), i + 2)
         elif s[i + 1] == ">" and preds.isXMLishTagname(tagname):
             el = SelfClosedTag.fromStream(s, start, i + 2, tagname, safeAttrs)
-            return Ok(el, i + 2)
+            return Ok(canonicalizeShortcuts(el), i + 2)
         elif tagname in VOID_ELEMENTS:
             m.die(f"Void element (<{tagname}>) with a spurious trailing /.", lineNum=s.loc(start))
             i += 1
@@ -887,7 +887,7 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
             el = SelfClosedTag.fromStream(s, start, i + 1, tagname, safeAttrs)
         else:
             el = StartTag.fromStream(s, start, i + 1, tagname, safeAttrs)
-        return Ok(el, i + 1)
+        return Ok(canonicalizeShortcuts(el), i + 1)
 
     if s.eof(i):
         m.die(f"Tag <{tagname}> wasn't closed at end of file.", lineNum=s.loc(start))
@@ -918,6 +918,77 @@ def bqCharPreviouslyOnLine(s: Stream, i: int) -> bool:
             return True
         i -= 1
     return False
+
+
+ATTR_SHORTCUTS = {
+    "export": "data-export",
+    "noexport": "data-noexport",
+    "link-spec": "data-link-spec",
+    "spec": "data-link-spec",
+    "link-status": "data-link-status",
+    "status": "data-link-status",
+    "dfn-for": "data-dfn-for",
+    "link-for": "data-link-for",
+    "link-for-hint": "data-link-for-hint",
+    "dfn-type": "data-dfn-type",
+    "link-type": "data-link-type",
+    "dfn-force": "data-dfn-force",
+    "force": "data-dfn-force",
+    "section": "data-section",
+    "attribute-info": "data-attribute-info",
+    "dict-member-info": "data-dict-member-info",
+    "lt": "data-lt",
+    "local-lt": "data-local-lt",
+    "algorithm": "data-algorithm",
+    "ignore": "data-var-ignore",
+}
+
+
+def canonicalizeShortcuts(el: StartTag | SelfClosedTag) -> StartTag | SelfClosedTag:
+    # Take all the invalid-HTML shortcuts and fix them.
+    attrs = el.attrs
+    for oldAttr, newAttr in ATTR_SHORTCUTS.items():
+        if oldAttr in attrs:
+            attrs[newAttr] = attrs.pop(oldAttr)
+
+    # Some of these attrs conflict with existing real attributes on some elements.
+    # Instead, limit the search/transforms to the relevant elements.
+    tag = el.tag
+    if tag in ("dfn", "h2", "h3", "h4", "h5", "h6"):
+        for dfnType in config.dfnTypes:
+            if dfnType in attrs:
+                if attrs[dfnType] == "":
+                    del attrs[dfnType]
+                    attrs["data-dfn-type"] = escapeAttr(dfnType)
+                    break
+                elif dfnType == "type" and attrs[dfnType] in config.dfnTypes:
+                    realDfnType = attrs[dfnType]
+                    m.die(
+                        f"You used type={realDfnType}, which isn't valid. Instead use just {realDfnType} as a boolean attribute, or dfn-type={realDfnType}.",
+                        lineNum=el.loc,
+                    )
+                    del attrs["type"]
+                    break
+
+    if tag in ("a", "l"):
+        for linkType in config.linkTypes:
+            if linkType in attrs:
+                del attrs[linkType]
+                attrs["data-link-type"] = escapeAttr(linkType)
+                break
+
+    if (
+        tag in ("a", "l")
+        or (tag == "dfn" and "data-var-ignore" not in attrs)
+        or (tag in ("h2", "h3", "h4", "h5", "h6") and "data-dfn-type" in attrs)
+    ):
+        if "for" in attrs:
+            if tag in ("a", "l"):
+                attrs["data-link-for"] = attrs.pop("for")
+            else:
+                attrs["data-dfn-for"] = attrs.pop("for")
+
+    return el
 
 
 def parseTagName(s: Stream, start: int) -> ResultT[str]:
@@ -2625,7 +2696,7 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             innerStart,
             "a",
             {
-                "section": "",
+                "data-section": "",
                 "href": escapeAttr(section),
                 "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
@@ -2639,7 +2710,7 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             "span",
             {
                 "spec-section": escapeAttr(justPage + "#"),
-                "spec": escapeAttr(spec),
+                "data-link-spec": escapeAttr(spec),
                 "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )
@@ -2652,7 +2723,7 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             "span",
             {
                 "spec-section": escapeAttr(section),
-                "spec": escapeAttr(spec),
+                "data-link-spec": escapeAttr(spec),
                 "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )
