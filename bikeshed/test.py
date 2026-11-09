@@ -53,11 +53,11 @@ def allowedPath(filePath: str, filters: TestFilter) -> bool:
     if extension not in TEST_FILE_EXTENSIONS:
         return False
 
-    if re.search(r"\d{3}-files$", pathSegs[0]):
+    if re.search(r"\d{3}-files$", pathSegs[-2]):
         # support files for a manual test
         return False
 
-    if filters.manualOnly and pathSegs[0] == "github":
+    if filters.manualOnly and pathSegs[0] != "manual":
         return False
 
     if filters.folders:
