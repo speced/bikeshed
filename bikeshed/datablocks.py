@@ -85,7 +85,7 @@ def reformatBlockData(data: str, el: t.ElementT) -> str:
 def countMdBlockquoteAncestors(el: t.ElementT) -> int:
     count = 0
     while (el := h.parentElement(el)) is not None:
-        if el.tag == "blockquote" and h.hasAttr(el, "bs-md"):
+        if el.tag == "blockquote" and h.hasAttr(el, "bs-md-blockquote"):
             count += 1
     return count
 

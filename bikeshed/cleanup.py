@@ -55,10 +55,10 @@ def cleanupHTML(doc: t.SpecT) -> None:
 
         # Allow MD-generated lists to be surrounded by HTML list containers,
         # so you can add classes/etc without an extraneous wrapper.
-        if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is None:
+        if el.tag in ["ol", "ul", "dl"] and el.get("bs-md-list") is None:
             if el.tag in ["ol", "ul"]:
                 onlyChild = h.hasOnlyChild(el)
-                if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("data-md") is not None:
+                if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("bs-md-list") is not None:
                     # The md-generated list container is featureless,
                     # so we can just throw it away and move its children into its parent.
                     nestedLists.append(onlyChild)
@@ -67,7 +67,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
                 # (which'll make an md-generated dl)
                 # and divs, so I need to account for multiple children
                 for child in h.childElements(el):
-                    if child.tag == "dl" and child.get("data-md") is not None:
+                    if child.tag == "dl" and child.get("bs-md-list") is not None:
                         nestedLists.append(child)
                     elif child.tag == "div":
                         pass
@@ -82,17 +82,13 @@ def cleanupHTML(doc: t.SpecT) -> None:
         # and remove it.
         if (
             h.tagName(el) == "dl"
-            and el.get("data-md") is not None
+            and el.get("bs-md-list") is not None
             and h.tagName(h.parentElement(el)) == "div"
             and h.tagName(h.parentElement(el, 2)) == "dl"
         ):
             # Also featureless and can be safely thrown away
             # with its children merged into the parent div
             nestedLists.append(el)
-
-        # Remove any lingering data-md attributes on lists
-        if el.tag in ["ol", "ul", "dl"] and el.get("data-md") is not None:
-            h.removeAttr(el, "data-md")
 
         # Mark pre.idl blocks as .def, for styling
         if el.tag == "pre" and h.hasClass(doc, el, "idl") and not h.hasClass(doc, el, "def"):

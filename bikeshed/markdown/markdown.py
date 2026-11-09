@@ -535,7 +535,7 @@ def parseBulleted(stream: TokenStream) -> list[l.Line]:
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [l.Line(ul_i, startTag("ul", ul_i, {"data-md": ""}))]
+    lines = [l.Line(ul_i, startTag("ul", ul_i, {"bs-md-list": ""}))]
     for li_lines, i in getItems(stream):
         lines.append(l.Line(i, startTag("li", i, {"data-md": ""})))
         lines.extend(parse(li_lines, stream.config))
@@ -587,9 +587,9 @@ def parseNumbered(stream: TokenStream, start: int = 1) -> list[l.Line]:
             yield parseItem(stream)
 
     if start == 1:
-        lines = [l.Line(ol_i, startTag("ol", ol_i, {"data-md": ""}))]
+        lines = [l.Line(ol_i, startTag("ol", ol_i, {"bs-md-list": ""}))]
     else:
-        lines = [l.Line(ol_i, startTag("ol", ol_i, {"data-md": "", "start": str(start)}))]
+        lines = [l.Line(ol_i, startTag("ol", ol_i, {"bs-md-list": "", "start": str(start)}))]
     for li_lines, i in getItems(stream):
         lines.append(l.Line(i, startTag("li", i, {"data-md": ""})))
         lines.extend(parse(li_lines, stream.config))
@@ -648,7 +648,7 @@ def parseDl(stream: TokenStream) -> list[l.Line]:
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [l.Line(dl_i, startTag("dl", dl_i, {"data-md": ""}))]
+    lines = [l.Line(dl_i, startTag("dl", dl_i, {"bs-md-list": ""}))]
     for type, di_lines, i in getItems(stream):
         lines.append(l.Line(i, startTag(type, i, {"data-md": ""})))
         lines.extend(parse(di_lines, stream.config))
@@ -670,7 +670,7 @@ def parseBlockquote(stream: TokenStream) -> list[l.Line]:
         else:
             break
     return [
-        l.Line(i, startTag("blockquote", i, {"bs-md": ""})),
+        l.Line(i, startTag("blockquote", i, {"bs-md-blockquote": ""})),
         *parse(lines, stream.config),
         l.Line(-1, "</blockquote>\n"),
     ]
