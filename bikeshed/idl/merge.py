@@ -28,6 +28,7 @@ class _PostElement:
     end: int
     parent: _PostElement | None = None
     children: list[_PostElement] = dataclasses.field(default_factory=list)
+    remove: bool = False
 
 
 def _extractPostElements(tree: t.ElementT | list[t.NodeT]) -> tuple[str, list[_PostElement]]:
@@ -133,11 +134,18 @@ def _evaluateOrigElement(
                 _evaluateOrigElement(orig, cp, allPostElements, origByPost)
                 return
             continue
-        # 1. Check if orig is fully contained in the post element
+        # Exactly matching markup, with the original being the sort of element
+        # that the parser markup will turn into.
+        if cp.start == orig.start and cp.end == orig.end and orig.element.tag in ("a", "dfn"):
+            _evaluateOrigElement(orig, cp, allPostElements, origByPost)
+            if orig.valid:
+                _replacePostWithOrig(orig, cp)
+            return
+        # Check if orig is fully contained in the post element
         if cp.start <= orig.start and orig.end <= cp.end:
             _evaluateOrigElement(orig, cp, allPostElements, origByPost)
             return
-        # 2. Any other combo indicates either post is inside of orig, or they're misnested.
+        # Any other combo indicates either post is inside of orig, or they're misnested.
         elif max(orig.start, cp.start) < min(orig.end, cp.end):
             orig.valid = False
             m.die(
@@ -147,10 +155,58 @@ def _evaluateOrigElement(
             for child in orig.children:
                 _evaluateOrigElement(child, postContext, allPostElements, origByPost)
             return
-    # 3. Disjoint from all child post elements; valid in postContext
+    # Disjoint from all child post elements; valid in postContext
     orig.valid = True
     origByPost[postContext].append(orig)
     _markDescendantsValid(orig)
+
+
+CANON_ATTRIBUTES = [
+    "data-idl-type",
+    "data-idl-for",
+]
+
+
+def _replacePostWithOrig(orig: _OrigElement, post: _PostElement) -> None:
+    """
+    When Post is an <idl> and Orig is an <a> or <dfn>, just use Orig instead.
+    Transfer some attributes from Post, if necessary.
+    """
+    post.remove = True
+    # If it's a fully manual link, don't transfer any attributes
+    if orig.element.tag == "a" and h.hasAttr(orig.element, "href"):
+        return
+    # Otherwise, transfer the dfn or linking attributes from parser-created element,
+    # overriding whatever was put in manually.
+    for attrname in CANON_ATTRIBUTES:
+        if h.hasAttr(post.element, attrname):
+            origAttr = _translateAttribute(orig.element, attrname)
+            postValue = post.element.get(attrname)
+            assert isinstance(postValue, str)
+            if h.hasAttr(orig.element, origAttr):
+                origValue = orig.element.get(origAttr)
+                if origValue != postValue:
+                    m.die(
+                        f"The IDL parser says this element should have {origAttr}='{postValue}', but you've marked it as '{origValue}'.",
+                        el=orig.element,
+                    )
+            orig.element.set(origAttr, postValue)
+
+
+def _translateAttribute(el: t.ElementT, attrname: str) -> str:
+    """
+    Attributes on <idl> don't know whether they'll be on a link or dfn,
+    so they're spelled data-idl-foo.
+    Translate them to data-link-foo or data-dfn-foo.
+    """
+    if not attrname.startswith("data-idl-"):
+        return attrname
+    suffix = attrname[len("data-idl-") :]
+    if el.tag == "a":
+        prefix = "data-link-"
+    else:
+        prefix = "data-dfn-"
+    return prefix + suffix
 
 
 def _reconstructOrigElement(orig: _OrigElement, fullText: str) -> t.ElementT:
@@ -217,8 +273,12 @@ def _reconstructPostElement(
             h.clearContents(newEl)
             newEl.tail = None
             childContent = _reconstructPostElement(item, fullText, allPostElements, origByPost)
-            h.appendChild(newEl, *childContent, allowEmpty=True)
-            nodes.append(newEl)
+            # Removed post elements leave themselves out and just drop in their contents.
+            if item.remove:
+                nodes.extend(childContent)
+            else:
+                h.appendChild(newEl, *childContent, allowEmpty=True)
+                nodes.append(newEl)
         else:
             assert isinstance(item, _OrigElement)
             nodes.append(_reconstructOrigElement(item, fullText))
