@@ -144,8 +144,9 @@ def cleanupHTML(doc: t.SpecT) -> None:
 
         # Look for nested <a> elements, and warn about them.
         if el.tag == "a" and h.hasAncestor(el, lambda x: x.tag == "a"):
+            ancestor = h.closestAncestor(el, lambda x: x.tag == "a")
             m.warn(
-                f"The following (probably auto-generated) link is illegally nested in another link:\n{h.outerHTML(el)}",
+                f"A link (probably auto-generated) is illegally nested in another link:\n{h.outerHTML(ancestor)}",
                 el=el,
             )
 
