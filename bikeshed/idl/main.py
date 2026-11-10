@@ -27,6 +27,7 @@ def markupIDL(doc: t.SpecT) -> None:
     # and collect it for the index.
     for el in idlEls:
         if h.isNormative(doc, el):
+            checkForExtraneousXmp(el)
             lineNum = getContentStartingLineNum(el) or 1
             text = h.textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
@@ -50,6 +51,20 @@ def markupIDL(doc: t.SpecT) -> None:
                 contents = h.childNodes(span, clear=True)
                 h.replaceNode(span, *contents)
         return
+
+
+def checkForExtraneousXmp(el: t.ElementT) -> None:
+    # Some specs do <pre class=idl><xmp>...</xmp></pre>,
+    # which makes the markup-merger complain.
+    # Strip the xmp out; it performed its duties of safely parsing.
+    # Warn that they can just use an <xmp> directly.
+    onlyChild = h.hasOnlyChild(el)
+    if onlyChild is None:
+        return
+    if h.hasAttr(onlyChild, "bs-was-xmp"):
+        h.transferAttributes(onlyChild, el)
+        h.replaceWithContents(onlyChild)
+        m.warn("Instead of nesting an <xmp> inside of <pre>, just use an <xmp> directly.", el=onlyChild)
 
 
 def getContentStartingLineNum(el: t.ElementT) -> int | None:

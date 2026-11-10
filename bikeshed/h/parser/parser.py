@@ -724,6 +724,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             return Ok(el, i)
         elif startTag.tag == "xmp":
             startTag.tag = "pre"
+            startTag.attrs["bs-was-xmp"] = ""
             text, i, _ = parseXmpToEnd(s, i)
             if text is None:
                 return Err(start)
