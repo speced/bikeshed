@@ -137,6 +137,10 @@ def _evaluateOrigElement(
         # Exactly matching markup, with the original being the sort of element
         # that the parser markup will turn into.
         if cp.start == orig.start and cp.end == orig.end and orig.element.tag in ("a", "dfn"):
+            if orig.element.tag == "dfn" and cp.element.tag == "a":
+                orig.valid = False
+                m.die("<dfn> element used on a term that is *not* a defining instance in WebIDL.", el=orig.element)
+                return
             _evaluateOrigElement(orig, cp, allPostElements, origByPost)
             if orig.valid:
                 _replacePostWithOrig(orig, cp)
@@ -163,7 +167,9 @@ def _evaluateOrigElement(
 
 CANON_ATTRIBUTES = [
     "data-idl-type",
+    "data-link-type",
     "data-idl-for",
+    "data-link-for",
 ]
 
 
@@ -172,6 +178,12 @@ def _replacePostWithOrig(orig: _OrigElement, post: _PostElement) -> None:
     When Post is an <idl> and Orig is an <a> or <dfn>, just use Orig instead.
     Transfer some attributes from Post, if necessary.
     """
+
+    # Dfning something the IDL parser *knows* is in a linking position is weird.
+    if orig.element.tag == "dfn" and post.element.tag == "a":
+        m.die("<dfn> element used on a term that is *not* a defining instance in WebIDL.", el=orig.element)
+        return
+
     post.remove = True
     # If it's a fully manual link, don't transfer any attributes
     if orig.element.tag == "a" and h.hasAttr(orig.element, "href"):
