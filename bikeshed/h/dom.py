@@ -512,8 +512,10 @@ def replaceNode(node: t.ElementT, *replacements: t.NodeT) -> t.NodeT | None:
     return None
 
 
-def transferAttributes(source: t.ElementT, target: t.ElementT) -> t.ElementT:
+def transferAttributes(source: t.ElementT, target: t.ElementT, *, mergeClass: bool=False) -> t.ElementT:
     for k, v in source.attrib.items():
+        if mergeClass and k == "class" and hasAttr(target, "class"):
+            v = target.get("class", "") + " " + v
         target.set(k, v)
     return target
 
