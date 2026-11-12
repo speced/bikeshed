@@ -62,19 +62,23 @@ so running these before submitting a PR is important.
     (omitting today's date, etc),
     and `bikeshed test --rebase` ensures these are all set up correctly.
 
-* Both of these commands default to running all of the tests,
-    but you can run *particular* tests in several ways:
+* Both of these commands default to only running the manually-written tests
+    (in `tests/manual/`),
+    which are small and very fast,
+    skipping all the real-world document tests.
+    You can control which tests are run in several ways:
 
-    * passing `--manual` will only run the manually-written tests,
-        which are small and very fast,
-        skipping all the real-world document tests.
+    * passing `--all` will run all of the tests,
+        including both the manually-written tests and the real-world document tests.
+
+    * passing `--manual` will explicitly restrict the run to only the manually-written tests
+        (useful in combination with `--folder` or `--file`, which otherwise search all tests).
 
     * passing `--folder FOLDER FOLDER ...` will run any tests
-        for which one of the FOLDER values is the name of a folder in their path.
-        (exact matches required).
+        for which one of the FOLDER values is a substring of their path.
 
     * passing `--file FILE FILE ...` will run any tests
-        for which one fo the FILE values
+        for which one of the FILE values
         is a substring of their filename.
         (That is, exact matches not required.)
 

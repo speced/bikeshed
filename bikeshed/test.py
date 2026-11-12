@@ -23,11 +23,17 @@ TEST_FILE_EXTENSIONS = (".bs", ".tar")
 class TestFilter:
     folders: list[str] | None = None
     files: list[str] | None = None
-    manualOnly: bool = False
+    manualOnly: bool = True
 
     @staticmethod
     def fromOptions(options: argparse.Namespace) -> TestFilter:
-        return TestFilter(folders=options.folders, files=options.files, manualOnly=options.manualOnly)
+        if options.manualOnly is not None:
+            manualOnly = options.manualOnly
+        elif options.folders or options.files:
+            manualOnly = False
+        else:
+            manualOnly = True
+        return TestFilter(folders=options.folders, files=options.files, manualOnly=manualOnly)
 
 
 def testPaths(filters: TestFilter) -> list[str]:

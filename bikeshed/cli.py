@@ -399,13 +399,20 @@ def main() -> None:
         action="store_true",
         help="Rebase the specified files.",
     )
-    testParser.add_argument(
+    testScopeGroup = testParser.add_mutually_exclusive_group()
+    testScopeGroup.add_argument(
+        "--all",
+        dest="manualOnly",
+        action="store_false",
+        help="Run all tests, including both manual tests and the real-world files in the repo.",
+    )
+    testScopeGroup.add_argument(
         "--manual",
         dest="manualOnly",
-        default=False,
         action="store_true",
-        help="Skip testing the real-world files in the repo, and only run the manually-written ones.",
+        help="Skip testing the real-world files in the repo, and only run the manually-written ones. (Default if no filters are specified.)",
     )
+    testScopeGroup.set_defaults(manualOnly=None)
     testParser.add_argument(
         "--folder",
         dest="folders",
