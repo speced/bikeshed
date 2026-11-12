@@ -23,6 +23,7 @@ from .dfnTypes import (
     typeRe,
     typesNotUsingFor,
     typesUsingFor,
+    unexportedIgnorableTypes,
 )
 from .main import (
     chrootPath,

@@ -138,6 +138,8 @@ lowercaseTypes = (
     | markupTypes
     | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header", "permission"])
 )
+# Which types are allowed to be `data-noexport=by-default` and unreferenced.
+unexportedIgnorableTypes = cddlTypes
 
 
 def adjustKey(text: str, type: str) -> tuple[str, str]:
