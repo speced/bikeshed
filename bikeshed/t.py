@@ -3,7 +3,18 @@
 from __future__ import annotations
 
 # The only things that should be available during runtime.
-from typing import TYPE_CHECKING, Generic, NewType, TypedDict, TypeVar, assert_never, assert_type, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Generic,
+    NamedTuple,
+    NewType,
+    TypedDict,
+    TypeVar,
+    assert_never,
+    assert_type,
+    cast,
+    overload,
+)
 
 # Representing a string that has been escaped so it's safe to be emitted raw in an attr value.
 SafeAttrStr = NewType("SafeAttrStr", str)
@@ -33,7 +44,6 @@ if TYPE_CHECKING:
         Mapping,
         MutableMapping,
         MutableSequence,
-        NamedTuple,
         Protocol,
         Sequence,
         TextIO,
