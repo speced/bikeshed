@@ -106,7 +106,6 @@ KNOWN_KEYS = {
     ),
     "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joins.joinValue, parsers.parseSoftBoolean),
     "Indent": Metadata("Indent", "indent", joins.joinValue, parsers.parseInteger),
-    "Indent Info": Metadata("Indent Info", "indentInfo", joins.joinValue, parsers.parseLiteral),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joins.joinValue, parsers.parseBoolean),
     "Informative Classes": Metadata(
         "Informative Classes",
