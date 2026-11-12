@@ -711,6 +711,8 @@ def join(*sources: MetadataManager | None) -> MetadataManager:
     for mdsource in sources:
         if mdsource is None:
             continue
+        if mdsource.indentInfo:
+            md.indentInfo = mdsource.indentInfo
         for k in mdsource.manuallySetKeys:
             mdentry = keys.KNOWN_KEYS[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
