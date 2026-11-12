@@ -123,9 +123,9 @@ def parseBoolishList(
     extraValues: dict[str, bool] | None = None,
     lineNum: str | int | None = None,
 ) -> config.BoolSet:
-    # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet
-    # Supply a list of valid labels if you want to have them checked,
-    # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
+    # Parses anything defined as "label <boolish>, label <boolish>" into a BoolSet.
+    # validLabels gives an allowlist of valid labels (by default, anything is accepted).
+    # extraValues gives alternate boolish strings you want to allow, such as {"omit":False}
     boolset = config.BoolSet(default=default)
 
     if extraValues is None:
@@ -134,7 +134,7 @@ def parseBoolishList(
     for v in vals:
         name, _, boolstring = v.strip().rpartition(" ")
         if not name or not boolstring:
-            m.die(f"{key} metadata pieces are a label and a boolean. Got:\n{v}", lineNum=lineNum)
+            m.die(f"{key} metadata pieces are a label followed by a boolish. Got:\n{v}", lineNum=lineNum)
             continue
         if validLabels and name not in validLabels:
             m.die(
@@ -149,7 +149,7 @@ def parseBoolishList(
             if isinstance(onoff, bool):
                 boolset[name] = onoff
             else:
-                m.die(f"{key} metadata pieces are a shorthand category and a boolean. Got:\n{v}", lineNum=lineNum)
+                m.die(f"{key} metadata pieces are a label followed by a boolish. Got:\n{v}", lineNum=lineNum)
                 continue
     return boolset
 

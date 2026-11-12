@@ -1051,7 +1051,7 @@ Metadata {#metadata}
 Crucial to the processor's ability to automatically generate most of a spec's boilerplate is a small metadata section,
 typically located at the top of a file.
 
-A metadata block is just a <code>&lt;pre class='metadata'></code> element, with contents like:
+A metadata block is just a <code>&lt;pre class='metadata'></code> (or <code>&lt;xmp class='metadata'></code>) element, with contents like:
 
 ```html
 Status: UD
@@ -1065,24 +1065,50 @@ Abstract: This module introduces cascading variables as a new primitive value ty
 	and custom properties for defining them.
 ```
 
-The syntax of a metadata block is very simple - it's a line-based format, with each line consisting of a key and a value, separated by a colon.
-Or if you're adding multiple lines with the same key, you can just start the subsequent lines with whitespace to have it reuse the last-seen key.
+The syntax of a metadata block is very simple:
+it's a line-based format, with each line consisting of a case-insensitive key and a value, separated by a colon.
+If you're adding multiple lines with the same key,
+you can either repeat the key on each line,
+or start subsequent lines with whitespace to reuse the last-seen key
+(and for multiline prose keys like [=Abstract=], [=Status Text=], [=Custom Warning Text=], and [[#md-custom|custom `!` keys]],
+even blank lines will continue the previous key).
 
-Several keys are required information, and will cause the processor to flag an error if you omit them:
+<div class=note>
+	Several metadata keys take boolean-like values:
 
-<ul dfn-for=metadata export>
-	* <dfn>Title</dfn> is the spec's full title, used to generate both the <{title}> and <{h1}> of the document.
-		This can alternately be specified by adding an <{h1}> element as the first line of the spec.
+	A <dfn>boolish</dfn> value is a string representing a boolean value (true or false).
+	The strings `yes`, `on`, `true`, and `y` all represent true values,
+	while the strings `no`, `off`, `false`, and `n` all represent false values.
 
-		Note: The optional [=metadata/H1=] metadata lets you specify the text you want for the document's <{h1}>,
-		if for some reason you want the <{title}> and <{h1}> to have different text.
-		For example, some browsers interpret markup as literal text in <{title}>,
-		so you may want to provide "plain text" in the [=metadata/Title=] metadata
-		and marked-up text in [=metadata/H1=].
-	* <dfn>Org</dfn>, <dfn>Group</dfn>, and <dfn>Status</dfn>
-		collectively define the spec's <dfn for>doctype</dfn>.
-		All are technically optional,
-		but are used to select the correct boilerplate files
+	A <dfn>soft boolish</dfn> value is either a [=boolish=] value,
+	or one of the strings `maybe`, `if possible`, or `if needed`,
+	indicating an intermediate intention between something being turned on and off.
+	(All of these values are synonyms and can be used interchangeably.)
+
+	A <dfn>boolish list</dfn> is a comma-separated list of labels followed by a boolishes,
+	like `css no, markdown yes`.
+	Each usage will define whether the default for unspecified labels is true or false.
+</div>
+
+By default, every document (except those using `Group: byos`) must provide at least
+[=metadata/Title=], [=metadata/Shortname=], [=metadata/Status=], [=metadata/Editor=] (unless [=No Editor=] is set), and [=metadata/Abstract=] (unless [=No Abstract=] is set).
+Depending on your [=metadata/Group=] and [=metadata/Status=], additional keys (such as [=metadata/Level=], [=metadata/ED=], [=metadata/TR=], [=metadata/Date=], or [=metadata/Issue Tracking=]) may also be required.
+
+
+Metadata Keys {#metadata-keys}
+------------------------------
+
+### Doctype and Status ### {#md-doctype}
+
+These keys identify the organization, group, and maturity/publication status of the specification.
+
+<dl dfn-for=metadata export>
+	: <dfn>Org</dfn>
+	: <dfn>Group</dfn>
+	: <dfn>Status</dfn> (required)
+	:: Collectively define the spec's <dfn for>doctype</dfn>.
+		([=metadata/Status=] is required; [=Org=] and [=Group=] are optional.)
+		Together, they are used to select the correct boilerplate files
 		and control how some macros are generated.
 
 		All the recognized [=Org=]/[=Group=]/[=metadata/Status=] values
@@ -1106,7 +1132,7 @@ Several keys are required information, and will cause the processor to flag an e
 			to both specify
 			that it's in the W3C org
 			and that it's using the (W3C-specific) Working Draft status;
-			or it can use `Group: csswg; Status: WD`
+			or it can use `Group: csswg` and `Status: WD`
 			to infer that it's in the W3C org
 			(as the CSSWG [=Group=] is unique in the data file,
 			and part of the W3C org.)
@@ -1118,8 +1144,10 @@ Several keys are required information, and will cause the processor to flag an e
 			* ISO
 			* KHRONOS
 			* TC39
+			* UKLTD
 			* W3C
 			* WHATWG
+			* WINTERTC
 
 			If your organization is using Bikeshed
 			and is not listed here,
@@ -1135,7 +1163,7 @@ Several keys are required information, and will cause the processor to flag an e
 			and Orgs can restrict certain Status values to only certain "types" of Groups.
 			This is specified in the [=doctypes file=].
 			(For example, in the W3C Org, the CSSWG Group can't use the FINDING Status,
-			as that's restricted to the TAG Group.
+			as that's restricted to the TAG Group.)
 
 			[=Groups=], along with [=metadata/Statuses=],
 			can also dictate additional required Metadata values
@@ -1163,6 +1191,7 @@ Several keys are required information, and will cause the processor to flag an e
 			(or by specs without a [=Group=] or [=Org=] at all):
 
 			* DREAM: "A Collection of Interesting Ideas"
+			* DEV: "Edition for Web Developers"
 			* LS: "Living Standard"
 			* LS-COMMIT: "Commit Snapshot"
 			* LS-BRANCH: "Branch Snapshot"
@@ -1184,186 +1213,214 @@ Several keys are required information, and will cause the processor to flag an e
 			it is preferable to submit a one-line PR to the [=doctypes file=]
 			to get your [=Group=] recognized.
 
-	* <dfn>ED</dfn> (or its synonym <dfn>URL</dfn>) must contain a link that points to the most current draft
-		(typically the "editor's draft", or otherwise the version that's most live and updated).
-	* <dfn>Shortname</dfn> must contain the spec's shortname, like "css-lists" or "css-backgrounds".
-	* <dfn>Level</dfn> (or <dfn>Revision</dfn>, an alias) must contain the spec's level as an integer or `none` if the spec does not use levels.
-	* <dfn>Editor</dfn> must contain an editor's information.
-		This has a special format of comma-separated clauses
-		the first is required and must contain the editor's name;
-		all the rest are optional.
+	: <dfn>Status Text</dfn>
+	:: Allows adding additional customized text or paragraphs to the document status section (via the [=[STATUSTEXT]=] macro).
+		Like [=Abstract=], multiple lines can be provided and are parsed as Bikeshed source.
 
-		* If editing a W3C document, your W3C ID (the number at the end of the url when you navigate to <a href="https://www.w3.org/users/myprofile">https://www.w3.org/users/myprofile</a>) can be added as a `w3cid ####` clause.
+	: <dfn>Work Status</dfn>
+	:: Indicates the status of the document, in a way unrelated to the publication status of [=metadata/Status=].
+		(Required by the `csswg` [=Group=].)
+		It must be one of `completed`, `stable`, `testing`, `refining`, `revising`, `exploring`, `rewriting`, or `abandoned`,
+		with those terms defined in [Fantasai's blog](http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process).
+		This sets the [=[WORKSTATUS]=] text macro to the corresponding word,
+		used in some of the boilerplates to pipe the metadata to scraping tools.
+
+	: <dfn>At Risk</dfn>
+	:: Contains an at-risk feature to be listed in the status section.
+		You can specify this key more than once for multiple entries.
+
+	: <dfn>CG Maturity</dfn>
+	:: For W3C Community Group specs using the `CG-LIVING` or `CG-SNAPSHOT` [=metadata/Status=],
+		indicates the maturity of the specification.
+		It must be one of `draft` (the default), `transferred`, or `unmaintained`.
+		This selects the corresponding status-block and footer boilerplate variants,
+		and sets the [=[CG-MATURITY]=] and [=[CG-MATURITY-LABEL]=] text macros.
+
+	: <dfn>CG Transferred To</dfn>
+	:: When [=CG Maturity=] is set to `transferred`,
+		specifies the name of the organization that the specification was transferred to.
+		This sets the [=[CG-TRANSFERRED-TO]=] text macro
+		(defaulting to `Another organization` with a warning if omitted).
+
+	: <dfn>Audience</dfn>
+	:: Indicates the target audience(s) for ISO C++ (`wg21`) papers
+		(and is required when [=Group=] is `wg21`),
+		generating an "Audience" entry in the spec metadata section.
+		It accepts either `all`,
+		or a comma-separated list of WG21 subgroup names:
+		`CWG`, `LWG`, `EWG`, `LEWG`, `DIRECTION`,
+		any `WG#` or `SG#` identifier (such as `SG1` or `WG14`),
+		or SG pseudonyms (`Concurrency`, `Modules`, `Networking`, `TM`, `Numerics`, `Reflection`, `FeatureTesting`, `UB`, `HMI`, `LowLatency`, `Tooling`, `Unicode`, `EWGI`, `LEWGI`, `MachineLearning`, `Education`, `Contracts`).
+		It can also be specified multiple times.
+</dl>
+
+
+### Document Identification ### {#md-identity}
+
+These keys define the specification's title, shortname, level, and abstract.
+
+<dl dfn-for=metadata export>
+	: <dfn>Title</dfn> (required)
+	:: The spec's full title, used to generate both the <{title}> (via [=[TITLE]=]) and <{h1}> (via [=[SPECTITLE]=]) of the document.
+		This can alternately be specified by adding an <{h1}> element as the first line of the spec.
+
+	: <dfn>H1</dfn>
+	:: Contains the text/markup that goes into the document's <{h1}> element (via [=[SPECTITLE]=]),
+		if you need the <{title}> and <{h1}> to have different text.
+		For example, browsers interpret markup as literal text in <{title}>,
+		so you may want to provide plain text in [=metadata/Title=]
+		and marked-up text in [=metadata/H1=].
+		If omitted, this defaults to the value of [=metadata/Title=],
+		which is usually what you want.
+
+	: <dfn>Shortname</dfn> (required)
+	:: Must contain the spec's unversioned shortname, like `css-lists` or `css-backgrounds`.
+		Used to populate [=[SHORTNAME]=] and (with [=metadata/Level=]) [=[VSHORTNAME]=].
+
+	: <dfn>Level</dfn>
+	: <dfn>Revision</dfn>
+	:: Must contain the spec's level as an integer, or `none` if the spec does not use levels.
+		(Required by most [=metadata/Statuses=]; [=Revision=] is an alias for [=metadata/Level=].)
+
+	: <dfn>Abstract</dfn> (required)
+	:: Must contain an abstract for the spec, a 1–2 sentence description of what the spec is about.
+		This is a multi-line key,
+		with the lines parsed as Bikeshed source.
+
+	: <dfn>No Abstract</dfn>
+	:: A [=boolish=] value (defaulting to false) that lets you omit the [=Abstract=] metadata without an error.
+		This should only be used for very small and trivial documents,
+		where the abstract would just be repeating the title more-or-less.
+</dl>
+
+
+### Editors ### {#md-editors}
+
+These keys configure the editors listed in the spec's header metadata.
+
+<dl dfn-for=metadata export>
+	: <dfn>Editor</dfn> (required)
+	:: Contains a current editor's information.
+		Multiple [=Editor=] lines can be used to supply multiple editors.
+
+		This has a special format of comma-separated clauses:
+		the first is required and must contain the editor's name;
+		all the rest are optional:
+
+		* If editing a W3C document, your W3C ID (the number at the end of the URL when you navigate to <a href="https://www.w3.org/users/myprofile">https://www.w3.org/users/myprofile</a>) can be added as a `w3cid ####` clause.
 		* Your affiliation (company you work for, etc), optionally followed by a link to their homepage, like `Example Company http://example.com`. If your affiliation contains a comma, HTML-escape it (`&#44;`).
 		* Your email address.
 		* Your homepage.
 
 		All of the optional clauses can occur in any order, except that affiliation must occur before email or homepage.
 
-		Multiple <a>Editor</a> lines can be used to supply multiple editors.
-	* <dfn>Abstract</dfn> must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
-		Multiple Abstract lines can be used, representing multiple lines of content, as if you'd written those multiple lines directly into the document.
-</ul>
+	: <dfn>Former Editor</dfn>
+	:: Contains a former editor's information, in the same format as [=Editor=].
+		Multiple [=Former Editor=] lines can be used to supply multiple former editors.
 
-There are several additional optional keys:
+	: <dfn>No Editor</dfn>
+	:: A [=boolish=] value (defaulting to false) that lets you omit the [=Editor=] metadata without an error.
+		This shouldn't generally be used;
+		even if your organization doesn't privilege editors in any way,
+		putting the organization itself in the [=Editor=] field
+		meets the intent while still producing useful information for readers of the spec.
 
-<ul dfn-for=metadata export>
-	* <dfn>Die On</dfn> and <dfn>Die When</dfn>
-		give the same control that the `--die-on` and `--die-when` command-line options do.
-		They take the same values--
-		a single keyword--
-		as the corresponding command-line arguments.
-	* <dfn>H1</dfn> contains the text/markup that goes into the document's <{h1}> element.
-		If omitted, this defaults to the value of the [=metadata/Title=] metadata,
-		which is usually what you want.
-	* <dfn>TR</dfn> must contain a link that points to the latest version on /TR.
-	* <dfn>Canonical URL</dfn> defines the canonical URL (as used by search engines) for the document; it can be set to "TR" (the default value if TR is defined), "ED", or a specific URL.
-	* <dfn>Favicon</dfn> defines the favicon URL for the document; it only supports one single URL.
-	* <dfn>Logo</dfn> defines the logo url for the document; it only supports one single url.
-		This URL can be used via the `[LOGO]` text macro ([[#text-macros]]),
-		and is by default used by the `logo` boilerplate section ([[#bp-sections]]).
-	* <dfn>Former Editor</dfn> must contain a former editor's information, in the same format as <a>Editor</a>.
-	* <dfn>Warning</dfn> generates a custom warning message,
-		which in the default Bikeshed styling will render as a floating red block
-		that partially covers the spec text
-		and must be clicked to dismiss.
-		Possible values are:
+	: <dfn>Editor Term</dfn>
+	:: A pair of comma-separated terms giving the singular and plural terms to refer to editors with,
+		if you want something other than the default `Editor, Editors`.
+</dl>
 
-		: not ready
-		:: marks that the spec is a very early version intended to spur discussion, and not yet ready for implementation.
-		: obsolete
-		:: marks that the spec is obsolete and should no longer be read except for historical info.
-		: new version URLHERE
-		: replaced by URLHERE
-		:: marks that the spec was completely replaced by another spec at the URL,
-			either a newer version of the same spec or a different spec covering the same topic.
-		: branch BRANCHNAME SNAPSHOTURL replaced by CURRENTURL
-		: commit COMMITHASH SHAPSHOTURL replaced by CURRENTURL
-		:: marks that this is a branch or commit snapshot of the document,
-			and points to the current version of the document for reference.
-		: custom
-		:: Something not covered by the above. You must also set [=Custom Warning Title=] and [=Custom Warning Text=] to control what the warning says.
 
-	* <dfn>Previous Version</dfn> can contain either a URL to a previously-published version (such as versions published on w3.org/TR),
+### URLs and Versions ### {#md-urls}
+
+These keys specify the URLs for current, published, previous, and translated versions of the specification.
+
+<dl dfn-for=metadata export>
+	: <dfn>ED</dfn>
+	: <dfn>URL</dfn>
+	:: Must contain a link that points to the most current draft
+		(typically the "editor's draft", or otherwise the version that's most live and updated).
+		Required by most [=metadata/Statuses=]; [=metadata/URL=] is a synonym for [=metadata/ED=].
+
+	: <dfn>TR</dfn>
+	:: Must contain a link that points to the latest published version on `/TR` (or equivalent snapshot location).
+		Required by W3C `/TR` [=metadata/Statuses=].
+
+	: <dfn>Canonical URL</dfn>
+	:: Defines the canonical URL (as used by search engines in `<link rel=canonical>`) for the document.
+		It can be set to `TR` (the default value if [=TR=] is defined), `ED` (the fallback default if [=metadata/ED=] is defined), or a specific URL.
+
+	: <dfn>Previous Version</dfn>
+	:: Can contain either a URL to a previously-published version (such as versions published on `w3.org/TR`),
 		or the value `from biblio` or `from biblio my-spec-1`.
+		Can be specified multiple times for multiple previous versions.
 
-		Links get displayed literally in the spec's metadata section. "from biblio" entries instead auto-generate a link to the latest dated version of the given versioned shortname that appears in the biblio database. (If omitted, the spec's own versioned shortname is implicitly used.)
-	* <dfn>At Risk</dfn> must contain an at-risk feature.  You can specify this key more than once for multiple entries.
-	* <dfn>Dark Mode</dfn> must contain a [=boolish=]
-		for whether or not Bikeshed includes darkmode-relevant colors/etc
-		for all of its built-in styles.
+		URLs get displayed literally in the spec's metadata section.
+		`from biblio` entries instead auto-generate a link to the latest dated version of the given versioned shortname that appears in the biblio database.
+		(If the shortname is omitted, the spec's own versioned shortname is implicitly used.)
 
-		It defaults to "on",
-		but if you provide custom styles that are not darkmode-aware,
-		you should set this "off"
-		so Bikeshed features don't render for darkmode
-		and become unreadable against your lightmode styles.
-	* <dfn>Status Text</dfn> allows adding an additional customized sentence that can be used in the document status section.
-	* <dfn>Ignored Terms</dfn> accepts a comma-separated list of terms and makes Bikeshed not emit warnings or errors when attempting to autolink those terms.  Use this to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
-	* <dfn>Date</dfn> must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec. Alternately it can contain the string `now`, which explicitly indicates a date of precisely when the output is generated.
-	* <dfn>Deadline</dfn> is also a YYYY-MM-DD date,
+	: <dfn>Version History</dfn>
+	:: Contains a URL pointing to the document's version or commit history,
+		generating a "Version History" entry in the spec metadata section
+		(unless the [=[HISTORY]=] macro is automatically populated, as on dated W3C `/TR` specs).
+		Can be specified multiple times for multiple URLs.
+
+	: <dfn>Translation</dfn>
+	:: Indicates a translation of the document.
+		Can be specified multiple times for multiple translations.
+		At minimum it consists of a language code (BCP47 format) and a URL, separated by whitespace.
+		Optionally, it can contain comma-separated `name [name-in-spec-language]` and `native-name [name-in-translation-language]` clauses,
+		but if Bikeshed knows about that language, these will be filled in for you.
+		(If Bikeshed doesn't know about a given language, let me know what its name is in English and itself!)
+</dl>
+
+
+### Dates ### {#md-dates}
+
+These keys control the publication, deadline, and expiration dates of the document.
+
+<dl dfn-for=metadata export>
+	: <dfn>Date</dfn>
+	:: Must contain a date in `YYYY-MM-DD` format,
+		which is used instead of today's date for all the date-related macros and boilerplate in the spec.
+		Alternately, it can contain the string `now`,
+		which explicitly indicates a date of precisely when the output is generated (the default if unspecified).
+		Required to be explicitly set by many snapshot [=metadata/Statuses=].
+
+	: <dfn>Deadline</dfn>
+	:: A `YYYY-MM-DD` date (or `now`),
 		which is used for things like the LCWD
-		and <a href="https://www.w3.org/pubrules/doc/rules/?profile=CR#reviewEndDate">CR Snapshot</a> Status section,
-		to indicate deadlines.
-	* <dfn>Expires</dfn> is also a YYYY-MM-DD date,
-		or can be the string `now` to indicate today's date,
-		or can be an "ISO Duration" like `P1Y` to indicate "+1 year"
-		from the [=Date=] metadata
-		(or the spec's generation date if that's not specified),
-		and indicates when the document should be considered "expired"--
+		and <a href="https://www.w3.org/pubrules/doc/rules/?profile=CR#reviewEndDate">CR Snapshot</a> Status section
+		to indicate review deadlines (via [=[DEADLINE]=] and [=[ISODEADLINE]=]).
+
+	: <dfn>Expires</dfn>
+	:: Indicates when the document should be considered "expired"--
 		before the expiration date an (initially closed) warning about the upcoming expiration is automatically included in the document;
 		afterwards the warning defaults to being open and annoying.
 
+		It can be a `YYYY-MM-DD` date,
+		the string `now` to indicate today's date,
+		or an ISO 8601 duration like `P1Y` to indicate "+1 year" from the [=Date=] metadata
+		(or the spec's generation date if that's not specified).
+
 		It can also take a [=boolish=] false value or `never` to indicate it never expires;
-		this is just the default value,
+		this is the default value,
 		so these values are only useful for turning off a default expiration
-		established by your default metadata.
-	* <dfn>Test Suite</dfn> must contain a link to the test suite (like <code>https://test.csswg.org/suites/css-flexbox-1_dev/nightly-unstable/</code>).
+		established by your [[#default-metadata|default metadata]].
+</dl>
 
-		Note: This merely displays a "Test Suite" item in the spec's header-list,
-		as linked text.
-		To display WPT results,
-		see [[#testing]].
-	* <dfn>Implementation Report</dfn> must contain a link to an implementation report,
-		either a hand-written document
-		or just a link to the spec's folder on <a href="https://wpt.fyi">wpt.fyi</a>.
-		This is <a href="https://www.w3.org/pubrules/doc/rules/?profile=CR#implReport">required for W3C Candidate Recommendation Snapshot</a>.
-	* <dfn>Mailing List</dfn> must contain an email address to be used for mailing lists.
-	* <dfn>Mailing List Archives</dfn> must contain a link to the list archives.
-	* <dfn>Issue Tracking</dfn> indicates what and where you track issues,
-		and will result in an "Issue Tracking" entry in your spec header.
-		It must contain a comma-separated list of locations,
-		each of which consists of the name of the location followed by the url.
 
-		Bikeshed will automatically add additional entries to this in some situations:
-		if you use any inline issues,
-		you'll automatically get an "In Spec" annotation;
-		if you develop from within a git repo with a GH remote,
-		or have the [=metadata/Repository=] metadata set,
-		you'll automatically get a "GitHub" annotation.
+### Feedback, Repository, and Issue Tracking ### {#md-feedback}
 
-		You can turn off the spec-header entry entirely with `Boilerplate: feedback-header off`,
-		or just turn off the GitHub entry specifically with `Boilerplate: repository-issue-tracking off`.
-	* <dfn>Issue Tracker Template</dfn> specifies a url template used to point [[#remote-issues|remote issues]] at your issue tracker of choice. It takes a url, with `{0}` in the place where you want the remote identifier to go.
-	* <dfn>Translation</dfn> indicates a translation of the document. At minimum it consists of a language code (BCP47 format) and a url. Optionally, it can contain comma-separated `name [name-in-spec-language]` and `native-name [name-in-translation-language]`, but if Bikeshed knows about that language, these will be filled in for you.  (If Bikeshed doesn't know about a given language, let me know what its name is in English and itself!)
-	* <dfn>Indent</dfn> tells Bikeshed how many spaces you prefer to use to indent your source code,
-		so it can properly parse your Markdown and data-blocks.
-		It takes a single integer,
-		and defaults to `4` if unspecified.
-		(Of course, using tabs avoids this entirely,
-		as one tab is always one indent.)
-	* <dfn>No Editor</dfn> lets you omit the `Editor` metadata without an error.
-		It takes a <a>boolish</a> value.
-		This shouldn't generally be used;
-		even if your organization doesn't privilege editors in any way,
-		putting the organization itself in the `Editor` field
-		meets the intent while still producing useful information for readers of the spec.
-	* <dfn>No Abstract</dfn> lets you omit the `Abstract` metadata without an error.
-		It takes a <a>boolish</a> value.
-		This should only be used for very small and trivial documents, where the abstract would just be repeating the title of the more-or-less.
-	* <dfn>Editor Term</dfn> is a pair of comma-separated terms giving the singular and plural terms to refer to editors with, if you want something other than the default "Editor(s)".
-	* <dfn>Default Ref Status</dfn> takes the values "current" or "snapshot",
-		and selects which URL you want to default to
-		for bibliography and autolinks entries that have both "current" and "snapshot" URLs.
-		(You can also specify this per-biblio entry or per-autolink.)
-	* <dfn>Default Biblio Display</dfn> takes the values "index" (default), "inline", or "direct"
-		and selects whether biblio autolinks default to
-		displaying as their shortname and linking to the bibliography index ("index"),
-		displaying as their title and linking straight to the referenced document ("inline"), or
-		displaying as their shortname and linking to the referenced document ("direct").
-		(You can also specify this per-biblio entry.)
-	* <dfn>Markup Shorthands</dfn> lets you specify which categories of markup shorthands you want to use; for example, you can turn off CSS shorthands and reclaim use of single quotes in your spec.  You can still link to things with HTML links (`<a dfn>some term</a>`) or with the <{l}> element (`<l>[=some term=]</l>`) even if the shorthand is turned off.  Its value is a comma-separated list of markup categories and <a>boolish</a> values, like `css no, biblio yes`.  The currently-recognized categories are:
+These keys configure where readers can file issues, view discussions, or find the specification's source repository.
 
-		* `algorithm`, covering the special <{var}> shorthand (the `|foo|` shorthand)
-		* `biblio`, covering the <a>dfn autolinks</a> for biblio links and section links (the `[[foo]]` shorthands)
-		* `cddl`, covering the <a>dfn autolinks</a> for CDDL types (the `{^foo^}` shorthand)
-		* `css`, covering the <a>dfn autolinks</a> for CSS types
-		* `dfn`, covering the <a>dfn autolinks</a> for "dfn" and "abstract-op" type definitions
-		* `http`, convering the [=dfn autolinks=] for "http-header" type definitions
-		* `idl`, covering the <a>dfn autolinks</a> for WebIDL types (the `{{foo}}` shorthand)
-		* `markdown`, covering the various inline Markdown syntaxes (block-level Markdown is always supported)
-		* `markup`, covering the <a>dfn autolinks</a> for HTML/etc elements and attributes (the `<{foo}>` shorthand)
-		* `macros-in-autolinks`, which allows macros in autolinks.
-			That is, it allows `[=[FOO]=]`,
-			which can expand the `[FOO]` macro
-			to produce something like `[=the long foo term you don't want to re-type=]`.
-			(Without this, all text in the link-data portion of an autolink
-			is interpreted literally,
-			with no parsing or substitution.)
-
-			Note: Macros are always allowed in the link-text portion of an autolink,
-			like `[=foo|some text about [FOO]=]`,
-			as normal parsing occurs there.
-		* `repository-links`, which allows inline links to repository issues. See [[#remote-issues]].
-
-		`markdown` and `macros-in-autolinks` default to "off"; the rest default to "on".
-	* <dfn>Text Macro</dfn> lets you specify custom text macros, like `[TITLE]` or `[DATE]`, letting you fill in different text when building a spec in multiple ways.  (This is mostly useful as a command-line option.)  Each <a>Text Macro</a> line consists of a macro name, which must be uppercase and alphanumeric, followed by the text it will get replaced with.
-	* <dfn>Work Status</dfn> indicates the status of the document, in a way unrelated to the publication status of <a for=metadata>Status</a>.  It must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned), with those terms defined in [Fantasai's blog](http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process). This just sets the `[WORKSTATUS]` text macro to the corresponding word, used in some of the boilerplates to pipe the metadata to scraping tools.
-	* <dfn>Repository</dfn> indicates the repository the spec is being tracked in.
-		You can specify a url followed by a "short name" for it,
-		and it populates the `[REPOSITORY]` and `[REPOSITORYURL]` text macros accordingly.
+<dl dfn-for=metadata export>
+	: <dfn>Repository</dfn>
+	:: Indicates the repository the spec is being tracked in.
+		You can specify a URL optionally followed by a "short name" for it,
+		and it populates the [=[REPOSITORY]=] and [=[REPOSITORYURL]=] text macros accordingly.
 		If you are using GitHub,
-		you can just specify `username/repo`,
+		you can just specify `username/repo` (or a GitHub URL),
 		and Bikeshed will infer the rest for you.
 		If you're developing *from within a GitHub repo*,
 		you don't need to specify this at all,
@@ -1374,52 +1431,499 @@ There are several additional optional keys:
 
 		If using GitHub,
 		this metadata causes Bikeshed to automatically add a "GitHub" annotation
-		to the <a>Issue Tracking</a> entry in your spec header.
+		to the [=Issue Tracking=] entry in your spec header.
 		You can turn this off with `Boilerplate: repository-issue-tracking off`.
-	* <dfn>Inline Github Issues</dfn> tells Bikeshed whether
-		to fetch the text of GitHub issues and inline them into the document, or not.
-		It takes a <a>boolish</a> value,
-		or the values "full" or "title".
-		If it's true or "full",
-		any [remote issues](#remote-issues) of the form <code>user/repo#issuenumber</code>
+
+	: <dfn>Issue Tracking</dfn>
+	:: Indicates what and where you track issues,
+		and will result in an "Issue Tracking" (or "Feedback" on `/TR` specs) entry in your spec header.
+		It must contain a comma-separated list of locations,
+		each of which consists of the name of the location followed by the URL.
+
+		Bikeshed will automatically add additional entries to this in some situations:
+		if you use any inline issues,
+		you'll automatically get an "Inline In Spec" annotation;
+		if you develop from within a git repo with a GitHub remote,
+		or have the [=metadata/Repository=] metadata set to a GitHub repo,
+		you'll automatically get a "GitHub" annotation.
+
+		You can turn off the spec-header entry entirely with `Boilerplate: feedback-header off`,
+		or just turn off the GitHub entry specifically with `Boilerplate: repository-issue-tracking off`.
+
+	: <dfn>Inline Github Issues</dfn>
+	:: Tells Bikeshed whether to fetch the text of GitHub issues and inline them into the document, or not.
+		It takes a [=boolish=] value (defaulting to false),
+		or the values `full` or `title`.
+		If it's true or `full`,
+		any [[#remote-issues|remote issues]] of the form `user/repo#issuenumber`
 		will have their contents replaced by the contents of the corresponding issue from GitHub;
-		if it's "title",
+		if it's `title`,
 		they'll have their contents replaced by just the title of the remote issue
 		(so a large, well-written initial issue post doesn't derail a spec).
 		If your [=metadata/Repository=] is set up to a GitHub repo,
-		[remote issues](#remote-issues) with just an issue number
+		[[#remote-issues|remote issues]] with just an issue number
 		will also be expanded to the corresponding issue from your repository.
-	* <dfn>Opaque Elements</dfn> and <dfn>Block Elements</dfn> are a comma-separated list of custom element names, to help control Bikeshed's parsing and serialization. By default, custom elements are treated as inline; marking an element as "opaque" makes it like <{pre}>, so shorthands and Markdown aren't processed in it, and it's serialized precisely as entered; marking an element as "block" makes it interrupt paragraphs when it starts a line, and causes the pretty-printer to serialize it in a block-like way.
-	* <dfn>Note Class</dfn>, <dfn>Issue Class</dfn>, <dfn>Assertion Class</dfn>, and <dfn>Advisement Class</dfn> specify the class name given to paragraphs using the note/issue/advisement <a>markup shorthand</a>.  They default to "note", "issue", and "advisement".
-	* <dfn>Informative Classes</dfn> is a comma-separated list of classes that should be considered "informative" or "non-normative"--
+
+	: <dfn>Issue Tracker Template</dfn>
+	:: Specifies a URL template used to point [[#remote-issues|remote issues]] at your issue tracker of choice.
+		It takes a URL, with `{0}` in the place where you want the remote identifier to go.
+
+	: <dfn>Mailing List</dfn>
+	:: Must contain an email address to be used for mailing lists
+		(displayed in the "Feedback" header entry and used in [=[MAILINGLIST]=]).
+
+	: <dfn>Mailing List Archives</dfn>
+	:: Must contain a link to the mailing list archives
+		(linked alongside [=Mailing List=] and used in [=[MAILINGLISTARCHIVES]=]).
+</dl>
+
+
+### Document Warnings ### {#md-warnings}
+
+These keys generate a prominent warning box in the specification (for example, marking a spec as obsolete or replaced).
+
+<dl dfn-for=metadata export>
+	: <dfn>Warning</dfn>
+	:: Generates a custom warning message,
+		which in the default Bikeshed styling will render as a floating red block
+		that partially covers the spec text
+		and must be clicked to dismiss.
+		Possible values are:
+
+		: `not ready`
+		:: Marks that the spec is a very early version intended to spur discussion, and not yet ready for implementation.
+		: `obsolete`
+		:: Marks that the spec is obsolete and should no longer be read except for historical info.
+		: `new version URLHERE`
+		: `replaced by URLHERE`
+		:: Marks that the spec was completely replaced by another spec at the URL,
+			either a newer version of the same spec or a different spec covering the same topic
+			(populating [=[REPLACEDBY]=]).
+		: `branch BRANCHNAME SNAPSHOTURL replaced by CURRENTURL`
+		: `commit COMMITHASH SNAPSHOTURL replaced by CURRENTURL`
+		:: Marks that this is a branch or commit snapshot of the document,
+			and points to the current version of the document for reference
+			(populating [=[SNAPSHOTID]=], [=[SNAPSHOTURL]=], and [=[REPLACEDBY]=]).
+		: `custom`
+		:: Something not covered by the above.
+			You must also set [=Custom Warning Title=] and [=Custom Warning Text=] to control what the warning says.
+
+	: <dfn>Custom Warning Title</dfn>
+	:: Specifies the title of a "custom" warning,
+		requested via `Warning: custom` metadata (populating [=[CUSTOMWARNINGTITLE]=]).
+
+	: <dfn>Custom Warning Text</dfn>
+	:: Specifies the body of a "custom" warning,
+		requested via `Warning: custom` metadata (populating [=[CUSTOMWARNINGTEXT]=]).
+		Like [=Abstract=],
+		it accepts multiple lines,
+		and is parsed as Markdown
+		(as if you'd written them directly into the document).
+</dl>
+
+
+### Appearance, Boilerplate, and Output ### {#md-boilerplate}
+
+These keys control the visual presentation, boilerplate generation, and HTML output behavior of the document.
+
+<dl dfn-for=metadata export>
+	: <dfn>Logo</dfn>
+	:: Defines the logo URL for the document; it only supports one single URL.
+		This URL can be used via the [=[LOGO]=] text macro ([[#text-macros]]),
+		and is by default used by the `logo` boilerplate section ([[#bp-sections]]).
+
+	: <dfn>Favicon</dfn>
+	:: Defines the favicon URL for the document; it only supports one single URL.
+
+	: <dfn>Dark Mode</dfn>
+	:: A [=boolish=] value (defaulting to `on`)
+		controlling whether or not Bikeshed includes darkmode-relevant colors/styles
+		for all of its built-in styles.
+
+		If you provide custom styles that are not darkmode-aware,
+		you should set this `off`
+		so Bikeshed features don't render for darkmode
+		and become unreadable against your lightmode styles.
+
+	: <dfn>Max ToC Depth</dfn>
+	:: Specifies the maximum heading depth you want the Table of Contents to generate to.
+		It can be the value `none` (the default), meaning generate the ToC normally,
+		or an integer between `1` and `5`.
+
+	: <dfn>Toggle Diffs</dfn>
+	:: A [=boolish=] value (defaulting to false)
+		that specifies whether Bikeshed should include a "Hide deleted text" button
+		to toggle hiding <{del}> elements in your spec header.
+
+	: <dfn>Boilerplate</dfn>
+	:: Toggles the generation of individual [[#bp-sections|boilerplate sections]] or built-in style/script blocks.
+		Its value is a comma-separated list of section names and [=boolish=] values,
+		e.g. `Boilerplate: issues-index no` to disable the list of issues.
+		(For legacy compatibility, `omit <section>` is also accepted as a synonym for `<section> no`.)
+
+	: <dfn>Local Boilerplate</dfn>
+	:: Tells Bikeshed which boilerplate include files to look for relative to the specification
+		(as opposed to inside Bikeshed's built-in boilerplate data).
+		Its value is a comma-separated list of include file basenames and [=boolish=] values
+		(defaulting to false),
+		e.g. `Local Boilerplate: footer yes` to look for `footer.include` and `footer-[STATUS].include` next to the specification.
+		This also works for default includes that aren't quite boilerplate,
+		like [[#default-metadata|`defaults.include`]], [[#computed-metadata|`computed-metadata.include`]], and [[#echidna-hooks|`bs-extensions.include`]].
+
+	: <dfn>Metadata Include</dfn>
+	: <dfn>Metadata Order</dfn>
+	:: Control which entries appear in the `spec-metadata` boilerplate section and in what order.
+		See [[#rearranging-metadata]] for details.
+
+	: <dfn>Text Macro</dfn>
+	:: Lets you specify custom [[#text-macros|text macros]], like `[TITLE]` or `[DATE]`,
+		letting you fill in different text when building a spec in multiple ways
+		(or avoid repeating a common phrase).
+		Each [=Text Macro=] line consists of a macro name (which must be uppercase ASCII alphanumeric and hyphens)
+		followed by whitespace and the text it will get replaced with.
+
+	: <dfn>Prepare For TR</dfn>
+	:: A [=boolish=] value (defaulting to false) that specifies
+		whether or not to apply a bunch of automatic "fixups"
+		for common errors that would make a spec fail the W3C's PubRules check.
+		This is applied automatically when you run the [[#cli-echidna|`bikeshed echidna`]] command to publish your spec,
+		but you can use it manually to check precisely what your spec will look like when published.
+
+	: <dfn>Slim Build Artifact</dfn>
+	:: A [=boolish=] value (defaulting to false)
+		that specifies whether or not Bikeshed should try to "slim" the output,
+		to make it more appropriate as an obvious "build artifact",
+		rather than an active usable spec.
+		This turns off various usability features which otherwise bloat your HTML,
+		and which aren't necessary if the output isn't intended to be actively used by humans.
+		The exact set of features that are affected by this will evolve over time.
+
+	: <dfn>Force Crossorigin</dfn>
+	:: A [=boolish=] value (defaulting to false) that auto-adds the `crossorigin=anonymous` attribute
+		to every relevant element (<{link}>, <{script}>, <{img}>, <{audio}>, <{video}>).
+		You can set a different `crossorigin` value manually on the element,
+		or skip the element entirely by putting `nocrossorigin` on it or an ancestor.
+
+	: <dfn>Image Auto Size</dfn>
+	:: A [=boolish=] value (defaulting to true)
+		that specifies whether Bikeshed should [[#img-size|automatically detect the size]] of images used in the document
+		and populate their `width` and `height` attributes.
+</dl>
+
+
+### Syntax, Parsing, and Markup ### {#md-syntax}
+
+These keys control how Bikeshed parses Markdown, shorthands, custom elements, code blocks, and admonitions in your source file.
+
+<dl dfn-for=metadata export>
+	: <dfn>Markup Shorthands</dfn>
+	:: A [=boolish list=] (with mixed defaults, see below)
+		that lets you specify which categories of markup shorthands you want to use;
+		for example, you can turn off CSS shorthands and reclaim use of single quotes in your spec.
+		You can still link to things with HTML links (`<a dfn>some term</a>`) or with the <{l}> element (`<l>[=some term=]</l>`) even if a shorthand is turned off.
+		Its value is a comma-separated list of markup categories and [=boolish=] values, like `css no, markdown yes`.
+		The currently-recognized categories are:
+
+		* `algorithm` (default: on): covers the special <{var}> shorthand (`|foo|`).
+		* `biblio` (default: on): covers the [=dfn autolinks=] for biblio links and section links (`[[foo]]`).
+		* `cddl` (default: on): covers the [=dfn autolinks=] for CDDL types (`{^foo^}`).
+		* `css` (default: on): covers the [=dfn autolinks=] for CSS properties/descriptors (`'foo'`), values (`''foo''`), and grammar productions (`<<foo>>`).
+		* `dfn` (default: on): covers the [=dfn autolinks=] for `dfn` (`[=foo=]`) and `abstract-op` (`[$foo$]`) definitions.
+		* `http` (default: on): covers the [=dfn autolinks=] for `http-header` definitions (`[:foo:]`).
+		* `idl` (default: on): covers the [=dfn autolinks=] for WebIDL types (`{{foo}}`).
+		* `macros-in-autolinks` (default: off): allows macros in the link-data portion of autolinks.
+			That is, it allows `[=[FOO]=]`,
+			which can expand the `[FOO]` macro
+			to produce something like `[=the long foo term you don't want to re-type=]`.
+			(Without this, all text in the link-data portion of an autolink
+			is interpreted literally,
+			with no parsing or substitution.)
+
+			Note: Macros are always allowed in the link-text portion of an autolink,
+			like `[=foo|some text about [FOO]=]`,
+			as normal parsing occurs there.
+		* `markdown-block` (default: on): covers block-level [[#markdown|Markdown]] constructs (paragraphs, lists, headings, fenced code blocks, etc.).
+		* `markdown-blockquotes` (default: on, with a warning if used without being explicitly set): covers [[#md-blockquote|Markdown blockquotes]] (`> ...`).
+		* `markdown-inline` (or its alias `markdown`; default: off): covers inline [[#markdown|Markdown]] constructs (`*emphasis*`, `**strong**`, `` `code` ``, `[links](url)`).
+		* `markdown-escapes` (default: off): covers backslash-escaping of ASCII punctuation characters (`\*`, `\[`, etc.) in normal prose.
+		* `markup` (default: on): covers the [=dfn autolinks=] for HTML/XML/SVG/etc. elements and attributes (`<{foo}>`).
+		* `repository-links` (default: on): allows inline links to repository issues (`<#123>`, `<user/repo#123>`). See [[#remote-issues]].
+
+	: <dfn>Indent</dfn>
+	:: Tells Bikeshed how many spaces you prefer to use to indent your source code,
+		so it can properly parse your Markdown and data-blocks.
+		It takes a single integer.
+		If unspecified, Bikeshed attempts to automatically infer the space indent size from your document
+		(falling back to `4` if there aren't enough space-indented lines to infer from).
+		(Of course, using tabs avoids this entirely,
+		as one tab is always one indent.)
+
+	: <dfn>Opaque Elements</dfn>
+	: <dfn>Block Elements</dfn>
+	:: Each takes a comma-separated list of custom element names,
+		to help control Bikeshed's parsing and serialization.
+		By default, custom elements are treated as inline;
+		marking an element as "opaque" makes it like <{pre}>,
+		so shorthands and Markdown aren't processed in it,
+		and it's serialized precisely as entered;
+		marking an element as "block" makes it interrupt paragraphs when it starts a line,
+		and causes the pretty-printer to serialize it in a block-like way.
+
+	: <dfn>Default Highlight</dfn>
+	:: Specifies the default [[#syntax-highlighting|syntax highlighting]] language.
+		Every <{pre}>, <{xmp}>, and <{code}> will automatically be highlighted according to the specified language,
+		unless they or an ancestor specifies a different `highlight=foo` or `nohighlight` attribute overriding it.
+
+	: <dfn>Line Numbers</dfn>
+	:: A [=boolish=] value (defaulting to off) specifying whether, by default,
+		code blocks (<{pre}> and <{xmp}>) should get [[#line-numbers|line numbers]].
+
+	: <dfn>Note Class</dfn>
+	: <dfn>Issue Class</dfn>
+	: <dfn>Assertion Class</dfn>
+	: <dfn>Advisement Class</dfn>
+	:: Specify the class name given to paragraphs using the [[#notes-etc|note/issue/assertion/advisement markup shorthands]].
+		They default to `note`, `issue`, `assertion`, and `advisement`, respectively.
+
+	: <dfn>Informative Classes</dfn>
+	:: A comma-separated list of classes that should be considered "informative" or "non-normative"--
 		elements with these classes must not contain definitions or requirements,
 		and Bikeshed will verify this for you
 		(either automatically, or via the `Complain About: accidental-2119` metadata).
-		"note", "example", "informative", and "non-normative" all trigger this behavior by default.
-	* <dfn>Translate IDs</dfn> maps Bikeshed-generated IDs to manually-specified IDs, for cases where you need to manually specify an ID but it's generated by Bikeshed in a hard-to-override way (like IDL blocks).  It takes a comma separated list of Bikeshed IDs and new IDs.
-	* <dfn>Default Highlight</dfn> specifies the default highlighting language. Every <{pre}>, <{xmp}>, and <{code}> will automatically be highlighted according to the specified language, unless they or an ancestor specifies a different `highlight=foo` or `nohighlight` attribute overriding it.
-	* <dfn>Line Numbers</dfn> is a <a>boolish</a> specifying whether, by default, code blocks (<{pre}> and <{xmp}>) should get line numbers. Defaults to off.
-	* <dfn>Toggle Diffs</dfn> is a <a>boolish</a> that specifies whether Bikeshed should include a 'Hide deleted text' button to toggle hiding <{del}> elements in your spec header. Defaults to off.
-	* <dfn>Boilerplate</dfn> toggles the generation of individual [boilerplate sections](#bp-sections). Its value is a comma-separated list of section name and <a>boolish</a> value, e.g. `Boilerplate: issues-index no` to disable the list of issues.
-	* <dfn>Local Boilerplate</dfn> tells Bikeshed which boilerplate include files to look for relative to the specification (as opposed to inside the Bikeshed source). Its value is a comma-separated list of include file basename and <a>boolish</a> value, e.g. `Local Boilerplate: footer yes` to look for `footer.include` and `footer-[STATUS].include` next to the specification. This also works for default includes that aren't quite boilerplate like [defaults.include](#default-metadata), [computed-metadata.include](#computed-metadata), and [bs-extensions.include](#echidna-hooks).
-	* <dfn>External Infotrees</dfn> lists which of [anchors.bsdata](#custom-dfns) and [link-defaults.infotree](#link-defaults) should be found in files adjacent to the specification instead of in `<pre>` blocks inside it.
-	* <dfn>Complain About</dfn> indicates what nits you'd like Bikeshed to complain about, that are normally too noisy to be turned on by default. Its value is a <a>boolish</a> list like <a>Markup Shorthands</a>. Accepted values are:
+		`note`, `example`, `informative`, and `non-normative` all trigger this behavior by default.
+</dl>
 
-		: `accidental-2119`
-		:: Complains about usage of RFC 2119 terms (may, must, should, etc) in non-normative sections.
+
+### Definitions, Autolinking, and Bibliography ### {#md-linking}
+
+These keys configure how Bikeshed processes definitions, resolves autolinks, and formats bibliography references.
+
+<dl dfn-for=metadata export>
+	: <dfn>Infer CSS Dfns</dfn>
+	:: A [=boolish=] value (defaulting to off, though enabled by default for the `csswg`, `svg`, `fxtf`, and `houdini` [=Groups=])
+		that specifies whether Bikeshed should try to [[#dfn-types|"infer" what type a `<dfn>` is]] by looking at its text,
+		using CSS-biased heuristics.
+		(In other words, this'll only auto-detect certain CSS types.)
+
+	: <dfn>Assume Explicit For</dfn>
+	:: A [=boolish=] value (defaulting to off)
+		that specifies whether an omitted `for` attribute on an autolink should imply `for="/"`
+		(that is, selecting a definition without a `for` value),
+		or just not express a `for` requirement at all
+		(that is, selecting a definition without caring about what its `for` value is).
+		Truthy values set the former,
+		falsey set the latter.
+
+		Note: Turning this on is a better match for some people's mental models,
+		but it requires you to specify more `for` values on your autolinks
+		even when it's not necessary to disambiguate things,
+		so it's off by default.
+
+	: <dfn>Use Dfn Panels</dfn>
+	:: A [=boolish=] value (defaulting to true) that determines
+		whether "definition panels" are generated for every definition.
+		These panels show up when you click on a <{dfn}>,
+		and show every local reference to the definition.
+
+		It automatically adds some JS and CSS to your page for the panels;
+		you can suppress this with `Boilerplate: script-dfn-panel no, style-dfn-panel no`
+		and supply your own if desired.
+
+	: <dfn>Remove Multiple Links</dfn>
+	:: A [=boolish=] value (defaulting to false)
+		that controls whether Bikeshed automatically suppresses multiple autolinks to the same term
+		in a single paragraph.
+		(That is, if multiple autolinks point to the same URL within a single parent element,
+		all but the first will be reverted to plain <{span}>s.)
+
+	: <dfn>Ignored Terms</dfn>
+	:: Accepts a comma-separated list of terms and makes Bikeshed not emit warnings or errors when attempting to autolink those terms.
+		Use this to quiet spurious preprocessor warnings caused by you inventing terms
+		(for example, the Variables spec invents custom properties like `'var-foo'`),
+		or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
+
+	: <dfn>Default Ref Status</dfn>
+	: <dfn>Default Biblio Status</dfn>
+	:: Takes the values `current` or `snapshot` (or the legacy synonym `dated`),
+		and selects which URL you want to default to
+		for bibliography and autolink entries that have both "current" (Editor's Draft) and "snapshot" (`/TR`) URLs.
+		([=Default Biblio Status=] is a synonym for [=Default Ref Status=].)
+		You can also specify this per-biblio entry or per-autolink.
+
+	: <dfn>Default Biblio Display</dfn>
+	:: Takes the values `index` (default), `inline`, or `direct`,
+		and selects whether [[#biblio-mods|biblio autolinks]] default to
+		displaying as their shortname and linking to the bibliography index (`index`),
+		displaying as their title and linking straight to the referenced document (`inline`), or
+		displaying as their shortname and linking to the referenced document (`direct`).
+		(You can also specify this per-biblio entry.)
+
+	: <dfn>External Infotrees</dfn>
+	:: A [=boolish list=] (defaulting to false) of filenames 
+		(specifically, `anchors.bsdata` and `link-defaults.infotree`),
+		indicating whether to look for these files adjacent to the spec.
+		(These contain the same data as a `<pre class=anchor>` or `<pre class=link-defaults>` block in your spec.) 
+
+	: <dfn>Translate IDs</dfn>
+	:: Maps Bikeshed-generated IDs to manually-specified IDs,
+		for cases where you need to manually specify an ID
+		but it's generated by Bikeshed in a hard-to-override way (like IDL blocks).
+		It takes a comma-separated list of whitespace-separated pairs: `old-id new-id, old-id2 new-id2`.
+</dl>
+
+
+### Testing, Support Panels, and Annotations ### {#md-testing-panels}
+
+These keys integrate test suites (including Web Platform Tests), browser support panels (MDN and Can I Use), and fingerprinting tracking vector annotations.
+
+<dl dfn-for=metadata export>
+	: <dfn>Test Suite</dfn>
+	:: Must contain a link to the test suite (like `https://test.csswg.org/suites/css-flexbox-1_dev/nightly-unstable/`).
+
+		Note: This merely displays a "Test Suite" item in the spec's header-list,
+		as linked text.
+		To display WPT results inline in the spec,
+		see [[#testing]] and the `WPT *` keys below.
+
+	: <dfn>Implementation Report</dfn>
+	:: Must contain a link to an implementation report,
+		either a hand-written document
+		or just a link to the spec's folder on <a href="https://wpt.fyi">wpt.fyi</a>.
+		This is <a href="https://www.w3.org/pubrules/doc/rules/?profile=CR#implReport">required for W3C Candidate Recommendation Snapshot</a> (as well as PR, PER, and REC).
+
+	: <dfn>WPT Path Prefix</dfn>
+	:: A partial URL path
+		that specifies a default path prefix for all of the tests in your [[#testing|`<wpt>` elements]].
+		(This can be overridden on an individual <{wpt}> element.)
+
+	: <dfn>WPT Display</dfn>
+	:: Takes the values `none` (default), `closed`, `open`, or `inline`,
+		and specifies whether and how [[#testing|`<wpt>` elements]] display anything in the output document.
+
+	: <dfn>WPT Errors</dfn>
+	:: Takes the values `minimal` (default) or `verbose`,
+		and specifies whether missing WPT tests should be indicated with a minimal summary message,
+		or with a full listing of all missing test paths.
+
+	: <dfn>Include MDN Panels</dfn>
+	:: A [=soft boolish=] value (defaulting to false) that specifies whether to include [MDN](https://developer.mozilla.org/en-US/docs/Web) panels or not.
+		If it's turned on, MDN panels will be added automatically in output,
+		positioned to line up with the elements which define the features the panels annotate.
+		Each MDN panel includes a hyperlink to the MDN article for the feature it annotates,
+		as well as browser-support details for the feature
+		(similar to what's shown in the panels added when [=Include Can I Use Panels=] is enabled).
+
+		Because this examines MDN links for the IDs to use,
+		no configuration is necessary beyond turning the feature on;
+		the panels will automatically be added to the definitions or headings
+		with the associated IDs.
+
+		If your spec is not *yet* in MDN,
+		but you'd like the panels to be added when it shows up,
+		you can pass one of the "maybe" values of a [=soft boolish=]
+		to allow it to silently upgrade when possible;
+		otherwise, if directly turned on,
+		it will emit a fatal error if it can't find your spec.
+
+	: <dfn>Ignore MDN Failure</dfn>
+	:: Takes a comma-separated list of IDs that MDN is attempting (and failing) to target,
+		and prevents Bikeshed from emitting a warning
+		if it can't find that ID.
+		This allows you to avoid having a build warning
+		while waiting for MDN to be updated.
+
+	: <dfn>Include Can I Use Panels</dfn>
+	:: A [=boolish=] value (defaulting to false) that specifies whether to include [Can I Use](https://caniuse.com/) usage-data panels or not.
+		If it's turned on, elements can take a `caniuse="featureID"` attribute,
+		where the `featureID` is the value specified in the URL like `https://caniuse.com/#feat=FEATUREIDHERE`,
+		and the panel will be positioned to line up with that element.
+		(When possible, put this on the corresponding <{dfn}>,
+		as the panel doesn't have any special indication of what feature it's for;
+		if you don't, you must ensure the element has an ID of its own.)
+
+	: <dfn>Can I Use URL</dfn>
+	:: Automatically informs you when/if Can I Use starts tracking new features from your spec,
+		so you don't have to check that yourself.
+		It takes a single URL prefix, and can be specified multiple times to provide multiple URLs.
+		These URLs are checked against the Can I Use data,
+		and if there are any Can I Use features whose URL includes one of the specified URLs as a prefix,
+		and the feature isn't already specified somewhere in your spec,
+		it will log a warning for you.
+
+	: <dfn>Ignore Can I Use URL Failure</dfn>
+	:: Takes one of the URLs specified in [=Can I Use URL=],
+		and suppresses the warning that Bikeshed emits if the URL doesn't show up in the Can I Use database.
+		(This error exists to help catch typos,
+		rather than just letting it silently fail.)
+		This allows you to put your URL in pre-emptively,
+		and get an error only when Can I Use *does* include your specification
+		(and you thus have features that aren't being tracked in your spec).
+
+	: <dfn>Tracking Vector Class</dfn>
+	:: The HTML `class` attribute value used on the link inserted in elements annotated with the [[#tracking-vectors|`tracking-vector` attribute]]
+		(defaults to `tracking-vector`),
+		or `none` to omit the class.
+
+	: <dfn>Tracking Vector Image</dfn>
+	:: An image URL that can be used to represent [[#tracking-vectors|tracking vectors]] with an external image
+		(or `none` to use the default inline SVG).
+		The image is a child of the aforementioned link.
+		This image *will* be marked as darkmode-aware, so make sure it actually is.
+
+	: <dfn>Tracking Vector Image Width</dfn>
+	: <dfn>Tracking Vector Image Height</dfn>
+	:: The width and height (in pixels) of the external [=Tracking Vector Image=], if any.
+		Default to `46` and `64`, respectively.
+
+	: <dfn>Tracking Vector Alt Text</dfn>
+	:: The replacement (`alt`) text for the tracking vector inline SVG or external image.
+		Defaults to `(This is a tracking vector.)`.
+
+	: <dfn>Tracking Vector Title</dfn>
+	:: The `title` attribute text for the tracking vector inline SVG or external image.
+		Defaults to `There is a tracking vector here.`.
+</dl>
+
+
+### Error Handling and Linting ### {#md-linting}
+
+These keys control Bikeshed's error reporting, build failure thresholds, and optional lint checks.
+
+<dl dfn-for=metadata export>
+	: <dfn>Die On</dfn>
+	: <dfn>Die When</dfn>
+	:: Give the same control that the [[#cli-options|`--die-on` and `--die-when`]] command-line options do.
+		They take the same values--
+		a single keyword (`nothing`, `fatal`, `link-error`, `warning`, `lint`, `message`, or `everything` for [=Die On=];
+		`early` or `late` for [=Die When=])--
+		as the corresponding command-line arguments.
+
+	: <dfn>Complain About</dfn>
+	:: A [=boolish list=] (defaulting to false)
+		indicating what nits you'd like Bikeshed to complain about (at the `lint` message level),
+		which are mostly too noisy to be turned on by default.
+		Accepted values are:
+
+		: `accidental-2119` (default: off)
+		:: Complains about usage of RFC 2119 terms (`may`, `must`, `should`, etc.) in non-normative sections.
 			If you *need* to use one of those terms
 			(such as in an example about using them),
-			you can put a `class=allow-2119` on the text's immediate parent element.
-		: `broken-links`
+			you can put `class=allow-2119` on the text's immediate parent element.
+		: `broken-links` (default: off)
 		:: Checks all the external links in the document,
 			and verifies that they result in a 200 response code.
 			See [=metadata/Link Checker Timeout=] to control this.
-		: `missing-example-ids`
+		: `missing-example-ids` (default: off)
 		:: Complains about examples without a manually-specified ID.
 			(Examples auto-generate an ID based on their contents otherwise,
 			which might not be stable over time.)
-		: `mixed-indents`
-		:: Checks that all of your line-starting whitespace is either tabs *or* spaces, not both. (Complains both about a line using spaces when your document otherwise uses spaces, and a line using a mix of tabs and spaces at once.)
+		: `missing-exposed` (default: off)
+		:: Checks that every WebIDL `interface` (except callback interfaces without constants, or interfaces with `[NoInterfaceObject]`)
+			and `namespace` has an `[Exposed]` extended attribute.
+		: `mixed-indents` (default: **on**)
+		:: Checks that all of your line-starting whitespace is either tabs *or* spaces, not both.
+			(Complains both about a line using spaces when your document otherwise uses tabs, or vice versa,
+			and a line using a mix of tabs and spaces at once.)
 
 			This intentionally skips lines in "raw" elements
 			like <{pre}>,
@@ -1427,148 +1931,35 @@ There are several additional optional keys:
 			using tabs to match the indent of the opening tag,
 			then spaces to align the preformatted text.
 
-			This value *is turned on by default*. You can turn it off with `Complain About: mixed-indents no`
-	* <dfn>Link Checker Timeout</dfn> takes a pair of ints,
+			This value *is turned on by default*. You can turn it off with `Complain About: mixed-indents no`.
+
+	: <dfn>Link Checker Timeout</dfn>
+	:: Takes a pair of whitespace-separated numbers,
 		specifying the timeouts for the `Complain About: broken-links yes` link checker,
 		in seconds.
 		The first value is the per-link timeout,
-		the second is the global timeout for all links.
-		Defaults to 5 and 10.
-	* <dfn>Infer CSS Dfns</dfn> is a <a>boolish</a> that specifies whether Bikeshed should try to "infer" what type a <{dfn}> is by looking at the text,
-		using CSS-biased heuristics.
-		(In other words, this'll only auto-detect certain CSS types.)
-		Defaults to off.
-	* <dfn>Assume Explicit For</dfn> is a <a>boolish</a> that specifies whether an omitted `for` attribute on an autolink should imply `for="/"`
-		(that is, selecting a definition without a `for` value),
-		or just not express a `for` requirement at all
-		(that is, selecting a definition without caring about what its `for` value is).
-		Truthy values set the former,
-		falsey set the latter.
-		Defaults to off.
+		and the second is the global timeout for all links.
+		Defaults to `5 10`.
 
-		Note: Turning this on is a better match for some people's mental models,
-		but it requires you to specify more `for` values on your autolinks
-		even when it's not necessary to disambiguate things,
-		so it's off by default.
-	* <dfn>Max ToC Depth</dfn> specifies the maximum depth you want the ToC to generate to. It can be the value "none", meaning generate the ToC normally, or an integer between 1 and 5. It defaults to "none".
-	* Several keys related to the [MDN](https://developer.mozilla.org/en-US/docs/Web) project:
-		* <dfn>Include MDN Panels</dfn> is a <a>soft boolish</a> that specifies whether to include [MDN](https://developer.mozilla.org/en-US/docs/Web) panels or not.
-			If it's turned on, MDN panels will be added automatically in output,
-			positioned to line up with the elements which define the features the panels annotate.
-			Each MDN panel includes a hyperlink to the MDN article for the feature it annotates,
-			as well as browser-support details for the feature
-			(similar to what's shown in the panels added when [=Include Can I Use Panels=] is enabled).
+	: <dfn>Required IDs</dfn>
+	:: A comma-separated list of IDs (with or without a leading `#`) that the document *must* contain.
+		This can be used to ensure that certain important links into the document don't rot over time.
+</dl>
 
-			Because this examines MDN links for the IDs to use,
-			no configuration is necessary beyond turning the feature on;
-			the panels will automatically be added to the definitions or headings
-			with the associated IDs.
 
-			If your spec is not *yet* in MDN,
-			but you'd like the panels to be added when it shows up,
-			you can pass one of the "maybe" values of a [=soft boolish=]
-			to allow it to silently upgrade when possible;
-			otherwise, if directly turned on,
-			it will emit a fatal error if it can't find your spec.
-		* <dfn>Ignore MDN Failure</dfn> takes a comma-separated list of IDs that MDN is attempting (and failing) to target,
-			and prevents Bikeshed from emitting a warning
-			if it can't find that ID.
-			This allows you to have avoid having a build warning
-			while waiting for MDN to be updated.
-	* Several keys relate to the [Can I Use](https://caniuse.com/) project:
-		* <dfn>Include Can I Use Panels</dfn> is a <a>boolish</a> that specifies whether to include [Can I Use](https://caniuse.com/) usage-data panels or not. If it's turned on, elements can take a `caniuse="featureID"` attribute, where the `featureID` is the value specified in the url like `https://caniuse.com/#feat=FEATUREIDHERE`, and the panel will be positioned to line up with that element.
-			(When possible, put this on the corresponding <{dfn}>,
-			as the panel doesn't have any special indication of what feature it's for;
-			if you don't, you must ensure the element has an ID of its own.)
-		* <dfn>Can I Use URL</dfn> automatically informs you when/if Can I Use starts tracking new features from your spec, so you don't have to check that yourself.
-			It takes a single URL prefix, and can be specified multiple times to provide multiple URLs.
-			These URLs are checked against the Can I Use data,
-			and if there are any Can I Use features whose URL includes one of the specified URLs as a prefix,
-			and the feature isn't already specified somewhere in your spec,
-			it will log a warning for you.
-		* <dfn>Ignore Can I Use URL Failure</dfn> takes one of the URLs specified in [=Can I Use URL=],
-			and suppresses the warning that Bikeshed emits if the URL doesn't show up in the Can I Use database.
-			(This error exists to help catch typos,
-			rather than just letting it silently fail.)
-			This allows you to put your URL in pre-emptively,
-			and get an error only when Can I Use *does* include your specification
-			(and you thus have features that aren't being tracked in your spec).
-	* <dfn>Custom Warning Title</dfn> specifies the title of a "custom" warning,
-		requested via `Warning: custom` metadata.
-	* <dfn>Custom Warning Text</dfn> specifies the body of a "custom" warning.
-		Like <a>Abstract</a>,
-		it accepts multiple lines,
-		and is parsed as Markdown
-		(as if you'd written them directly into the document).
-	* <dfn>Prepare For TR</dfn> is a <a>boolish</a> that specifies
-		whether or not to apply a bunch of automatic "fixups"
-		for common errors that would make a spec fail the W3C's PubRules check.
-		This is applied automatically when you run the [[#cli-echidna|Echidna]] command to publish your spec,
-		but you can use it manually to check precisely what your spec will look like when published.
-	* <dfn>Use Dfn Panels</dfn> is a <a>boolish</a> that determines
-		whether "definition panels" are generated for every definition;
-		it defaults to true.
-		These "panels" show up when you click on a <{dfn}>,
-		and show every local reference to the definition.
-
-		It automatically adds some JS and CSS to your page for the panels;
-		you can suppress this with `Boilerplate: script-dfn-panel no, style-dfn-panel no`
-		and supply your own if desired.
-	* <dfn>Metadata Include</dfn> and <dfn>Metadata Order</dfn> are defined in [[#rearranging-metadata]].
-	* <dfn>Remove Multiple Links</dfn> is a <a>boolish</a> (defaulting to false)
-		that controls whether Bikeshed automatically suppresses multiple autolinks to the same term
-		in a single paragraph.
-		(That is, if multiple autolinks point to the same URL within a single parent element,
-		all but the first will be reverted to plain <{span}>s.)
-	* <dfn>Slim Build Artifact</dfn> is a <a>boolish</a> (defaulting to false)
-		that specifies whether or not Bikeshed should try and "slim" the output,
-		to make it more appropriate as an obvious "build artifact",
-		rather than an active usable spec.
-		This turns off various usability features which otherwise bloat your HTML,
-		and which aren't necessary if the output isn't intended to be actively used by humans.
-		The exact set of features that are affected by this will evolve over time.
-	* <dfn>Required IDs</dfn> is a list of IDs that the document *must* contain.
-		This can be used to ensure that certain links into the document don't rot over time.
-	* <dfn>Force Crossorigin</dfn> is a [=boolish=] that auto-adds the `crossorigin=anonymous` attribute
-		to every relevant element (<{link}>, <{script}>, <{img}>, <{audio}>, <{video}>).
-		You can set a different `crossorigin` value manually on the element,
-		or skip the element entirely by putting `nocrossorigin` on it or an ancestor.
-	* <dfn>WPT Path Prefix</dfn> is a partial URL path
-		that specifies a default path prefix for all of the tests in your <{wpt}> elements.
-		(This can be overridden on an individual <{wpt}> element.)
-	* <dfn>WPT Display</dfn> takes the values "none", "closed" (default), "open", or "inline",
-		and specifies whether and how <{wpt}> elements display anything in the output document.
-	* <dfn>WPT Errors</dfn> takes the values "minimal" (default) or "verbose",
-		and specifies whether missing WPT tests should be indicated with a minimal message,
-		or with a full listing of all missing paths.
-	* <dfn>Tracking Vector Class</dfn> is the HTML `class` attribute value used on the link inserted in elements annotated with the `tracking-vector` attribute.
-	* <dfn>Tracking Vector Image</dfn> is an image URL that can be used to represent tracking vectors with an external image.
-		Otherwise an inline SVG is used. The image is a child of the aforementioned link. This image *will* be marked as darkmode-aware, so make sure it actually is.
-	* <dfn>Tracking Vector Image Width</dfn> is the width of the external image, if any.
-	* <dfn>Tracking Vector Image Height</dfn> is the height of the external image, if any.
-	* <dfn>Tracking Vector Alt Text</dfn> is the replacement text for the inline SVG or external image.
-	* <dfn>Tracking Vector Title</dfn> is the title for the inline SVG or external image.
-	* <dfn>Image Auto Size</dfn> is a [=boolish=] (defaulting to true)
-		that specifies whether Bikeshed should [[#img-size|automatically detect the size]] of images used in the document.
-</ul>
-
-<div class=note>
-	A <dfn>boolish</dfn> value is a string representing a boolean value (true or false).
-	The string "yes", "on", "true", and "y" all represent true values,
-	while the strings "no", "off", "false", and "n" all represent false values.
-
-	A <dfn>soft boolish</dfn> value is either a [=boolish=] value,
-	or one of the strings "maybe", "if possible", or "if needed",
-	indicating an intermediate intention between something being turned on and off.
-</div>
+### Custom Metadata (`!`) ### {#md-custom}
 
 You can also provide custom keys with whatever values you want,
 by prefixing the key with `!`,
 like `!Issue Tracking: in spec`.
-Any custom keys are collected together and formatted as entries in the "spec metadata" boilerplate <{dl}>.
+Any custom keys are collected together and formatted as entries in the `spec-metadata` boilerplate <{dl}> (with their values parsed for inline HTML/shorthands).
 Specifying a custom key multiple times will put all the values as <{dd}>s under a single <{dt}> for the key.
 A custom key name equal to one of the auto-generated keys
 will add your custom value as an additional <{dd}> under that auto-generated key.
+See [[#rearranging-metadata]] for how to control the ordering of custom and standard keys.
+
+
+### Deprecated Metadata ### {#md-deprecated}
 
 Some of the metadata keys are *deprecated*;
 you shouldn't use them,
@@ -1576,28 +1967,33 @@ but just in case you run into them in the wild,
 they're documented here for understanding.
 Each one recommends what you should be using instead.
 
-<ul dfn-for=metadata export>
-	* <dfn>Use &lt;i> Autolinks</dfn> turns on legacy support for using <{i}> elements as "dfn" autolinks.
-		It takes a <a>boolish</a> value.
+<dl dfn-for=metadata export>
+	: <dfn>Use &lt;i> Autolinks</dfn>
+	:: Turns on legacy support for using <{i}> elements as `dfn` autolinks.
+		It takes a [=boolish=] value.
 
 		Instead of using this,
-		just use the <{a}> element to autolink, as usual.
-	* <dfn>Link Defaults</dfn> lets you specify a default spec for particular autolinks to link to.
+		just use the <{a}> element (or `[=term=]` shorthand) to autolink, as usual.
+
+	: <dfn>Link Defaults</dfn>
+	:: Lets you specify a default spec for particular autolinks to link to.
 		The value is a comma-separated list of entries,
 		where each entry is a versioned spec shortname,
-		followed by a parenthesized link type,
-		followed by a "/"-separated list of link phrases.
+		followed by a parenthesized link type (and optional `snapshot`/`current` status),
+		followed by a `/`-separated list of link phrases.
 		For example, `Link Defaults: html (dfn) allowed to show a popup/in parallel`.
 
 		Instead of using this,
-		use a `<pre class=link-defaults>` block,
+		use a [[#link-defaults|`<pre class=link-defaults>`]] block,
 		as the error message suggests when this is necessary.
-	* <dfn>Ignored Vars</dfn> accepts a comma-separated list of variable names,
+
+	: <dfn>Ignored Vars</dfn>
+	:: Accepts a comma-separated list of variable names,
 		and makes Bikeshed not emit warnings or errors about them being used only once in the document/algorithm.
 
 		Instead of using this,
 		put an `ignore` attribute on the <{var}> in question.
-</ul>
+</dl>
 
 
 Default Metadata {#default-metadata}
@@ -2029,6 +2425,12 @@ and won't be seen in the actual document source.
 		(taken from [=metadata/Status Text=]).
 	* <dfn>`[WORKSTATUS]`</dfn> gives the spec's current work status
 		(taken from [=Work Status=]).
+	* <dfn>`[CG-MATURITY]`</dfn> and <dfn>`[CG-MATURITY-LABEL]`</dfn> give the maturity of a W3C Community Group `CG-LIVING` or `CG-SNAPSHOT` spec in lowercase and capitalized form
+		(taken from [=CG Maturity=]).
+		* <dfn>`[CG-TRANSFERRED-TO]`</dfn> gives the organization a CG spec was transferred to
+			(taken from [=CG Transferred To=]).
+		* <dfn>`[CG-SNAPSHOTS-INDEX]`</dfn> and <dfn>`[CG-SNAPSHOT-ADDRESS]`</dfn> give the URLs for the CG's snapshots index and the dated snapshot address
+			(taken from [=Group=], [=Shortname=], and [=Date=]).
 	* <dfn>`[LATEST]`</dfn> gives the link to the latest /TR version of the spec
 		(taken from [=TR=]).
 	* <dfn>`[VERSION]`</dfn> gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date
@@ -2110,7 +2512,7 @@ These can be customized with increasing levels of precision, depending on what y
 	and then use a `<div class=marker>` as its first child.
 
 
-Figures and Tables
+Figures and Tables {#figures}
 ------------------
 
 Figures (using `<figure>` and `<figcaption>` markup)
@@ -3915,7 +4317,7 @@ All values are placed directly into the output HTML as written,
 so HTML tags, Bikeshed autolinks, etc can all be used as normal.
 
 If defining a shorthand property,
-put a `"shorthand"` class on the block.
+put a `shorthand` class on the block.
 This will change the block to only require `Name` and `Value`;
 `Canonical Order` is still allowed,
 but continues to default to "per grammar" as usual.
@@ -3924,7 +4326,7 @@ which is usually all you need.
 
 If adding some values to a property,
 rather than defining the property itself,
-put a `"partial"` class on the block.
+put a `partial` class on the block.
 It will now require a `New Values` key,
 rather than `Value`,
 but is otherwise normal.
@@ -3964,13 +4366,13 @@ like `For: @counter-style`.
 The rest of the propdef keys are not meaningful for descriptors.
 
 Like propdef blocks,
-a `"partial"` class can be put on the block
+a `partial` class can be put on the block
 to indicate that you're adding values to an existing definition;
 `Name`, `For`, and `New Values` must be provided.
 
 While not technically descriptors,
 media features can be defined with this block as well,
-if an `"mq"` class is put on the block.
+if an `mq` class is put on the block.
 It then only requires `Name`, `For`, and `Value`.
 
 Additional keys beyond what is described here can be provided;
