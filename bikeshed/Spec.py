@@ -32,7 +32,6 @@ from . import (
     highlight,
     idl,
     includes,
-    inlineTags,
     language,
     links,
     lint,
@@ -284,7 +283,6 @@ class Spec:
         admonitions.addNoteHeaders(self)
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.run(self)
-        inlineTags.processTags(self)
         algorithms.addImplicitAlgorithms(self)
         datablocks.fixManualDefTables(self)
         headings.processHeadings(self)
