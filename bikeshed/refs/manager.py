@@ -450,7 +450,11 @@ class ReferenceManager:
         cached = self.cachedRefs[key]
         if error and cached.error:
             m.linkerror(cached.error, el=el)
-        return cached.ref or cached.error
+        if cached.ref:
+            return cached.ref
+        if error and cached.error:
+            return cached.error
+        return None
 
     def _getRef(
         self,
@@ -618,7 +622,11 @@ class ReferenceManager:
                     break
                 if len(possibleMethods) > 1:
                     # Too many to disambiguate.
-                    err = f"The argument autolink '{text}' for '{linkFor}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for."
+                    err = (
+                        f"The argument autolink '{text}' for '{linkFor}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for."
+                        if zeroRefsError(linkType)
+                        else None
+                    )
                     return CachedRef(ref=None, error=err)
                 # Try out all the combinations of interface/status/signature
                 linkForPatterns = ["{interface}/{method}", "{method}"]
