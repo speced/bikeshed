@@ -93,7 +93,7 @@ def testNameForPath(path: str) -> str:
 
 
 def sortTests(tests: t.Iterable[str]) -> t.Iterable[str]:
-    return sorted(tests, key=lambda x: ("/" in testNameForPath(x), x))
+    return sorted(tests, key=lambda x: (0 if testNameForPath(x).startswith("manual") else 1, x))
 
 
 def run(
