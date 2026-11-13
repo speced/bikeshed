@@ -19,7 +19,7 @@ class RefDataT(t.TypedDict, total=False):
     el: t.ElementT | None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class RefWrapper:
     # Refs don't contain their own name, so I don't have to copy as much when there are multiple linkTexts
     # This wraps that, producing an object that looks like it has a text property.

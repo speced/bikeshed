@@ -56,26 +56,25 @@ class RefSource:
         self.specs: dict[str, dict[str, str]] = {} if specs is None else specs
         self.ignoredSpecs = set() if ignored is None else ignored
         self.replacedSpecs = set() if replaced is None else replaced
-        self._loadedAnchorGroups: set[str] = set()
+        self._loadedAnchorGroups: dict[str, AnchorGroup] = {}
 
     def fetchRefs(self, key: str) -> list[t.RefWrapper]:
         """Safe, lazy-loading version of self.refs[key]"""
 
-        if key in self.refs:
-            return self.refs[key]
+        if (refs := self.refs.get(key)) is not None:
+            return refs
 
         if self.source not in LAZY_LOADED_SOURCES:
             return []
 
         group = config.groupFromKey(key)
-        if group in self._loadedAnchorGroups:
-            # Group was loaded, but previous check didn't find it, so it's just not here.
-            return []
-        # Otherwise, load the group file.
-        with self.dataFile.fetch("anchors", f"anchors-{group}.data", okayToFail=True) as fh:
-            self.refs.update(decodeAnchors(fh))
-            self._loadedAnchorGroups.add(group)
-        return self.refs.get(key, [])
+        if (anchorGroup := self._loadedAnchorGroups.get(group)) is None:
+            raw = self.dataFile.fetch("anchors", f"anchors-{group}.data", str=True, okayToFail=True)
+            anchorGroup = AnchorGroup(raw)
+            self._loadedAnchorGroups[group] = anchorGroup
+        refs = anchorGroup.decodeKey(key)
+        self.refs[key] = refs
+        return refs
 
     def fetchAllRefs(self) -> list[tuple[str, list[t.RefWrapper]]]:
         """Nuts to lazy-loading, just load everything at once."""
@@ -89,13 +88,15 @@ class RefSource:
                 m.warn(f"Ignoring a data file in the /anchors folder with a weird name: '{file}'")
                 continue
             group = match[1]
-            if group in self._loadedAnchorGroups:
+            if (anchorGroup := self._loadedAnchorGroups.get(group)) is not None and anchorGroup.fullyDecoded:
                 # Already loaded
                 continue
             with self.dataFile.fetch("anchors", file) as fh:
                 self.refs.update(decodeAnchors(fh))
-                self._loadedAnchorGroups.add(group)
-        return list(self.refs.items())
+                ag = AnchorGroup("")
+                ag.fullyDecoded = True
+                self._loadedAnchorGroups[group] = ag
+        return [item for item in self.refs.items() if item[1]]
 
     def queryRefs(
         self,
@@ -395,32 +396,151 @@ def filterByStatus(source: RefSource, refs: t.Sequence[t.RefWrapper], status: st
     raise Exception(msg)
 
 
-def decodeAnchors(linesIter: t.Iterator[str]) -> defaultdict[str, list[t.RefWrapper]]:
+class AnchorGroup:
+    __slots__ = ["_indexed", "_lines", "_offsets", "_queries", "_raw", "fullyDecoded"]
+
+    def __init__(self, raw: str) -> None:
+        self._raw = "\n-\n" + raw if raw else ""
+        self._queries = 0
+        self._indexed = False
+        self._lines: list[str] = []
+        self._offsets: dict[str, tuple[int, ...]] = {}
+        self.fullyDecoded = not raw
+
+    def decodeKey(self, key: str) -> list[t.RefWrapper]:
+        if self.fullyDecoded:
+            return []
+        if not self._indexed:
+            self._queries += 1
+            if self._queries <= 6:
+                return decodeAnchorKeyFromRaw(self._raw, key)
+            self._lines, self._offsets = indexAnchorLines(self._raw[3:])
+            self._raw = ""
+            self._indexed = True
+        indices = self._offsets.get(key)
+        if not indices:
+            return []
+        return decodeAnchorKeyFromIndex(key, self._lines, indices)
+
+
+def decodeAnchorKeyFromRaw(rawGroup: str, key: str) -> list[t.RefWrapper]:
+    if not rawGroup:
+        return []
+    needle = f"\n-\n{key}\n"
+    pos = rawGroup.find(needle)
+    if pos == -1:
+        return []
+    res: list[t.RefWrapper] = []
+    needleLen = len(needle)
+    while pos != -1:
+        start = pos + needleLen
+        end = rawGroup.find("\n-\n", start)
+        lines = rawGroup[start:end].split("\n")
+        data: wrapper.RefDataT = {
+            "type": lines[1],
+            "spec": lines[2],
+            "shortname": lines[3],
+            "level": lines[4],
+            "status": lines[5],
+            "url": lines[6],
+            "export": bool(lines[7]),
+            "normative": bool(lines[8]),
+            "for_": lines[9:],
+        }
+        res.append(wrapper.RefWrapper(key, lines[0], data))
+        pos = rawGroup.find(needle, end)
+    return res
+
+
+def indexAnchorLines(raw: str) -> tuple[list[str], dict[str, tuple[int, ...]]]:
+    if not raw:
+        return [], {}
+    lines = raw.split("\n")
+    n = len(lines) - 1
+    offsets: dict[str, tuple[int, ...]] = {}
+    i = 0
+    while i < n:
+        aText = lines[i]
+        if lines[i + 10] == "-":
+            nxt = i + 11
+        elif lines[i + 11] == "-":
+            nxt = i + 12
+        else:
+            j = i + 12
+            while lines[j] != "-":
+                j += 1
+            nxt = j + 1
+        if aText in offsets:
+            offsets[aText] = (*offsets[aText], i)
+        else:
+            offsets[aText] = (i,)
+        i = nxt
+    return lines, offsets
+
+
+def decodeAnchorKeyFromIndex(key: str, lines: list[str], indices: tuple[int, ...]) -> list[t.RefWrapper]:
+    res: list[t.RefWrapper] = []
+    for i in indices:
+        j = i + 10
+        while lines[j] != "-":
+            j += 1
+        data: wrapper.RefDataT = {
+            "type": lines[i + 2],
+            "spec": lines[i + 3],
+            "shortname": lines[i + 4],
+            "level": lines[i + 5],
+            "status": lines[i + 6],
+            "url": lines[i + 7],
+            "export": bool(lines[i + 8]),
+            "normative": bool(lines[i + 9]),
+            "for_": lines[i + 10 : j],
+        }
+        res.append(wrapper.RefWrapper(key, lines[i + 1], data))
+    return res
+
+
+def decodeAnchors(linesIter: t.Iterator[str] | str) -> defaultdict[str, list[t.RefWrapper]]:
     # Decodes the anchor storage format into {key: [{anchor-data}]}
-    anchors = defaultdict(list)
-    try:
-        while True:
-            aText = next(linesIter)[:-1]
-            displayText = next(linesIter)[:-1]
-            data: wrapper.RefDataT = {
-                "type": next(linesIter),
-                "spec": next(linesIter),
-                "shortname": next(linesIter),
-                "level": next(linesIter),
-                "status": next(linesIter),
-                "url": next(linesIter),
-                "export": next(linesIter) != "\n",
-                "normative": next(linesIter) != "\n",
-                "for_": [],
-            }
-            while True:
-                line = next(linesIter)
-                if line == "-\n":
-                    break
-                data["for_"].append(line)
-            anchors[aText].append(wrapper.RefWrapper(aText, displayText, data))
-    except StopIteration:
+    anchors: defaultdict[str, list[t.RefWrapper]] = defaultdict(list)
+    if isinstance(linesIter, str):
+        raw = linesIter
+    else:
+        read = getattr(linesIter, "read", None)
+        raw = read() if callable(read) else "".join(linesIter)
+    if not raw:
         return anchors
+    lines = raw.split("\n")
+    n = len(lines) - 1
+    i = 0
+    while i < n:
+        aText = lines[i]
+        displayText = lines[i + 1]
+        if lines[i + 10] == "-":
+            for_: list[str] = []
+            nxt = i + 11
+        elif lines[i + 11] == "-":
+            for_ = [lines[i + 10]]
+            nxt = i + 12
+        else:
+            j = i + 12
+            while lines[j] != "-":
+                j += 1
+            for_ = lines[i + 10 : j]
+            nxt = j + 1
+        data: wrapper.RefDataT = {
+            "type": lines[i + 2],
+            "spec": lines[i + 3],
+            "shortname": lines[i + 4],
+            "level": lines[i + 5],
+            "status": lines[i + 6],
+            "url": lines[i + 7],
+            "export": bool(lines[i + 8]),
+            "normative": bool(lines[i + 9]),
+            "for_": for_,
+        }
+        anchors[aText].append(wrapper.RefWrapper(aText, displayText, data))
+        i = nxt
+    return anchors
 
 
 def getArgfulMethodVariants(maybeMethodSig: str, refs: RefSource) -> list[str]:
@@ -429,13 +549,13 @@ def getArgfulMethodVariants(maybeMethodSig: str, refs: RefSource) -> list[str]:
     return []
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class MethodVariants:
     arglessSignature: str
     variants: dict[str, MethodVariant]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class MethodVariant:
     signature: str
     args: list[str]

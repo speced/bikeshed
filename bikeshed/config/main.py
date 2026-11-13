@@ -154,10 +154,11 @@ _groupFromKeyCache: dict[str, str]
 _groupFromKeyCache = {}
 
 
+_startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+
 def scriptPath(*pathSegs: str) -> str:
-    startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    path = os.path.join(startPath, *pathSegs)
-    return path
+    return os.path.join(_startPath, *pathSegs)
 
 
 def docPath(doc: t.SpecT, *pathSegs: str) -> str | None:
