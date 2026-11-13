@@ -90,7 +90,9 @@ if TYPE_CHECKING:
     from .biblio import BiblioEntry
     from .config.BoolSet import BoolSet
     from .metadata import MetadataManager
-    from .refs import MethodVariant, MethodVariants, ReferenceManager, RefSource, RefWrapper
+    from .refs import MethodVariant, MethodVariants, Ref, ReferenceManager, RefSource
+
+    type RefT = Ref
     from .retrieve import DataFileRequester
 
     type BiblioStorageT = DefaultDict[str, list[BiblioEntry]]

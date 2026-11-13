@@ -9,7 +9,7 @@ from .. import t
 class ExternalRefsManager:
     specs: dict[str, ExternalRefsSpec] = dc.field(default_factory=dict)
 
-    def addRef(self, specName: str, ref: t.RefWrapper, for_: str | None) -> None:
+    def addRef(self, specName: str, ref: t.Ref, for_: str | None) -> None:
         if specName not in self.specs:
             self.specs[specName] = ExternalRefsSpec()
         self.specs[specName].addRef(ref, for_)
@@ -34,7 +34,7 @@ class ExternalRefsSpec:
     refs: dict[str, ExternalRefsGroup] = dc.field(default_factory=dict)
     biblio: t.BiblioEntry | None = None
 
-    def addRef(self, ref: t.RefWrapper, for_: str | None) -> None:
+    def addRef(self, ref: t.Ref, for_: str | None) -> None:
         if ref.text not in self.refs:
             self.refs[ref.text] = ExternalRefsGroup()
         self.refs[ref.text].valuesByFor[for_] = ref
@@ -45,19 +45,19 @@ class ExternalRefsSpec:
 
 @dc.dataclass
 class ExternalRefsGroup:
-    valuesByFor: dict[str | None, t.RefWrapper] = dc.field(default_factory=dict)
+    valuesByFor: dict[str | None, t.Ref] = dc.field(default_factory=dict)
 
     def __len__(self) -> int:
         return len(self.valuesByFor)
 
-    def single(self) -> t.RefWrapper:
+    def single(self) -> t.Ref:
         if len(self.valuesByFor) == 1:
             return next(iter(self.valuesByFor.values()))
         else:
             msg = f"There are {len(self.valuesByFor)} values, not just 1."
             raise IndexError(msg)
 
-    def sorted(self) -> t.Generator[tuple[str | None, t.RefWrapper], None, None]:
+    def sorted(self) -> t.Generator[tuple[str | None, t.Ref], None, None]:
         if None in self.valuesByFor:
             yield None, self.valuesByFor[None]
         for forVal in sorted(x for x in self.valuesByFor if x is not None):

@@ -7,12 +7,12 @@ from .. import config, t
 
 
 def filterObsoletes(
-    refs: list[t.RefWrapper],
+    refs: list[t.Ref],
     replacedSpecs: set[tuple[str, str]],
     ignoredSpecs: set[str],
     localShortname: str | None = None,
     localSpec: str | None = None,
-) -> list[t.RefWrapper]:
+) -> list[t.Ref]:
     # Remove any ignored or obsoleted specs
     possibleSpecs = {ref.spec for ref in refs}
     if localSpec:
@@ -33,13 +33,13 @@ def filterObsoletes(
     return ret
 
 
-def filterOldVersions(refs: list[t.RefWrapper], status: str | None = None) -> list[t.RefWrapper]:
+def filterOldVersions(refs: list[t.Ref], status: str | None = None) -> list[t.Ref]:
     # If multiple levels of the same shortname exist,
     # only use the latest level.
     # If generating for a snapshot, prefer the latest snapshot level,
     # unless that doesn't exist, in which case just prefer the latest level.
-    shortnameLevels: defaultdict[str, defaultdict[str, list[t.RefWrapper]]] = defaultdict(lambda: defaultdict(list))
-    snapshotShortnameLevels: defaultdict[str, defaultdict[str, list[t.RefWrapper]]] = defaultdict(
+    shortnameLevels: defaultdict[str, defaultdict[str, list[t.Ref]]] = defaultdict(lambda: defaultdict(list))
+    snapshotShortnameLevels: defaultdict[str, defaultdict[str, list[t.Ref]]] = defaultdict(
         lambda: defaultdict(list),
     )
     for ref in refs:

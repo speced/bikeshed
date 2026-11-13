@@ -1,4 +1,4 @@
 from .external import ExternalRefsGroup, ExternalRefsManager, ExternalRefsSpec
 from .manager import ReferenceManager
-from .source import MethodVariant, MethodVariants, RefSource
-from .wrapper import RefDataT, RefWrapper
+from .ref import Ref
+from .source import MethodVariant, MethodVariants, RefSource, groupFromKey

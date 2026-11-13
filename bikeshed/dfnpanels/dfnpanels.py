@@ -56,7 +56,7 @@ def addDfnPanels(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
         }
 
 
-def addExternalDfnPanel(termEl: t.ElementT, ref: t.RefWrapper, doc: t.SpecT) -> None:
+def addExternalDfnPanel(termEl: t.ElementT, ref: t.Ref, doc: t.SpecT) -> None:
     # Constructs "dfn panels" which show all the local references to an external term
 
     # Calculate and cache the doc's links,

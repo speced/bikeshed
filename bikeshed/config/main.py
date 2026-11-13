@@ -133,27 +133,6 @@ def splitForValues(forValues: str | None) -> list[str] | None:
     return [value.strip() for value in re.split(r",(?![^()]*\))", forValues) if value.strip()]
 
 
-def groupFromKey(key: str, length: int = 2) -> str:
-    """Generates a filename-safe "group" from a key, of a specified length."""
-    if key in GROUP_FROM_KEY_CACHE:
-        return GROUP_FROM_KEY_CACHE[key]
-    safeChars = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
-    group = ""
-    for char in key.lower():
-        if len(group) == length:
-            GROUP_FROM_KEY_CACHE[key] = group
-            return group
-        if char in safeChars:
-            group += char
-    group = group.ljust(length, "_")
-    GROUP_FROM_KEY_CACHE[key] = group
-    return group
-
-
-GROUP_FROM_KEY_CACHE: dict[str, str]
-GROUP_FROM_KEY_CACHE = {}
-
-
 SCRIPT_PATH_BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 

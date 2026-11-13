@@ -310,7 +310,7 @@ def processAutolinks(doc: t.SpecT) -> None:
     h.dedupIDs(doc)
 
 
-def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str, ref: refs.RefWrapper) -> None:
+def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str, ref: refs.Ref) -> None:
     # Add additional effects to autolinks.
     if doc.md.slimBuildArtifact:
         return

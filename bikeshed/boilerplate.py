@@ -381,7 +381,7 @@ def addIndexOfLocallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> None:
     h.appendChild(container, indexHTML, allowEmpty=True)
 
 
-def disambiguator(ref: r.RefWrapper, types: set[str] | None, specs: list[str] | None) -> str:
+def disambiguator(ref: r.Ref, types: set[str] | None, specs: list[str] | None) -> str:
     disambInfo = []
     if types is None or len(types) > 1:
         disambInfo.append(ref.type)
@@ -462,7 +462,7 @@ def addExplicitIndexes(doc: t.SpecT) -> None:
 
         # Group entries by linking text,
         # ensuring no duplicate disambiguators.
-        refsFromText: t.DefaultDict[str, list[r.RefWrapper]] = defaultdict(list)
+        refsFromText: t.DefaultDict[str, list[r.Ref]] = defaultdict(list)
         for ref in possibleRefs:
             refDisambiguator = disambiguator(ref, elTypes, specs)
             for i, existingRef in enumerate(refsFromText[ref.text]):
@@ -493,7 +493,7 @@ def addExplicitIndexes(doc: t.SpecT) -> None:
 
         # Group entries by text/type/for,
         # then filter each group for obsolete/oldversions.
-        refsFromTtf: t.DefaultDict[tuple[str, str, str | None], list[r.RefWrapper]] = defaultdict(list)
+        refsFromTtf: t.DefaultDict[tuple[str, str, str | None], list[r.Ref]] = defaultdict(list)
         for text, entries in refsFromText.items():
             for ref in entries:
                 ttf = (text, ref.type, "".join(ref.for_) if ref.for_ else None)
@@ -564,7 +564,7 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
     if not doc.externalRefsUsed.hasRefs():
         return
 
-    def makeEntry(ref: t.RefWrapper, contents: t.NodeListT) -> t.ElementT:
+    def makeEntry(ref: t.Ref, contents: t.NodeListT) -> t.ElementT:
         return h.E.span(
             {"id": h.uniqueID("external-term", ref.url, ref.text)},
             *contents,

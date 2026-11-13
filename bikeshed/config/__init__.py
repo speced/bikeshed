@@ -31,7 +31,6 @@ from .main import (
     doEvery,
     englishFromList,
     flatIntersperse,
-    groupFromKey,
     intersperse,
     processTextNodes,
     reSubObject,

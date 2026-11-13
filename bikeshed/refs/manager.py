@@ -8,12 +8,11 @@ from collections import defaultdict
 
 from .. import biblio, config, constants, h, retrieve, t
 from .. import messages as m
-from . import headingdata, source, utils, wrapper
+from . import headingdata, source, utils
+from .ref import Ref
 from .utils import LinkFailure
 
 if t.TYPE_CHECKING:
-    from .wrapper import RefWrapper
-
     SpecDataT: t.TypeAlias = dict[str, str]
 
 
@@ -30,7 +29,7 @@ class RefCacheKeyT(t.NamedTuple):
 
 @dataclasses.dataclass
 class CachedRef:
-    ref: RefWrapper | None
+    ref: Ref | None
     error: str | None = None
 
 
@@ -286,7 +285,7 @@ class ReferenceManager:
         for _, refs in self.foreignRefs.refs.items():
             for ref in refs:
                 if ref.status != "local" and ref.shortname.rstrip() == self.shortname:
-                    ref._ref["export"] = False  # pylint: disable=protected-access
+                    ref.export = False
         self.cachedRefs.clear()
 
     def addLocalDfns(self, doc: t.SpecT, dfns: t.Iterable[t.ElementT]) -> None:
@@ -351,21 +350,19 @@ class ReferenceManager:
                 # convert back into a list now, for easier JSONing
                 dfnForList = sorted(dfnFor)
                 refKey, displayKey = config.adjustKey(linkText, linkType)
-                ref = wrapper.RefWrapper(
-                    refKey,
-                    displayKey,
-                    {
-                        "type": linkType,
-                        "status": "local",
-                        "spec": self.spec,
-                        "shortname": self.shortname,
-                        "level": self.specLevel,
-                        "url": "#" + elId,
-                        "export": True,
-                        "normative": True,
-                        "for_": dfnForList,
-                        "el": el,
-                    },
+                ref = Ref(
+                    text=refKey,
+                    displayText=displayKey,
+                    type=linkType,
+                    status="local",
+                    spec=self.spec,
+                    shortname=self.shortname,
+                    level=self.specLevel,
+                    url="#" + elId,
+                    export=True,
+                    normative=True,
+                    for_=dfnForList,
+                    el=el,
                 )
                 self.localRefs.refs[linkText].append(ref)
                 for for_ in dfnFor:
@@ -375,7 +372,7 @@ class ReferenceManager:
                     self.localRefs.addMethodVariants(linkText, dfnForList, ref.shortname)
         self.cachedRefs.clear()
 
-    def filterObsoletes(self, refs: list[RefWrapper]) -> list[RefWrapper]:
+    def filterObsoletes(self, refs: list[Ref]) -> list[Ref]:
         return utils.filterObsoletes(
             refs,
             replacedSpecs=self.replacedSpecs,
@@ -384,7 +381,7 @@ class ReferenceManager:
             localSpec=self.spec,
         )
 
-    def queryAllRefs(self, **kwargs: t.Any) -> list[RefWrapper]:
+    def queryAllRefs(self, **kwargs: t.Any) -> list[Ref]:
         r1, _, _ = self.localRefs.queryRefs(**kwargs)
         r2, _, _ = self.anchorBlockRefs.queryRefs(**kwargs)
         r3, _, _ = self.foreignRefs.queryRefs(**kwargs)
@@ -406,7 +403,7 @@ class ReferenceManager:
         linkForHint: str | None = None,
         error: bool = True,
         el: t.ElementT | None = None,
-    ) -> RefWrapper | str | None:
+    ) -> Ref | str | None:
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user,
         # and might return an error message as a str.
@@ -875,7 +872,7 @@ class ReferenceManager:
         return chosenVNames
 
 
-def simplifyPossibleRefs(refs: list[RefWrapper], alwaysShowFor: bool = False) -> list[SimplifiedRef]:
+def simplifyPossibleRefs(refs: list[Ref], alwaysShowFor: bool = False) -> list[SimplifiedRef]:
     # "Simplifies" the set of possible refs according to their 'for' value;
     # returns a list of text/type/spec/for objects,
     # with the for value filled in *only if necessary for disambiguation*.
@@ -927,7 +924,7 @@ def reportMultiplePossibleRefs(
     linkText: str,
     linkType: str,
     linkFor: str | list[str] | None,
-    defaultRef: RefWrapper,
+    defaultRef: Ref,
 ) -> str:
     # Sometimes a badly-written spec has indistinguishable dfns.
     # Detect this by seeing if more than one stringify to the same thing.
@@ -961,8 +958,8 @@ def reportMultiplePossibleRefs(
 
 def reportAmbiguousForlessLink(
     text: str,
-    forlessRefs: list[RefWrapper],
-    localRefs: list[RefWrapper],
+    forlessRefs: list[Ref],
+    localRefs: list[Ref],
 ) -> str:
     localRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)])
     forlessRefText = "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)])
@@ -978,7 +975,7 @@ def zeroRefsError(linkType: str) -> bool:
 
 def errorFromFailureCategory(
     failure: LinkFailure,
-    oldRefs: list[t.RefWrapper],
+    oldRefs: list[t.Ref],
     *,
     linkType: str,
     text: str,

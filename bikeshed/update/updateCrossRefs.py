@@ -9,7 +9,7 @@ import requests
 import tenacity
 from alive_progress import alive_it
 
-from .. import config, t
+from .. import config, refs, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
@@ -440,6 +440,7 @@ def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
     Keys may be duplicated.
 
     key
+    displayKey
     type
     spec
     shortname
@@ -454,7 +455,7 @@ def writeAnchorsFile(anchors: AnchorsT, path: str) -> set[str]:
     writtenPaths = set()
     groupedEntries: defaultdict[str, dict[str, list[AnchorT]]] = defaultdict(dict)
     for key, entries in anchors.items():
-        group = config.groupFromKey(key)
+        group = refs.groupFromKey(key)
         groupedEntries[group][key] = entries
     for group, group_anchors in groupedEntries.items():
         p = os.path.join(path, "anchors", f"anchors-{group}.data")
