@@ -14,40 +14,12 @@ import time
 
 from . import messages as m
 from . import metadata, t, test
-from .Spec import Spec
+from .Spec import PhaseRecord, PhaseTimer, Spec
 
 if t.TYPE_CHECKING:
     import argparse
 
 FunctionKey = tuple[str, int, str]  # (filename, line, func_name)
-
-
-@dataclasses.dataclass
-class PhaseRecord:
-    name: str
-    elapsed: float
-    group: str = ""
-
-
-class PhaseTimer:
-    def __init__(self, enabled: bool = False) -> None:
-        self.enabled = enabled
-        self.phases: list[PhaseRecord] = []
-
-    @contextlib.contextmanager
-    def phase(self, name: str, group: str = "") -> t.Generator[None, None, None]:
-        if not self.enabled:
-            yield
-            return
-        start = time.perf_counter()
-        try:
-            yield
-        finally:
-            elapsed = time.perf_counter() - start
-            self.phases.append(PhaseRecord(name=name, elapsed=elapsed, group=group))
-
-    def total_time(self) -> float:
-        return sum(p.elapsed for p in self.phases)
 
 
 @dataclasses.dataclass
@@ -202,7 +174,7 @@ def analyze_profile(
     leaf_filter: str | None = None,
 ) -> ProfileAnalysis:
     ps = pstats.Stats(pr)
-    ps_any = t.cast(t.Any, ps)
+    ps_any = t.cast("t.Any", ps)
     bikeshed_root = get_bikeshed_root()
 
     total_cpu_time = float(ps_any.total_tt)
