@@ -430,27 +430,137 @@ def main() -> None:
 
     profileParser = subparsers.add_parser(
         "profile",
-        help="Profiling Bikeshed. Needs graphviz, gprof2dot, and xdot installed.",
+        help="Profile Bikeshed performance: breakdown pipeline phases, function bottlenecks, and interactive flamegraphs.",
+    )
+    profileParser.add_argument(
+        "infile",
+        nargs="?",
+        default=None,
+        help="Path to the source file to profile. Defaults to finding a spec in the current directory.",
+    )
+    profileParser.add_argument(
+        "outfile",
+        nargs="?",
+        default=None,
+        help="Path to write the HTML output to (if saving spec output). By default profiling runs in dry-run mode.",
+    )
+    profileParser.add_argument(
+        "--html",
+        dest="htmlFile",
+        default=None,
+        metavar="PATH",
+        help="Generate a self-contained interactive HTML profile report with flamegraph and function explorer.",
+    )
+    profileParser.add_argument(
+        "--svg",
+        dest="svgFile",
+        default=None,
+        metavar="PATH",
+        help="Save a standalone interactive SVG flamegraph to the specified file.",
+    )
+    profileParser.add_argument(
+        "--json",
+        dest="jsonFile",
+        nargs="?",
+        const="-",
+        default=None,
+        metavar="PATH",
+        help="Output profile statistics as JSON. Outputs to stdout if no path is given.",
+    )
+    profileParser.add_argument(
+        "--pstats",
+        dest="pstatsFile",
+        default=None,
+        metavar="PATH",
+        help="Save raw Python pstats data to the specified file for inspection with snakeviz/tuna.",
+    )
+    profileParser.add_argument(
+        "--sort",
+        dest="sortBy",
+        choices=["cumtime", "tottime", "calls", "name"],
+        default="cumtime",
+        help="Sort key for function tables in terminal output (default: cumtime).",
+    )
+    profileParser.add_argument(
+        "-n",
+        "--limit",
+        dest="limit",
+        type=int,
+        default=20,
+        help="Maximum number of functions to display in terminal tables (default: 20).",
+    )
+    profileParser.add_argument(
+        "--all",
+        dest="showAll",
+        action="store_true",
+        default=False,
+        help="Show all functions in tables, not just internal Bikeshed code and top hotspots.",
+    )
+    profileParser.add_argument(
+        "--callers",
+        dest="callersFunc",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="FUNC",
+        help="Show callers for slowest functions (or specify a function name filter).",
+    )
+    profileParser.add_argument(
+        "--callees",
+        dest="calleesFunc",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="FUNC",
+        help="Show callees for slowest functions (or specify a function name filter).",
+    )
+    profileParser.add_argument(
+        "--save-output",
+        dest="saveOutput",
+        action="store_true",
+        default=False,
+        help="Save the generated HTML spec output to disk (by default, profiling dry-runs without modifying output).",
+    )
+    profileParser.add_argument(
+        "--test",
+        dest="profileTest",
+        action="store_true",
+        default=False,
+        help="Profile test runs instead of a spec.",
+    )
+    profileParser.add_argument(
+        "--file",
+        dest="testFiles",
+        nargs="+",
+        default=None,
+        help="When profiling tests, only run tests whose filenames match any of these strings.",
+    )
+    profileParser.add_argument(
+        "--folder",
+        dest="testFolders",
+        nargs="+",
+        default=None,
+        help="When profiling tests, only run tests in these folders.",
+    )
+    profileParser.add_argument(
+        "--command",
+        dest="command",
+        default=None,
+        help="Profile another Bikeshed command string (e.g. 'test --file 001').",
     )
     profileParser.add_argument(
         "--root",
         dest="root",
         default=None,
         metavar="ROOTFUNC",
-        help="Prune the graph to start with the specified root node.",
+        help="Prune the flamegraph/call tree to start with the specified root node.",
     )
     profileParser.add_argument(
         "--leaf",
         dest="leaf",
         default=None,
         metavar="LEAFFUNC",
-        help="Prune the graph to only show ancestors of the specified leaf node.",
-    )
-    profileParser.add_argument(
-        "--svg",
-        dest="svgFile",
-        default=None,
-        help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.",
+        help="Prune the flamegraph/call tree to only show ancestors of the specified leaf node.",
     )
 
     templateParser = subparsers.add_parser("template", help="Outputs a skeleton .bs file for you to start with.")
@@ -521,7 +631,7 @@ def main() -> None:
     elif options.subparserName == "test":
         handleTest(options, extras)
     elif options.subparserName == "profile":
-        handleProfile(options)
+        handleProfile(options, extras)
     elif options.subparserName == "template":
         handleTemplate(options)
     elif options.subparserName == "wpt":
@@ -751,17 +861,10 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
         sys.exit(0 if result else 1)
 
 
-def handleProfile(options: argparse.Namespace) -> None:
-    root = f'--root="{options.root}"' if options.root else ""
-    leaf = f'--leaf="{options.leaf}"' if options.leaf else ""
-    if options.svgFile:
-        os.system(  # noqa: S605
-            f"time python -m cProfile -o stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {options.svgFile} && rm stat.prof",
-        )
-    else:
-        os.system(  # noqa: S605
-            f"time python -m cProfile -o /tmp/stat.prof -m bikeshed -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &",
-        )
+def handleProfile(options: argparse.Namespace, extras: list[str]) -> None:
+    from . import profiling
+
+    profiling.handle_profile_cli(options, extras)
 
 
 def handleTemplate(options: argparse.Namespace) -> None:

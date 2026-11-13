@@ -47,6 +47,7 @@ from . import (
 )
 from . import line as l
 from . import messages as m
+from .profiling import PhaseTimer
 
 if t.TYPE_CHECKING:
     import widlparser
@@ -55,7 +56,7 @@ if t.TYPE_CHECKING:
 class Spec:
     def __init__(
         self,
-        inputFilename: str,
+        inputFilename: str | None = None,
         *,
         debug: bool = False,
         debugPrint: str | None = None,
@@ -63,7 +64,9 @@ class Spec:
         lineNumbers: bool = False,
         fileRequester: retrieve.DataFileRequester | None = None,
         testing: bool = False,
+        timer: PhaseTimer | None = None,
     ) -> None:
+        self.timer: PhaseTimer = timer if timer is not None else PhaseTimer(enabled=False)
         catchArgparseBug(inputFilename)
         self.valid: bool = False
         self.lineNumbers: bool = lineNumbers
@@ -216,143 +219,180 @@ class Spec:
         return self
 
     def assembleDocument(self) -> Spec:
-        self.initMetadata(self.inputContent)
-        self.recordDependencies(self.inputSource)
+        with self.timer.phase("assembleDocument: initMetadata & recordDependencies"):
+            self.initMetadata(self.inputContent)
+            self.recordDependencies(self.inputSource)
 
-        self.lines = self.earlyParse(self.inputContent)
+        with self.timer.phase("assembleDocument: earlyParse"):
+            self.lines = self.earlyParse(self.inputContent)
 
         if "mixed-indents" in self.md.complainAbout:
             if self.md.indentInfo and self.md.indentInfo.char:
-                checkForMixedIndents(self.lines, self.md.indentInfo)
+                with self.timer.phase("assembleDocument: mixedIndents"):
+                    checkForMixedIndents(self.lines, self.md.indentInfo)
 
-        extensions.load(self)
+        with self.timer.phase("assembleDocument: loadExtensions"):
+            extensions.load(self)
 
         # Initialize things
-        self.refs.initializeRefs(doc=self, datablocks=datablocks)
-        self.refs.initializeBiblio(doc=self)
+        with self.timer.phase("assembleDocument: initializeRefs"):
+            self.refs.initializeRefs(doc=self, datablocks=datablocks)
+        with self.timer.phase("assembleDocument: initializeBiblio"):
+            self.refs.initializeBiblio(doc=self)
 
         # Deal with markdown
         if self.debugPrint == "pre-md":
             print("".join(x.text for x in self.lines))  # noqa: T201
         if "markdown-block" in self.md.markupShorthands:
-            self.lines = markdown.parse(self.lines, markdown.MarkdownConfig.fromSpec(self))
+            with self.timer.phase("assembleDocument: markdown"):
+                self.lines = markdown.parse(self.lines, markdown.MarkdownConfig.fromSpec(self))
         if self.debugPrint == "post-md":
             print("".join(x.text for x in self.lines))  # noqa: T201
 
         # Convert to a single string of html now, for convenience.
         self.html = "".join(x.text for x in self.lines)
-        boilerplate.addHeaderFooter(self)
+        with self.timer.phase("assembleDocument: addHeaderFooter"):
+            boilerplate.addHeaderFooter(self)
 
         # Build the document
-        self.document, self.head, self.body = h.parseDocument(self.html)
+        with self.timer.phase("assembleDocument: parseDocument"):
+            self.document, self.head, self.body = h.parseDocument(self.html)
         if self.debugPrint == "boilerplate":
             print(h.printNodeTree(self.document))  # noqa: T201
-        datablocks.transformDataBlocks(self, self.document)
+        with self.timer.phase("assembleDocument: transformDataBlocks"):
+            datablocks.transformDataBlocks(self, self.document)
         if self.debugPrint == "datablocks":
             print(h.printNodeTree(self.document))  # noqa: T201
-        self.refs.setSpecData(self)
-        boilerplate.correctFrontMatter(self)
-        includes.processInclusions(self)
-        metadata.parseDoc(self)
+        with self.timer.phase("assembleDocument: setSpecData"):
+            self.refs.setSpecData(self)
+        with self.timer.phase("assembleDocument: correctFrontMatter"):
+            boilerplate.correctFrontMatter(self)
+        with self.timer.phase("assembleDocument: processInclusions"):
+            includes.processInclusions(self)
+        with self.timer.phase("assembleDocument: metadata.parseDoc"):
+            metadata.parseDoc(self)
         return self
 
     def processDocument(self) -> Spec:
         # Fill in and clean up a bunch of data
-        conditional.processConditionals(self)
-        self.fillContainers: t.FillContainersT = boilerplate.locateFillContainers(self)
-        lint.exampleIDs(self)
-        wpt.processWptElements(self)
+        with self.timer.phase("processDocument: boilerplate setup"):
+            conditional.processConditionals(self)
+            self.fillContainers: t.FillContainersT = boilerplate.locateFillContainers(self)
+            lint.exampleIDs(self)
+            wpt.processWptElements(self)
 
-        boilerplate.addBikeshedVersion(self)
-        boilerplate.addCanonicalURL(self)
-        boilerplate.addFavicon(self)
-        boilerplate.addSpecVersion(self)
-        boilerplate.addStatusSection(self)
-        boilerplate.addCGHeader(self)
-        if boilerplate.isCGRedesign(self):
-            self.fillContainers = boilerplate.locateFillContainers(self)
-            boilerplate.addCGStatusBlocks(self)
-            boilerplate.addCGFoot(self)
-        boilerplate.addLogo(self)
-        boilerplate.addCopyright(self)
-        boilerplate.addSpecMetadataSection(self)
-        boilerplate.addAbstract(self)
-        boilerplate.addExpiryNotice(self)
-        boilerplate.addObsoletionNotice(self)
-        boilerplate.addAtRisk(self)
-        admonitions.addNoteHeaders(self)
-        boilerplate.removeUnwantedBoilerplate(self)
-        shorthands.run(self)
-        algorithms.addImplicitAlgorithms(self)
-        datablocks.fixManualDefTables(self)
-        headings.processHeadings(self)
-        algorithms.checkVarHygiene(self)
-        admonitions.processIssuesAndExamples(self)
-        idl.markupIDL(self)
-        cddl.markupCDDL(self)
-        admonitions.inlineRemoteIssues(self)
-        cleanup.addImageSize(self)
+            boilerplate.addBikeshedVersion(self)
+            boilerplate.addCanonicalURL(self)
+            boilerplate.addFavicon(self)
+            boilerplate.addSpecVersion(self)
+            boilerplate.addStatusSection(self)
+            boilerplate.addCGHeader(self)
+            if boilerplate.isCGRedesign(self):
+                self.fillContainers = boilerplate.locateFillContainers(self)
+                boilerplate.addCGStatusBlocks(self)
+                boilerplate.addCGFoot(self)
+            boilerplate.addLogo(self)
+            boilerplate.addCopyright(self)
+            boilerplate.addSpecMetadataSection(self)
+            boilerplate.addAbstract(self)
+            boilerplate.addExpiryNotice(self)
+            boilerplate.addObsoletionNotice(self)
+            boilerplate.addAtRisk(self)
+            admonitions.addNoteHeaders(self)
+            boilerplate.removeUnwantedBoilerplate(self)
+
+        with self.timer.phase("processDocument: shorthands"):
+            shorthands.run(self)
+        with self.timer.phase("processDocument: algorithms"):
+            algorithms.addImplicitAlgorithms(self)
+            datablocks.fixManualDefTables(self)
+        with self.timer.phase("processDocument: headings (pass 1)"):
+            headings.processHeadings(self)
+            algorithms.checkVarHygiene(self)
+        with self.timer.phase("processDocument: admonitions"):
+            admonitions.processIssuesAndExamples(self)
+        with self.timer.phase("processDocument: IDL & CDDL markup"):
+            idl.markupIDL(self)
+            cddl.markupCDDL(self)
+            admonitions.inlineRemoteIssues(self)
+            cleanup.addImageSize(self)
 
         # Handle all the links
-        biblio.processBiblioLinks(self)
-        dfns.processDfns(self)
-        idl.processIDL(self)
-        cddl.processCDDL(self)
-        dfns.annotateDfns(self)
-        datablocks.formatArgumentdefTables(self)
-        datablocks.formatElementdefTables(self)
-        links.processAutolinks(self)
-        links.fixInterDocumentReferences(self)
-        biblio.dedupBiblioReferences(self)
-        boilerplate.addIndexSection(self)
-        boilerplate.addExplicitIndexes(self)
-        boilerplate.addStyles(self)
-        boilerplate.addReferencesSection(self)
-        boilerplate.addPropertyIndex(self)
-        boilerplate.addIDLSection(self)
-        boilerplate.addCDDLSection(self)
-        boilerplate.addIssuesSection(self)
-        boilerplate.addCustomBoilerplate(self)
-        headings.processHeadings(self, "all")  # again
-        boilerplate.removeUnwantedBoilerplate(self)
-        boilerplate.addTOCSection(self)
-        links.addSelfLinks(self)
-        links.processAutolinks(self)
-        boilerplate.removeUnwantedBoilerplate(self)
+        with self.timer.phase("processDocument: biblio links"):
+            biblio.processBiblioLinks(self)
+        with self.timer.phase("processDocument: dfns"):
+            dfns.processDfns(self)
+            idl.processIDL(self)
+            cddl.processCDDL(self)
+            dfns.annotateDfns(self)
+        with self.timer.phase("processDocument: def tables"):
+            datablocks.formatArgumentdefTables(self)
+            datablocks.formatElementdefTables(self)
+        with self.timer.phase("processDocument: links.processAutolinks (pass 1)"):
+            links.processAutolinks(self)
+        with self.timer.phase("processDocument: references & indexes"):
+            links.fixInterDocumentReferences(self)
+            biblio.dedupBiblioReferences(self)
+            boilerplate.addIndexSection(self)
+            boilerplate.addExplicitIndexes(self)
+            boilerplate.addStyles(self)
+            boilerplate.addReferencesSection(self)
+            boilerplate.addPropertyIndex(self)
+            boilerplate.addIDLSection(self)
+            boilerplate.addCDDLSection(self)
+            boilerplate.addIssuesSection(self)
+            boilerplate.addCustomBoilerplate(self)
+        with self.timer.phase("processDocument: headings (pass 2)"):
+            headings.processHeadings(self, "all")  # again
+            boilerplate.removeUnwantedBoilerplate(self)
+            boilerplate.addTOCSection(self)
+            links.addSelfLinks(self)
+        with self.timer.phase("processDocument: links.processAutolinks (pass 2)"):
+            links.processAutolinks(self)
+            boilerplate.removeUnwantedBoilerplate(self)
         # Add MDN panels after all IDs/anchors have been added
-        mdn.addMdnPanels(self)
-        caniuse.addCanIUsePanels(self)
-        highlight.addSyntaxHighlighting(self)
-        boilerplate.addBikeshedBoilerplate(self)
-        boilerplate.addDarkmodeIndicators(self)
-        fingerprinting.addTrackingVector(self)
-        links.fixIntraDocumentReferences(self)
-        links.fixInterDocumentReferences(self)
-        biblio.verifyUsageOfAllLocalBiblios(self)
-        links.removeMultipleLinks(self)
-        cleanup.forceCrossorigin(self)
-        addDomintroStyles(self)
-        lint.brokenLinks(self)
-        lint.accidental2119(self)
-        lint.missingExposed(self)
-        lint.requiredIDs(self)
-        lint.unusedInternalDfns(self)
+        with self.timer.phase("processDocument: MDN & CanIUse panels"):
+            mdn.addMdnPanels(self)
+            caniuse.addCanIUsePanels(self)
+        with self.timer.phase("processDocument: syntax highlighting"):
+            highlight.addSyntaxHighlighting(self)
+        with self.timer.phase("processDocument: boilerplate & references"):
+            boilerplate.addBikeshedBoilerplate(self)
+            boilerplate.addDarkmodeIndicators(self)
+            fingerprinting.addTrackingVector(self)
+            links.fixIntraDocumentReferences(self)
+            links.fixInterDocumentReferences(self)
+            biblio.verifyUsageOfAllLocalBiblios(self)
+            links.removeMultipleLinks(self)
+            cleanup.forceCrossorigin(self)
+            addDomintroStyles(self)
+        with self.timer.phase("processDocument: lint"):
+            lint.brokenLinks(self)
+            lint.accidental2119(self)
+            lint.missingExposed(self)
+            lint.requiredIDs(self)
+            lint.unusedInternalDfns(self)
 
         if self.debugPrint == "final":
             print(h.printNodeTree(self.document))  # noqa: T201
 
         # Any final HTML cleanups
-        cleanup.cleanupHTML(self)
-        boilerplate.addCGAssets(self)
-        if self.md.prepTR:
-            prepTR(self)
+        with self.timer.phase("processDocument: cleanup HTML"):
+            cleanup.cleanupHTML(self)
+            boilerplate.addCGAssets(self)
+            if self.md.prepTR:
+                prepTR(self)
 
         return self
 
     def serialize(self) -> str | None:
-        try:
-            rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
-        except Exception as e:
+        with self.timer.phase("serialize (HTML)"):
+            try:
+                rendered = h.Serializer(self.md.opaqueElements, self.md.blockElements).serialize(self.document)
+            except Exception as e:
+                m.die(str(e))
+                return None
+            return rendered
             m.die(str(e))
             return None
         return rendered
@@ -380,14 +420,15 @@ class Spec:
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
         if rendered and not constants.dryRun:
-            try:
-                if outputFilename == "-":
-                    sys.stdout.write(rendered)
-                else:
-                    with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
-                        f.write(rendered)
-            except Exception as e:
-                m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
+            with self.timer.phase("write output file"):
+                try:
+                    if outputFilename == "-":
+                        sys.stdout.write(rendered)
+                    else:
+                        with open(outputFilename, "w", encoding="utf-8", newline=newline) as f:
+                            f.write(rendered)
+                except Exception as e:
+                    m.die(f"Something prevented me from saving the output document to {outputFilename}:\n{e}")
 
     def printResultMessage(self) -> None:
         # If I reach this point, I've succeeded, but maybe with reservations.
