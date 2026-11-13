@@ -66,7 +66,7 @@ class Spec:
         testing: bool = False,
         timer: PhaseTimer | None = None,
     ) -> None:
-        self.timer: PhaseTimer = timer if timer is not None else PhaseTimer(enabled=False)
+        self.timer: PhaseTimer = timer or PhaseTimer(enabled=False)
         catchArgparseBug(inputFilename)
         self.valid: bool = False
         self.lineNumbers: bool = lineNumbers
@@ -393,9 +393,6 @@ class Spec:
                 m.die(str(e))
                 return None
             return rendered
-            m.die(str(e))
-            return None
-        return rendered
 
     def fixMissingOutputFilename(self, outputFilename: str | None) -> str:
         if outputFilename is None:

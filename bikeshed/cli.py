@@ -864,7 +864,7 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
 def handleProfile(options: argparse.Namespace, extras: list[str]) -> None:
     from . import profiling
 
-    profiling.handle_profile_cli(options, extras)
+    profiling.handle_profile_cli(options, extras, cliMain=main)
 
 
 def handleTemplate(options: argparse.Namespace) -> None:

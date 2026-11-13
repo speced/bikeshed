@@ -1,25 +1,23 @@
 from __future__ import annotations
 
+# This file was Gemini-generated.
 import contextlib
 import cProfile
 import dataclasses
 import html
-import io
 import json
 import os
 import pstats
 import re
 import sys
 import time
-from typing import Any
 
-from . import constants, t
 from . import messages as m
+from . import metadata, t, test
+from .Spec import Spec
 
 if t.TYPE_CHECKING:
     import argparse
-
-    from .Spec import Spec
 
 FunctionKey = tuple[str, int, str]  # (filename, line, func_name)
 
@@ -204,7 +202,7 @@ def analyze_profile(
     leaf_filter: str | None = None,
 ) -> ProfileAnalysis:
     ps = pstats.Stats(pr)
-    ps_any = t.cast(Any, ps)
+    ps_any = t.cast(t.Any, ps)
     bikeshed_root = get_bikeshed_root()
 
     total_cpu_time = float(ps_any.total_tt)
@@ -449,7 +447,10 @@ def print_terminal_report(
     # 1. Pipeline Phases
     if analysis.phases:
         m.say("")
-        m.say(f"── Pipeline Phases ({len(analysis.phases)} recorded) " + (sub_divider * (54 - len(str(len(analysis.phases))))))
+        m.say(
+            f"── Pipeline Phases ({len(analysis.phases)} recorded) "
+            + (sub_divider * (54 - len(str(len(analysis.phases))))),
+        )
         header = f"  {'Phase':<42} {'Duration':>10} {'% Total':>9}  {'Proportion':<12}"
         m.say(header)
         m.say("  " + (sub_divider * 76))
@@ -462,10 +463,10 @@ def print_terminal_report(
 
         for p in visible_phases:
             pct = (p.elapsed / total_time) * 100.0
-            bar = format_bar(p.elapsed / total_time, width=12, ascii_only=ascii_only)
+            p_bar = format_bar(p.elapsed / total_time, width=12, ascii_only=ascii_only)
             dur_str = format_duration(p.elapsed)
             name_str = p.name if len(p.name) <= 42 else (p.name[:39] + "...")
-            m.say(f"  {name_str:<42} {dur_str:>10} {pct:>8.1f}%  {bar}")
+            m.say(f"  {name_str:<42} {dur_str:>10} {pct:>8.1f}%  {p_bar}")
 
     # 2. Top Functions
     fn_list = analysis.top_overall_functions if show_all else analysis.bikeshed_functions
@@ -481,7 +482,10 @@ def print_terminal_report(
         sorted_fns = sorted(fn_list, key=lambda s: s.cumtime, reverse=True)
 
     m.say("")
-    m.say(f"── Top {title_kind} Bottlenecks (Sorted by {sort_by}) " + (sub_divider * (45 - len(title_kind) - len(sort_by))))
+    m.say(
+        f"── Top {title_kind} Bottlenecks (Sorted by {sort_by}) "
+        + (sub_divider * (45 - len(title_kind) - len(sort_by))),
+    )
     header = f"  {'Function':<28} {'Location':<24} {'Calls':>7} {'Self':>9} {'%Tot':>6} {'Cumul':>9} {'%Cum':>6} {'PerCall':>8}"
     m.say(header)
     m.say("  " + (sub_divider * 98))
@@ -512,7 +516,9 @@ def print_terminal_report(
                 floc = s.location if len(s.location) <= 20 else ("..." + s.location[-17:])
                 calls_str = f"{s.ncalls:,}" if s.ncalls < 1000000 else f"{s.ncalls/1000000:.1f}M"
                 cum_str = format_duration(s.cumtime)
-                m.say(f"  {fname:<28} {s.category:<12} {floc:<20} {calls_str:>7} {cum_str:>9} {s.cumtime_percent:>5.1f}%")
+                m.say(
+                    f"  {fname:<28} {s.category:<12} {floc:<20} {calls_str:>7} {cum_str:>9} {s.cumtime_percent:>5.1f}%",
+                )
 
     # 4. Caller details for top bottlenecks or requested function
     targets_for_callers: list[FunctionStat] = []
@@ -521,7 +527,9 @@ def print_terminal_report(
             targets_for_callers = sorted_fns[:5]
         else:
             targets_for_callers = [
-                s for s in analysis.functions.values() if callers_func.lower() in s.name.lower() or callers_func in s.location
+                s
+                for s in analysis.functions.values()
+                if callers_func.lower() in s.name.lower() or callers_func in s.location
             ][:5]
     else:
         # Default: show callers for the top 3 slowest functions with callers
@@ -536,7 +544,9 @@ def print_terminal_report(
             for caller in stat.callers[:4]:
                 caller_cum = format_duration(caller.cumtime)
                 pct = caller.percent_of_callee
-                m.say(f"      ↳ {caller.ncalls:,} calls ({caller_cum}, {pct:4.1f}%) from {caller.location} ({caller.name})")
+                m.say(
+                    f"      ↳ {caller.ncalls:,} calls ({caller_cum}, {pct:4.1f}%) from {caller.location} ({caller.name})",
+                )
 
     # 5. Callees details if requested
     if callees_func is not None:
@@ -544,7 +554,9 @@ def print_terminal_report(
             sorted_fns[:3]
             if callees_func == ""
             else [
-                s for s in analysis.functions.values() if callees_func.lower() in s.name.lower() or callees_func in s.location
+                s
+                for s in analysis.functions.values()
+                if callees_func.lower() in s.name.lower() or callees_func in s.location
             ][:5]
         )
         if targets_for_callees:
@@ -556,7 +568,9 @@ def print_terminal_report(
                 for callee in stat.callees[:6]:
                     callee_cum = format_duration(callee.cumtime)
                     pct = callee.percent_of_caller
-                    m.say(f"      ⮡ {callee.ncalls:,} calls ({callee_cum}, {pct:4.1f}%) to {callee.location} ({callee.name})")
+                    m.say(
+                        f"      ⮡ {callee.ncalls:,} calls ({callee_cum}, {pct:4.1f}%) to {callee.location} ({callee.name})",
+                    )
 
     # Footer tips
     m.say("")
@@ -844,8 +858,6 @@ def generate_svg_flamegraph(
 
 def generate_html_report(
     analysis: ProfileAnalysis,
-    root_filter: str | None = None,
-    leaf_filter: str | None = None,
 ) -> str:
     """Generates an all-in-one standalone HTML profile report."""
     svg_flamegraph = generate_svg_flamegraph(analysis)
@@ -1265,8 +1277,6 @@ def profile_spec(
     options: argparse.Namespace,
     extras: list[str],
 ) -> ProfileAnalysis:
-    from . import metadata
-    from .Spec import Spec
 
     infile = getattr(options, "infile", None)
     timer = PhaseTimer(enabled=True)
@@ -1327,7 +1337,6 @@ def profile_spec(
 
 
 def profile_test(options: argparse.Namespace) -> ProfileAnalysis:
-    from . import test
 
     filters = test.TestFilter.fromOptions(options)
     timer = PhaseTimer(enabled=True)
@@ -1352,9 +1361,8 @@ def profile_test(options: argparse.Namespace) -> ProfileAnalysis:
     return analysis
 
 
-def profile_command(command_str: str, options: argparse.Namespace) -> ProfileAnalysis:
+def profile_command(command_str: str, options: argparse.Namespace, cliMain: t.Callable[[], None]) -> ProfileAnalysis:
     """Runs an arbitrary bikeshed command string under the profiler."""
-    from .cli import main
 
     orig_argv = sys.argv[:]
     timer = PhaseTimer(enabled=True)
@@ -1364,7 +1372,7 @@ def profile_command(command_str: str, options: argparse.Namespace) -> ProfileAna
     try:
         sys.argv = ["bikeshed", *command_str.split()]
         pr.enable()
-        main()
+        cliMain()
     except SystemExit:
         pass
     finally:
@@ -1384,11 +1392,15 @@ def profile_command(command_str: str, options: argparse.Namespace) -> ProfileAna
     return analysis
 
 
-def handle_profile_cli(options: argparse.Namespace, extras: list[str]) -> None:
+def handle_profile_cli(options: argparse.Namespace, extras: list[str], cliMain: t.Callable[[], None]) -> None:
     # Check if profiling tests or custom command
     if getattr(options, "command", None):
-        analysis = profile_command(options.command, options)
-    elif getattr(options, "profileTest", False) or getattr(options, "testFiles", None) or getattr(options, "testFolders", None):
+        analysis = profile_command(options.command, options, cliMain)
+    elif (
+        getattr(options, "profileTest", False)
+        or getattr(options, "testFiles", None)
+        or getattr(options, "testFolders", None)
+    ):
         # Profiling tests
         # Adapt test options
         options.manualOnly = None
@@ -1419,11 +1431,7 @@ def handle_profile_cli(options: argparse.Namespace, extras: list[str]) -> None:
     # Generate and save HTML report if requested
     html_file = getattr(options, "htmlFile", None)
     if html_file:
-        html_content = generate_html_report(
-            analysis,
-            root_filter=getattr(options, "root", None),
-            leaf_filter=getattr(options, "leaf", None),
-        )
+        html_content = generate_html_report(analysis)
         with open(html_file, "w", encoding="utf-8") as f:
             f.write(html_content)
         m.say(f"Saved interactive HTML profile report to {html_file}")
@@ -1435,7 +1443,7 @@ def handle_profile_cli(options: argparse.Namespace, extras: list[str]) -> None:
         json_str = json.dumps(json_obj, indent=2)
         if json_file == "-":
             with contextlib.suppress(BrokenPipeError):
-                print(json_str)
+                print(json_str)  # noqa: T201
             return
         with open(json_file, "w", encoding="utf-8") as f:
             f.write(json_str)
