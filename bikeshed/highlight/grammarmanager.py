@@ -10,6 +10,7 @@ from .. import messages as m
 LANGUAGE_ALIASES: dict[str, str] = {
     "docker": "dockerfile",
     "gql": "graphql",
+    "idl": "webidl",
     "js": "javascript",
     "jsx": "javascript",
     "md": "markdown",
