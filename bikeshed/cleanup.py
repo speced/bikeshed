@@ -192,7 +192,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
             h.removeAttr(
                 el,
                 "path",
-                "highlight",
                 "line-start",
                 "data-code-show",
                 "line-highlight",
@@ -202,7 +201,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
             el,
             "bs-autolink-syntax",
             "data-alternate-id",
-            "highlight",
             "nohighlight",
             "line-numbers",
             "data-opaque",

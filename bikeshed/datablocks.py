@@ -7,6 +7,7 @@ from collections import OrderedDict, defaultdict
 
 from . import biblio, config, constants, h, idl, printjson, railroadparser, refs, t
 from . import messages as m
+from .highlight import grammarmanager
 
 if t.TYPE_CHECKING:
     import widlparser
@@ -35,6 +36,7 @@ def transformDataBlocks(doc: t.SpecT, tree: t.SpecT | t.ElementT) -> None:
         "link-defaults": transformLinkDefaults,
         "ignored-specs": transformIgnoredSpecs,
         "info": transformInfo,
+        "highlight-grammar": transformHighlightGrammar,
         "include": transformInclude,
         "include-code": transformIncludeCode,
         "include-raw": transformIncludeRaw,
@@ -755,6 +757,35 @@ def processInfo(infos: InfoTreeT, doc: t.SpecT, lineNum: int | None = None) -> N
         infoCollections[infoType].append(info)
     for infoType, infoItem in infoCollections.items():
         knownInfoTypes[infoType](infoItem, doc, lineNum=0)
+
+
+def transformHighlightGrammar(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
+    data = data.strip()
+    try:
+        grammar = grammarmanager.parseGrammarText(data)
+    except Exception as e:
+        m.die(f"Error parsing highlight-grammar datablock: {e}", el=el)
+        return None
+
+    lang = None
+    if el is not None:
+        lang = el.get("for")
+    if not lang:
+        if "name" in grammar and isinstance(grammar["name"], str):
+            lang = grammar["name"]
+        elif "scopeName" in grammar and isinstance(grammar["scopeName"], str):
+            parts = grammar["scopeName"].split(".")
+            lang = parts[-1] if len(parts) > 1 else parts[0]
+
+    if not lang:
+        m.die(
+            "highlight-grammar datablocks must specify a language name via 'for' on the element, or 'scopeName' in the grammar.",
+            el=el,
+        )
+        return None
+
+    doc.highlightGrammars.addGrammar(lang, grammar)
+    return None
 
 
 def transformInclude(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:

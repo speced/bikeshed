@@ -92,8 +92,18 @@ class JCManager:
     def addDomintro(self) -> None:
         self._addCSS("domintro")
 
-    def addSyntaxHighlighting(self) -> None:
-        self._addCSS("syntax-highlighting", "highlight")
+    def addSyntaxHighlighting(self, theme: str = "monokai", grammars: dict[str, t.Any] | None = None) -> Script:
+        script = self._addJS("microlighter", "highlight")
+        if not script.styles and theme != "none":
+            script.styles = [Style(f"syntax-theme-{theme}", Path(config.scriptPath(f"highlight/themes/{theme}.css")))]
+        if not script.data:
+            script.data = ("highlightGrammars", {})
+        if grammars:
+            script.data[1].update(grammars)
+        return script
+
+    def addLegacySyntaxHighlighting(self) -> None:
+        self._addCSS("legacy-syntax-highlighting", "highlight")
 
     def addLineNumbers(self) -> None:
         self._addCSS("line-numbers", "highlight")

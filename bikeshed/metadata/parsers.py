@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 
 from isodate import parse_duration
 
-from .. import config, constants, h, repository, t
+from .. import config, constants, h, highlight, repository, t
 from .. import messages as m
 
 if t.TYPE_CHECKING:
@@ -647,3 +647,25 @@ def parseLinkCheckerTimeout(key: str, val: str, lineNum: str | int | None) -> Li
 
 def parseCgMaturity(key: str, val: str, lineNum: str | int | None) -> str | None:
     return parseFixedList(key, val, ["draft", "transferred", "unmaintained"], lineNum)
+
+
+def parseHighlightGrammar(key: str, val: str, lineNum: str | int | None) -> dict[str, str]:
+    vals = val.strip().split(maxsplit=1)
+    if len(vals) != 2:
+        m.die(
+            f"Highlight Grammar metadata must be of the form '<grammar-name> <file-path>', got '{val}'.",
+            lineNum=lineNum,
+        )
+        return {}
+    return {vals[0]: vals[1]}
+
+
+def parseHighlightTheme(key: str, val: str, lineNum: str | int | None) -> str:
+    val = val.strip().lower()
+    if val not in highlight.grammarmanager.SUPPORTED_THEMES:
+        m.die(
+            f"Unknown Highlight Theme '{val}'. Supported themes are: {', '.join(sorted(highlight.grammarmanager.SUPPORTED_THEMES))}.",
+            lineNum=lineNum,
+        )
+        return "monokai"
+    return val

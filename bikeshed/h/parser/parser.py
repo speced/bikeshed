@@ -795,6 +795,7 @@ def isDatablockClass(text: str) -> bool:
         "link-defaults",
         "ignored-specs",
         "info",
+        "highlight-grammar",
         "include",
         "include-code",
         "include-raw",

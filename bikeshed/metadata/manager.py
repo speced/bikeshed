@@ -80,6 +80,8 @@ class MetadataManager:
         self.favicon: str | None = None
         self.forceCrossorigin: bool = False
         self.h1: str | None = None
+        self.highlightGrammars: dict[str, str] = {}
+        self.highlightTheme: str = "monokai"
         self.ignoreCanIUseUrlFailure: list[str] = []
         self.ignoreMDNFailure: list[str] = []
         self.ignoredTerms: list[str] = []
@@ -95,6 +97,7 @@ class MetadataManager:
         self.issueClass: str = "issue"
         self.issues: list[tuple[str, str]] = []
         self.issueTrackerTemplate: str | None = None
+        self.legacyHighlights: list[str] = ["webidl"]
         self.lineNumbers: bool = False
         self.linkCheckerTimeout: parsers.LinkCheckerTimeout = parsers.LinkCheckerTimeout()
         self.linkDefaults: t.LinkDefaultsT = defaultdict(list)

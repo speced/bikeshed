@@ -77,6 +77,14 @@ KNOWN_KEYS = {
     "Former Editor": Metadata("Former Editor", "previousEditors", joins.joinList, parsers.parseEditor),
     "Group": Metadata("Group", "rawGroup", joins.joinValue, parsers.parseLiteral),
     "H1": Metadata("H1", "h1", joins.joinValue, parsers.parseLiteral),
+    "Highlight Grammar": Metadata(
+        "Highlight Grammar",
+        "highlightGrammars",
+        joins.joinDict,
+        parsers.parseHighlightGrammar,
+    ),
+    "Highlight Theme": Metadata("Highlight Theme", "highlightTheme", joins.joinValue, parsers.parseHighlightTheme),
+    "Legacy Highlights": Metadata("Legacy Highlights", "legacyHighlights", joins.joinList, parsers.parseCommaSeparated),
     "Ignore Can I Use Url Failure": Metadata(
         "Ignore Can I Use Url Failure",
         "ignoreCanIUseUrlFailure",

@@ -151,6 +151,8 @@ class Spec:
         self.languages: dict[str, language.Language] = fetchLanguages(self.dataFile)
         self.doctypes: doctypes.DoctypeManager = fetchDoctypes(self.dataFile)
 
+        self.highlightGrammars: highlight.HighlightGrammarManager = highlight.HighlightGrammarManager(self)
+
         self.extraJC = stylescript.JCManager()
         self.extraJC.addColors()
         self.extraJC.addMdLists()
