@@ -19,7 +19,11 @@ from .Spec import PhaseRecord, PhaseTimer, Spec
 if t.TYPE_CHECKING:
     import argparse
 
-FunctionKey = tuple[str, int, str]  # (filename, line, func_name)
+
+class FunctionKey(t.NamedTuple):
+    filename: str
+    line: int
+    func_name: str
 
 
 @dataclasses.dataclass
@@ -187,19 +191,19 @@ def analyze_profile(
 
     # First pass: categorize and build initial FunctionStat objects
     fn_stats: dict[FunctionKey, FunctionStat] = {}
-    for key, (cc, nc, tt, ct, _) in raw_stats.items():
-        fname, line, func_name = key
-        category, loc = categorize_function(fname, bikeshed_root)
-        display_loc = f"{loc}:{line}" if line > 0 else loc
+    for raw_key, (cc, nc, tt, ct, _) in raw_stats.items():
+        key = FunctionKey(*raw_key)
+        category, loc = categorize_function(key.filename, bikeshed_root)
+        display_loc = f"{loc}:{key.line}" if key.line > 0 else loc
         tot_pct = (tt / effective_total_time) * 100.0
         cum_pct = (ct / effective_total_time) * 100.0
         percall_tot = tt / max(1, nc)
         percall_cum = ct / max(1, nc)
         fn_stats[key] = FunctionStat(
             key=key,
-            name=func_name,
-            filename=fname,
-            line=line,
+            name=key.func_name,
+            filename=key.filename,
+            line=key.line,
             location=display_loc,
             category=category,
             ncalls=cc,
@@ -213,9 +217,11 @@ def analyze_profile(
         )
 
     # Second pass: compute callers and callees
-    for callee_key, (_, _, _, callee_ct, callers_dict) in raw_stats.items():
+    for raw_callee_key, (_, _, _, callee_ct, callers_dict) in raw_stats.items():
+        callee_key = FunctionKey(*raw_callee_key)
         callee_stat = fn_stats[callee_key]
-        for caller_key, caller_info in callers_dict.items():
+        for raw_caller_key, caller_info in callers_dict.items():
+            caller_key = FunctionKey(*raw_caller_key)
             if caller_key not in fn_stats:
                 continue
             caller_stat = fn_stats[caller_key]
