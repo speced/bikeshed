@@ -135,29 +135,30 @@ def splitForValues(forValues: str | None) -> list[str] | None:
 
 def groupFromKey(key: str, length: int = 2) -> str:
     """Generates a filename-safe "group" from a key, of a specified length."""
-    if key in _groupFromKeyCache:
-        return _groupFromKeyCache[key]
+    if key in GROUP_FROM_KEY_CACHE:
+        return GROUP_FROM_KEY_CACHE[key]
     safeChars = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
     group = ""
     for char in key.lower():
         if len(group) == length:
-            _groupFromKeyCache[key] = group
+            GROUP_FROM_KEY_CACHE[key] = group
             return group
         if char in safeChars:
             group += char
     group = group.ljust(length, "_")
-    _groupFromKeyCache[key] = group
+    GROUP_FROM_KEY_CACHE[key] = group
     return group
 
 
-_groupFromKeyCache: dict[str, str]
-_groupFromKeyCache = {}
+GROUP_FROM_KEY_CACHE: dict[str, str]
+GROUP_FROM_KEY_CACHE = {}
+
+
+SCRIPT_PATH_BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 def scriptPath(*pathSegs: str) -> str:
-    startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    path = os.path.join(startPath, *pathSegs)
-    return path
+    return os.path.join(SCRIPT_PATH_BASE, *pathSegs)
 
 
 def docPath(doc: t.SpecT, *pathSegs: str) -> str | None:
