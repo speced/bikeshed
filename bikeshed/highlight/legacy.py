@@ -5,7 +5,6 @@ import dataclasses
 import re
 
 import pygments
-import widlparser
 from pygments.lexers import get_lexer_by_name
 
 from .. import h, t
@@ -21,11 +20,7 @@ class ColoredText:
 
 def highlightEl(doc: t.SpecT, el: t.ElementT, lang: str) -> None:
     text = h.textContent(el)
-    coloredText: t.Deque[ColoredText] | None
-    if lang == "webidl":
-        coloredText = highlightWithWebIDL(text, el=el)
-    else:
-        coloredText = highlightWithPygments(text, lang, el=el)
+    coloredText = highlightWithPygments(text, lang, el=el)
     if coloredText is not None:
         coloredText = mergeColors(coloredText)
         readdWhitespacePrefix(text, coloredText)
@@ -71,108 +66,6 @@ def readdWhitespacePrefix(rawText: str, coloredText: t.Deque[ColoredText]) -> t.
     prefix = ColoredText(textMatch[0], None)
     coloredText.appendleft(prefix)
     return coloredText
-
-
-def highlightWithWebIDL(text: str, el: t.ElementT) -> t.Deque[ColoredText] | None:
-    """
-    Trick the widlparser emitter,
-    which wants to output HTML via wrapping with start/end tags,
-    into instead outputting a stack-based text format.
-    A \1 indicates a new stack push;
-    the text between the \1 and the \2 is the attr to be pushed.
-    A \3 indicates a stack pop.
-    All other text is colored with the attr currently on top of the stack.
-    """
-
-    class SilentUI:
-        def warn(self, msg: str) -> None:
-            pass
-
-        def note(self, msg: str) -> None:
-            pass
-
-    class HighlightMarker:
-        # Just applies highlighting classes to IDL stuff.
-
-        def markup_type_name(
-            self,
-            text: str,  # pylint: disable=unused-argument
-            construct: widlparser.constructs.Construct,  # pylint: disable=unused-argument
-        ) -> tuple[str | None, str | None]:
-            return ("\1n\2", "\3")
-
-        def markup_name(
-            self,
-            text: str,  # pylint: disable=unused-argument
-            construct: widlparser.constructs.Construct,  # pylint: disable=unused-argument
-        ) -> tuple[str | None, str | None]:
-            return ("\1g\2", "\3")
-
-        def markup_keyword(
-            self,
-            text: str,  # pylint: disable=unused-argument
-            construct: widlparser.constructs.Construct,  # pylint: disable=unused-argument
-        ) -> tuple[str | None, str | None]:
-            return ("\1b\2", "\3")
-
-        def markup_enum_value(
-            self,
-            text: str,  # pylint: disable=unused-argument
-            construct: widlparser.constructs.Construct,  # pylint: disable=unused-argument
-        ) -> tuple[str | None, str | None]:
-            return ("\1s\2", "\3")
-
-    if "\1" in text or "\2" in text or "\3" in text:
-        m.die(
-            "WebIDL text contains some U+0001-0003 characters, which are used by the highlighter. This block can't be highlighted. :(",
-            el=el,
-        )
-        return None
-
-    widl = widlparser.parser.Parser(text, SilentUI())
-    return coloredTextFromWidlStack(str(widl.markup(t.cast(widlparser.protocols.Marker, HighlightMarker()))))
-
-
-def coloredTextFromWidlStack(widlText: str) -> t.Deque[ColoredText]:
-    coloredTexts: t.Deque[ColoredText] = collections.deque()
-    colors: list[str] = []
-    currentText = ""
-    mode = "text"
-    for char in widlText:
-        if mode == "text":
-            if char == "\1":
-                if colors:
-                    coloredTexts.append(ColoredText(currentText, colors[-1]))
-                else:
-                    coloredTexts.append(ColoredText(currentText, None))
-                currentText = ""
-                mode = "color"
-                continue
-            if char == "\2":
-                assert False, r"Encountered a \2 while in text mode"
-            if char == "\3":
-                assert colors, r"Encountered a \3 without any colors on stack."
-                coloredTexts.append(ColoredText(currentText, colors.pop()))
-                currentText = ""
-                continue
-
-            currentText += char
-        elif mode == "color":
-            if char == "\1":
-                assert False, r"Encountered a \1 while in color mode."
-            if char == "\2":
-                colors.append(currentText)
-                currentText = ""
-                mode = "text"
-                continue
-            if char == "\3":
-                assert False, r"Encountered a \3 while in color mode."
-            currentText += char
-            continue
-    assert len(colors) == 0, r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
-    if currentText:
-        coloredTexts.append(ColoredText(currentText, None))
-    return coloredTexts
 
 
 def highlightWithPygments(text: str, lang: str, el: t.ElementT) -> t.Deque[ColoredText] | None:

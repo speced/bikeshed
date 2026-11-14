@@ -44,13 +44,6 @@ def markupIDL(doc: t.SpecT) -> None:
             doc.widl.parse(text)
         h.addClass(doc, el, "highlight")
         doc.extraJC.addIDLHighlighting()
-    if doc.md.slimBuildArtifact:
-        # Remove the highlight-only spans
-        for el in idlEls:
-            for span in h.findAll("span", el):
-                contents = h.childNodes(span, clear=True)
-                h.replaceNode(span, *contents)
-        return
 
 
 def checkForExtraneousXmp(el: t.ElementT) -> None:

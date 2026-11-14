@@ -81,8 +81,11 @@ def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[Fals
     if attr == "highlight":
         return lang
     # Highlight-by-default, if applicable.
-    if el.tag in ["pre", "xmp"] and h.hasClass(doc, el, "idl"):
-        return "webidl"
+    if el.tag in ["pre", "xmp"]:
+        if h.hasClass(doc, el, "idl"):
+            return "webidl"
+        if h.hasClass(doc, el, "cddl"):
+            return "cddl"
     return doc.md.defaultHighlight
 
 
