@@ -66,16 +66,11 @@ def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[Fals
     attr, lang = h.closestAttr(el, "nohighlight", "highlight")
     lang = normalizeLanguageName(lang)
     if el.tag == "code":
-        # If <pre> triggers highlighting, don't *also* trigger it
-        # on the <pre><code> child.
-        parent = h.parentElement(el)
-        assert parent is not None
-        if h.tagName(parent) == "pre" and determineHighlightLang(doc, parent):
+        # If an ancestor <pre> triggers highlighting, don't *also* trigger it
+        # on a <code> descendant.
+        pre = h.closestAncestor(el, lambda x: h.tagName(x) in ("pre", "xmp"))
+        if pre is not None and determineHighlightLang(doc, pre):
             return None
-    if lang == "webidl" and el.tag == "code" and h.tagName(h.parentElement(el)) == "dfn":
-        # No such thing as a dfn that needs to be WebIDL-highlighted.
-        # This is probably happening from a <dfn idl-type> inside a <pre highlight=idl>.
-        return None
     if attr == "nohighlight":
         return None
     if attr == "highlight":
