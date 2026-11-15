@@ -389,43 +389,46 @@ def nextSiblingElement(el: t.ElementT) -> t.ElementT | None:
             return next
 
 
-@t.overload
-def appendChild(parent: t.ElementT, *els: t.NodeT, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
+_UNSET = object()
 
 
 @t.overload
-def appendChild(parent: t.ElementT, *els: t.NodeT, allowEmpty: bool) -> t.ElementT | None: ...
+def appendChild(parent: t.ElementT, *els: t.NodeT | None, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
 
 
-def appendChild(parent: t.ElementT, *children: t.NodeT, allowEmpty: bool = False) -> t.ElementT | None:
+@t.overload
+def appendChild(parent: t.ElementT, *els: t.NodeT | None, allowEmpty: bool) -> t.ElementT | None: ...
+
+
+def appendChild(parent: t.ElementT, *children: t.NodeT | None, allowEmpty: bool = False) -> t.ElementT | None:
     # Appends either text or an element.
-    parentLen = len(parent)
-    if len(children) == 0 and not allowEmpty:
-        msg = "Empty child list appended without allowEmpty=True"
-        raise Exception(msg)
-    for child in children:
-        if isinstance(child, str):
-            if parentLen > 0:
-                parent[-1].tail = (parent[-1].tail or "") + child
-            else:
-                parent.text = (parent.text or "") + child
-        else:
-            if parentLen == 0 and parent.text is not None:
-                # LXML "helpfully" assumes you meant to insert it before the text,
-                # and so moves the text into the element's tail when you append.
-                text, parent.text = parent.text, None
-                parent.append(child)
-                parent.text = text
-            else:
-                # For some reason it doesn't make any weird assumptions about text
-                # when the parent already has children; the last child's tail
-                # doesn't get moved into the appended child or anything.
-                parent.append(child)
-            parentLen += 1
-    if len(children) > 0 and isElement(children[-1]):
-        return children[-1]
-    else:
+    if len(children) == 0:
+        if not allowEmpty:
+            msg = "Empty child list appended without allowEmpty=True"
+            raise Exception(msg)
         return None
+    lastEl: t.ElementT | object | None = _UNSET
+    ret: t.ElementT | None = None
+    for child in children:
+        if child is None:
+            continue
+        if isinstance(child, str):
+            if lastEl is _UNSET:
+                try:
+                    lastEl = parent[-1]
+                except IndexError:
+                    lastEl = None
+            if lastEl is not None:
+                lastElElem = t.cast("t.ElementT", lastEl)
+                lastElElem.tail = child if lastElElem.tail is None else lastElElem.tail + child
+            else:
+                parent.text = child if parent.text is None else parent.text + child
+            ret = None
+        else:
+            parent.append(child)
+            lastEl = child
+            ret = child
+    return ret
 
 
 def prependChild(parent: t.ElementT, *children: t.NodeT) -> None:
@@ -1158,10 +1161,14 @@ def createElement(
     *children: t.NodeT | None,
 ) -> t.ElementT:
     if attrs is None:
-        attrs = {}
-    el: t.ElementT = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
+        el: t.ElementT = etree.Element(tag)
+    else:
+        try:
+            el = etree.Element(tag, t.cast("dict[str, str]", attrs))
+        except TypeError:
+            el = etree.Element(tag, {n: v for n, v in attrs.items() if v is not None})
     if children:
-        appendChild(el, *[x for x in children if x is not None], allowEmpty=True)
+        appendChild(el, *children, allowEmpty=True)
     return el
 
 
@@ -1177,6 +1184,7 @@ if t.TYPE_CHECKING:
 
 class ElementCreationHelper:
     def __getattr__(self, name: str) -> ElementCreatorFnT:
+        attrName = name
         if name in ("inline", "block"):
             name = "bs-" + name
 
@@ -1184,12 +1192,16 @@ class ElementCreationHelper:
             attrsOrChild: t.Mapping[str, str | None] | t.NodeT | None = None,
             *children: t.NodeT | None,
         ) -> t.ElementT:
+            if attrsOrChild is None:
+                return createElement(name, None, *children)
+            if isinstance(attrsOrChild, dict):
+                return createElement(name, attrsOrChild, *children)
             if isNode(attrsOrChild):
                 return createElement(name, None, attrsOrChild, *children)
-            else:
-                assert isinstance(attrsOrChild, dict) or attrsOrChild is None
-                return createElement(name, attrsOrChild, *children)
+            assert isinstance(attrsOrChild, t.Mapping)
+            return createElement(name, attrsOrChild, *children)
 
+        setattr(self, attrName, _creater)
         return _creater
 
 
