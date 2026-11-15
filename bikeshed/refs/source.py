@@ -514,7 +514,7 @@ def indexAnchorLines(raw: str) -> tuple[list[str], dict[str, tuple[int, ...]]]:
     lines = raw.split("\n")
     n = len(lines) - 1
     offsets: dict[str, tuple[int, ...]] = {}
-    i = 1  # Line 0 is the ENTRY_SEPARATOR
+    i = 2  # Lines 0 and 1 are the ENTRY_SEPARATOR ("", "-")
     while i < n:
         aText = lines[i]
         j = i + MINIMUM_ENTRY_LINES

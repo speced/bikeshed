@@ -40,6 +40,9 @@ class BiblioEntry(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def valid(self) -> bool: ...
 
+    def __post_init__(self) -> None:
+        self.strip()
+
     def strip(self) -> BiblioEntry:
         self.linkText = self.linkText.strip()
         if self.title:
@@ -283,6 +286,107 @@ def processSpecrefBiblioFile(text: str, storage: t.BiblioStorageT, order: int) -
             for biblio in storage[old]:
                 biblio.obsoletedBy = new
     return storage
+
+
+# Each entry is separated by a line containing just a single -
+ENTRY_SEPARATOR = "\n-\n"
+
+
+class BiblioGroup:
+    __slots__ = ["_raw", "empty"]
+
+    def __init__(self, raw: str) -> None:
+        """Initialize a biblio group with raw text for lazy decoding."""
+        self._raw = "\n-\n" + raw if raw else ""
+        self.empty = raw == ""
+
+    def decodeBiblio(self, key: str) -> list[BiblioEntry]:
+        """Find and decode a biblio entry for a key using binary search on the sorted raw text."""
+        if self.empty:
+            return []
+        raw = self._raw
+        lo = 0
+        hi = len(raw) - 3
+        while lo < hi:
+            mid = (lo + hi) // 2
+            pos = raw.rfind(ENTRY_SEPARATOR, lo, mid + 3)
+            keyStart = pos + 5
+            nl = raw.find("\n", keyStart)
+            midKey = raw[keyStart:nl]
+            if key == midKey:
+                prefix = raw[pos + 3]
+                end = raw.find(ENTRY_SEPARATOR, nl)
+                lines = raw[nl + 1 : end].split("\n")
+                if prefix == "d":
+                    return [
+                        NormalBiblioEntry(
+                            linkText=lines[0],
+                            date=lines[1],
+                            status=lines[2],
+                            title=lines[3],
+                            snapshotURL=lines[4],
+                            currentURL=lines[5],
+                            obsoletedBy=lines[6],
+                            other=lines[7],
+                            etAl=bool(lines[8]),
+                            order=3,
+                            authors=lines[9:],
+                        ),
+                    ]
+                elif prefix == "a":
+                    return [
+                        AliasBiblioEntry(
+                            linkText=lines[0],
+                            aliasOf=lines[1],
+                            order=3,
+                        ),
+                    ]
+                elif prefix == "s":
+                    return [
+                        StringBiblioEntry(
+                            linkText=lines[0],
+                            data=lines[1],
+                            order=3,
+                        ),
+                    ]
+                else:
+                    m.die(f"Unknown biblio prefix '{prefix}' on key '{raw[pos + 3 : nl]}'")
+                    return []
+            elif key < midKey:
+                hi = pos
+            else:
+                lo = raw.find(ENTRY_SEPARATOR, nl)
+        return []
+
+    def keysWithPrefix(self, prefix: str) -> list[str]:
+        """Return all keys in this group starting with the given prefix."""
+        if self.empty:
+            return []
+        raw = self._raw
+        lo = 0
+        end = len(raw) - 3
+        hi = end
+        while lo < hi:
+            mid = (lo + hi) // 2
+            pos = raw.rfind(ENTRY_SEPARATOR, lo, mid + 3)
+            keyStart = pos + 5
+            nl = raw.find("\n", keyStart)
+            midKey = raw[keyStart:nl]
+            if midKey < prefix:
+                lo = raw.find(ENTRY_SEPARATOR, nl)
+            else:
+                hi = pos
+        res: list[str] = []
+        pos = lo
+        while pos < end:
+            keyStart = pos + 5
+            nl = raw.find("\n", keyStart)
+            k = raw[keyStart:nl]
+            if not k.startswith(prefix):
+                break
+            res.append(k)
+            pos = raw.find(ENTRY_SEPARATOR, nl)
+        return res
 
 
 def loadBiblioDataFile(lines: t.Iterator[str], storage: t.BiblioStorageT) -> None:

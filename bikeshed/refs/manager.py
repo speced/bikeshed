@@ -86,7 +86,7 @@ class ReferenceManager:
         # Dict of {biblio term => biblio data}
         # Sparsely populated, with more loaded on demand
         self.biblios: defaultdict[str, list[biblio.BiblioEntry]] = defaultdict(list)
-        self.loadedBiblioGroups: set[str] = set()
+        self.loadedBiblioGroups: dict[str, biblio.BiblioGroup] = {}
 
         # Most of the biblio keys, for biblio near-miss correction
         # (Excludes dated versions, and all huge "foo\d+" groups that can't usefully correct typos.)
@@ -744,16 +744,17 @@ class ReferenceManager:
             # then [[foo-2]] is just an error.
             match = re.match(r"(.+)-\d+$", key)
             failFromWrongSuffix = False
-            if match and match.group(1) in self.biblios:
+            if match:
                 unversionedKey = match.group(1)
-                if unversionedKey in self.biblioNumericSuffixes:
-                    # Nope, there are more numeric-suffixed versions,
-                    # just not the one you asked for
-                    failFromWrongSuffix = True
-                else:
-                    # Load up the unversioned url!
-                    candidates = self.biblios[unversionedKey]
-                    break
+                if unversionedCandidates := self.bibliosFromKey(unversionedKey):
+                    if unversionedKey in self.biblioNumericSuffixes:
+                        # Nope, there are more numeric-suffixed versions,
+                        # just not the one you asked for
+                        failFromWrongSuffix = True
+                    else:
+                        # Load up the unversioned url!
+                        candidates = unversionedCandidates
+                        break
 
             # Did it fail because I only know about the spec from Shepherd?
             if key in self.specs and generateFakeRef:
@@ -817,22 +818,30 @@ class ReferenceManager:
         bib.preferredStatus = status
         return bib
 
+    def _getBiblioGroup(self, group: str) -> biblio.BiblioGroup:
+        biblioGroup = self.loadedBiblioGroups.get(group)
+        if biblioGroup is None:
+            raw = self.dataFile.fetch("biblio", f"biblio-{group}.data", str=True, okayToFail=True)
+            biblioGroup = biblio.BiblioGroup(raw)
+            self.loadedBiblioGroups[group] = biblioGroup
+        return biblioGroup
+
     def bibliosFromKey(self, key: str) -> list[biblio.BiblioEntry]:
         # Load up the biblio data necessary to fetch the given key
         # and then actually fetch it.
         # If you don't call this,
         # the current data might not be reliable.
-        if key not in self.biblios:
-            # Try to load the group up, if necessary
-            group = key[0:2]
-            if group not in self.loadedBiblioGroups:
-                with self.dataFile.fetch("biblio", f"biblio-{group}.data", okayToFail=True) as fh:
-                    biblio.loadBiblioDataFile(fh, self.biblios)
-            self.loadedBiblioGroups.add(group)
-        return self.biblios.get(key, [])
+        if (entries := self.biblios.get(key)) is not None:
+            return entries
+        biblioGroup = self._getBiblioGroup(key[0:2])
+        entries = biblioGroup.decodeBiblio(key)
+        self.biblios[key] = entries
+        return entries
 
     def _bestCandidateBiblio(self, candidates: list[biblio.BiblioEntry]) -> biblio.BiblioEntry:
-        return sorted(candidates, key=lambda x: x.order or 0)[0].strip()
+        if len(candidates) == 1:
+            return candidates[0]
+        return sorted(candidates, key=lambda x: x.order or 0)[0]
 
     def getLatestBiblioRef(self, key: str) -> biblio.BiblioEntry | None:
         # Takes a biblio reference name,
@@ -842,20 +851,21 @@ class ReferenceManager:
         if not candidates:
             return None
         latestDate = None
-        latestRefs = None
-        for k, biblios in self.biblios.items():
-            if not k.startswith(key):
-                continue
+        latestKey = None
+        group = self._getBiblioGroup(key[0:2])
+        possibleKeys = {k for k, v in self.biblios.items() if v and k.startswith(key)}
+        possibleKeys.update(group.keysWithPrefix(key))
+        for k in possibleKeys:
             match = re.search(r"(\d{8})$", k)
             if not match:
                 continue
             date = match.group(1)
             if latestDate is None or date > latestDate:
                 latestDate = date
-                latestRefs = biblios
-        if latestRefs is None:
+                latestKey = k
+        if latestKey is None:
             return None
-        return self._bestCandidateBiblio(latestRefs)
+        return self._bestCandidateBiblio(self.bibliosFromKey(latestKey))
 
     def vNamesFromSpecNames(self, specName: str) -> list[str]:
         # Takes an unversioned specName,
