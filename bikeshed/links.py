@@ -7,6 +7,7 @@ from urllib import parse
 from . import biblio, config, dfnpanels, h, t
 from . import messages as m
 from .translate import _t
+from .unset import UNSET
 
 if t.TYPE_CHECKING:
     from . import refs
@@ -131,62 +132,136 @@ def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: st
     biblio.registerBiblioUsage(doc, bib, el=el)
 
 
-def determineLinkType(el: t.ElementT) -> str:
+class _LinkAttrTupleT(t.NamedTuple):
+    type: str | None = None
+    status: str | None = None
+    for_: str | None = None
+    spec: str | None = None
+    forHint: str | None = None
+
+
+_EMPTY_LINK_ATTRS = _LinkAttrTupleT()
+
+
+def _getInheritedLinkAttrs(
+    el: t.ElementT | None,
+    cache: dict[t.ElementT, _LinkAttrTupleT],
+) -> _LinkAttrTupleT:
+    if el is None:
+        return _EMPTY_LINK_ATTRS
+    if (res := cache.get(el)) is not None:
+        return res
+    pType, pStatus, pFor, pSpec, pForHint = _getInheritedLinkAttrs(el.getparent(), cache)
+    attrib = el.attrib
+    res = _LinkAttrTupleT(
+        attrib.get("data-link-type", pType),
+        attrib.get("data-link-status", pStatus),
+        attrib.get("data-link-for", pFor),
+        attrib.get("data-link-spec", pSpec),
+        attrib.get("data-link-for-hint", pForHint),
+    )
+    cache[el] = res
+    return res
+
+
+def determineLinkType(
+    el: t.ElementT,
+    *,
+    typeFromParent: str | t.UnsetT | None = UNSET,
+    contents: str | None = None,
+) -> str:
+    """
+    Determines the linkType for the element and returns it.
+    The inherited type and text content can be passed if you already have them, otherwise it'll compute them fresh.
+    """
     # 1. Look at data-link-type
-    linkType = h.treeAttr(el, "data-link-type")
+    linkType = el.get("data-link-type", typeFromParent)
+    if linkType is UNSET:
+        linkType = h.treeAttr(el, "data-link-type")
     if linkType:
         if linkType in config.linkTypes:
             return linkType
         m.die(f"Unknown link type '{linkType}':\n{h.outerHTML(el)}", el=el)
         return "unknown-type"
     # 2. Introspect on the text
-    text = h.textContent(el)
-    if config.typeRe["at-rule"].match(text):
+    if contents is None:
+        contents = h.textContent(el)
+    if config.typeRe["at-rule"].match(contents):
         return "at-rule"
-    if config.typeRe["type"].match(text):
+    if config.typeRe["type"].match(contents):
         return "type"
-    if config.typeRe["selector"].match(text):
+    if config.typeRe["selector"].match(contents):
         return "selector"
-    if config.typeRe["function"].match(text):
+    if config.typeRe["function"].match(contents):
         return "functionish"
     return "dfn"
 
 
-def determineLinkText(el: t.ElementT) -> str:
-    linkType = el.get("data-link-type", "")
-    contents = h.textContent(el)
-    if el.get("data-lt"):
-        linkText = el.get("data-lt", "")
-    elif config.linkTypeIn(linkType, "function") and re.match(r"^[\w-]+\(.*\)$", contents):
-        # Remove arguments from CSS function autolinks,
-        # as they should always be defined argument-less
-        # (and this allows filled-in examples to still autolink).
-        linkText = t.cast("t.Match", re.match(r"^([\w-]+)\(.*\)$", contents)).group(1) + "()"
+_FUNC_AUTOLINK_RE = re.compile(r"^([\w-]+)\(.*\)$")
+
+
+def determineLinkText(el: t.ElementT, *, linkType: str | None = None, contents: str | None = None) -> str:
+    """
+    Determines the linking text for the element and returns it.
+    linkType and text content can be passed if you already have them, otherwise it'll compute them fresh.
+    """
+    rawLt = el.get("data-lt")
+    if rawLt:
+        linkText = rawLt
     else:
-        linkText = contents
+        if contents is None:
+            contents = h.textContent(el)
+        if linkType is None:
+            linkType = determineLinkType(el, contents=contents)
+        if config.linkTypeIn(linkType, "function") and (match := _FUNC_AUTOLINK_RE.match(contents)):
+            # Remove arguments from CSS function autolinks,
+            # as they should always be defined argument-less
+            # (and this allows filled-in examples to still autolink).
+            linkText = match.group(1) + "()"
+        else:
+            linkText = contents
     linkText = h.foldWhitespace(linkText)
-    if len(linkText) == 0:
-        m.die(f"Autolink {h.outerHTML(el)} has no linktext.", el=el)
+    if not linkText:
+        m.die("Autolink has no linktext.", el=el)
     return linkText
 
 
-def classifyLink(el: t.ElementT) -> t.ElementT:
-    linkType = determineLinkType(el)
+def classifyLink(
+    el: t.ElementT,
+    attrCache: dict[t.ElementT, _LinkAttrTupleT] | None = None,
+) -> tuple[str, str]:
+    """
+    Determine and return a link's type and linking text.
+    Additionally, find its status, for, spec, and for-hint, which might be on an ancestor,
+    and save them directly on the element.
+    (type might also be on an ancestor)
+    If this is being called more than once, you should pass and reuse an attrCache empty dict
+    so it can skip a lot of tree-crawling on subsequent calls.
+    """
+    if attrCache is None:
+        attrCache = {}
+    attrib = el.attrib
+    pType, pStatus, pFor, pSpec, pForHint = _getInheritedLinkAttrs(el.getparent(), attrCache)
+    if "data-link-status" not in attrib and pStatus is not None:
+        el.set("data-link-status", pStatus)
+    if "data-link-for" not in attrib and pFor is not None:
+        el.set("data-link-for", pFor)
+    if "data-link-spec" not in attrib and pSpec is not None:
+        el.set("data-link-spec", pSpec)
+    if "data-link-for-hint" not in attrib and pForHint is not None:
+        el.set("data-link-for-hint", pForHint)
+
+    if not (attrib.get("data-link-type") or pType) and not attrib.get("data-lt"):
+        contents = h.textContent(el)
+    else:
+        contents = None
+    linkType = determineLinkType(el, typeFromParent=pType, contents=contents)
     el.set("data-link-type", linkType)
 
-    linkText = determineLinkText(el)
+    linkText = determineLinkText(el, linkType=linkType, contents=contents)
     el.set("data-lt", linkText)
 
-    for attr in [
-        "data-link-status",
-        "data-link-for",
-        "data-link-spec",
-        "data-link-for-hint",
-    ]:
-        val = h.treeAttr(el, attr)
-        if val is not None:
-            el.set(attr, val)
-    return el
+    return linkType, linkText
 
 
 def processAutolinks(doc: t.SpecT) -> None:
@@ -195,16 +270,16 @@ def processAutolinks(doc: t.SpecT) -> None:
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
-    for el in h.collectAutolinks(doc.body):
+    autolinks = h.collectAutolinks(doc.body)
+    linkAttrCache: dict[t.ElementT, _LinkAttrTupleT] = {}
+    for el in autolinks:
         if el.tag == "bs-link":
             el.tag = "a"
         # Explicitly empty linking text indicates this shouldn't be an autolink.
         if el.get("data-lt") == "":
             continue
 
-        classifyLink(el)
-        linkType = t.cast(str, el.get("data-link-type"))
-        linkText = t.cast(str, el.get("data-lt"))
+        linkType, linkText = classifyLink(el, linkAttrCache)
 
         # Properties and descriptors are often written like 'foo-*'. Just ignore these.
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
@@ -287,7 +362,7 @@ def processAutolinks(doc: t.SpecT) -> None:
             cachedRef = refsJSON.get(ref.url)
             if cachedRef is None:
                 refsJSON[ref.url] = ref
-            elif cachedRef != ref:
+            elif cachedRef is not ref and cachedRef != ref:
                 # whoops, multiple refs with the same URL
                 subKey = ref.refKey() + "_" + ref.url
                 if subKey not in refsJSON:
@@ -331,11 +406,10 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
             titleText = doc.typeExpansions[linkText]
         else:
             typeRefs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
-            texts = sorted({ref.text for ref in typeRefs})
             if typeRefs:
+                texts = sorted({ref.text for ref in typeRefs})
                 titleText = _t("Expands to: ") + " | ".join(texts)
-                assert titleText is not None
-                doc.typeExpansions[linkText] = titleText
+            doc.typeExpansions[linkText] = titleText
         if titleText:
             titleData = doc.extraJC.addLinkTitles()
             titleData[ref.url] = titleText

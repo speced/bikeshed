@@ -91,6 +91,7 @@ if TYPE_CHECKING:
     from .config.BoolSet import BoolSet
     from .metadata import MetadataManager
     from .refs import MethodVariant, MethodVariants, Ref, ReferenceManager, RefSource
+    from .unset import UnsetT
 
     type RefT = Ref
     from .retrieve import DataFileRequester

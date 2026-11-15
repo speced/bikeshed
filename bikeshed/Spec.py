@@ -137,7 +137,7 @@ class Spec:
         self.mdDefaults: metadata.MetadataManager | None = None
         self.mdOverridingDefaults: metadata.MetadataManager | None = None
 
-        self.typeExpansions: dict[str, str] = {}
+        self.typeExpansions: dict[str, str | None] = {}
 
         self.cachedLinksFromHref: OrderedDict[str, list[t.ElementT]] = OrderedDict()
         self.cachedClassTests: dict[tuple[str, str], bool] = {}

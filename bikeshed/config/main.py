@@ -113,6 +113,10 @@ def simplifyText(text: str) -> str:
     return text
 
 
+_WS_RE = re.compile(r"\s+")
+_FOR_SPLIT_RE = re.compile(r",(?![^()]*\))")
+
+
 @t.overload
 def splitForValues(forValues: str) -> list[str]: ...
 
@@ -129,8 +133,12 @@ def splitForValues(forValues: str | None) -> list[str] | None:
     """
     if forValues is None:
         return None
-    forValues = re.sub(r"\s+", " ", forValues)
-    return [value.strip() for value in re.split(r",(?![^()]*\))", forValues) if value.strip()]
+    forValues = _WS_RE.sub(" ", forValues).strip()
+    if not forValues:
+        return []
+    if "," not in forValues:
+        return [forValues]
+    return [val for value in _FOR_SPLIT_RE.split(forValues) if (val := value.strip())]
 
 
 SCRIPT_PATH_BASE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))

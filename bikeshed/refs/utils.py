@@ -18,9 +18,10 @@ def filterObsoletes(
     if localSpec:
         possibleSpecs.add(localSpec)
     moreIgnores = set()
-    for oldSpec, newSpec in replacedSpecs:
-        if newSpec in possibleSpecs:
-            moreIgnores.add(oldSpec)
+    if len(possibleSpecs) > 1:
+        for oldSpec, newSpec in replacedSpecs:
+            if newSpec in possibleSpecs:
+                moreIgnores.add(oldSpec)
     ret = []
     for ref in refs:
         if ref.spec in ignoredSpecs:
@@ -34,6 +35,8 @@ def filterObsoletes(
 
 
 def filterOldVersions(refs: list[t.Ref], status: str | None = None) -> list[t.Ref]:
+    if len(refs) <= 1:
+        return refs
     # If multiple levels of the same shortname exist,
     # only use the latest level.
     # If generating for a snapshot, prefer the latest snapshot level,

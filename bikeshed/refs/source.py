@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import dataclasses
 import re
 from collections import defaultdict
@@ -132,6 +131,10 @@ class RefSource:
         el: t.ElementT | None = None,
     ) -> tuple[list[t.Ref], LinkFailure | None, list[t.Ref]]:
         """Query refs by criteria, trying an exact match first and falling back to conjugating."""
+        if self.source not in LAZY_LOADED_SOURCES and not self.refs:
+            return [], LinkFailure.Text, []
+        if exact is None and not text:
+            exact = True
         if exact is not None:
             return self._queryRefs(
                 text=text,
@@ -254,10 +257,10 @@ class RefSource:
 
         oldRefs = refs
         if linkType:
-            if linkType in config.dfnTypes:
-                linkTypes = [linkType]
-            elif linkType in config.linkTypeToDfnType:
-                linkTypes = list(config.linkTypeToDfnType[linkType])
+            if linkType in config.linkTypeToDfnType:
+                linkTypes = config.linkTypeToDfnType[linkType]
+            elif linkType in config.dfnTypes:
+                linkTypes = frozenset([linkType])
             else:
                 if error:
                     m.linkerror(f"Unknown link type '{linkType}'.", el=el)
@@ -331,13 +334,13 @@ class RefSource:
         if not refs:
             return [], LinkFailure.IgnoredSpecs, oldRefs
 
-        if dedupURLs:
+        if dedupURLs and len(refs) > 1:
             # With non-exact texts, you might have multiple "anchors"
             # that point to the same url. Dedup them.
             seenUrls = set()
             tempRefs = []
             # Sort the refs so the kept one doesn't depend on ordering in the RefSource dict.
-            for ref in sorted(copy.copy(refs), key=lambda x: x.text):
+            for ref in sorted(refs, key=lambda x: x.text):
                 if ref.url not in seenUrls:
                     tempRefs.append(ref)
                     seenUrls.add(ref.url)
@@ -413,7 +416,7 @@ def filterByStatus(source: RefSource, refs: t.Sequence[t.Ref], status: str) -> l
 # Initially we just do a search on the raw text,
 # but after enough queries in a group, we pay the
 # tax of indexing to make future queries faster.
-QUERY_INDEX_SWITCHOVER = 6
+QUERY_INDEX_SWITCHOVER = 2
 
 # Each entry is separated by a line containing just a single -
 ENTRY_SEPARATOR = "\n-\n"
@@ -443,15 +446,14 @@ GROUP_FROM_KEY_CACHE: dict[str, str] = {}
 
 
 class AnchorGroup:
-    __slots__ = ["_indexed", "_lines", "_offsets", "_queries", "_raw", "empty"]
+    __slots__ = ["_entries", "_indexed", "_queries", "_raw", "empty"]
 
     def __init__(self, raw: str) -> None:
         """Initialize an anchor group with raw text for lazy decoding."""
         self._raw = "\n-\n" + raw if raw else ""
         self._queries = 0
         self._indexed = False
-        self._lines: list[str] = []
-        self._offsets: dict[str, tuple[int, ...]] = {}
+        self._entries: dict[str, str | list[str]] = {}
         self.empty = raw == ""
 
     def decodeRefs(self, key: str) -> list[t.Ref]:
@@ -465,13 +467,13 @@ class AnchorGroup:
             if self._queries <= QUERY_INDEX_SWITCHOVER:
                 return decodeRefsFromRaw(self._raw, key)
             else:
-                self._lines, self._offsets = indexAnchorLines(self._raw)
+                self._entries = indexAnchorEntries(self._raw)
                 self._raw = ""
                 self._indexed = True
-        indices = self._offsets.get(key)
-        if not indices:
+        entries = self._entries.get(key)
+        if not entries:
             return []
-        return decodeRefsFromIndex(key, self._lines, indices)
+        return decodeRefsFromEntries(key, entries)
 
 
 def decodeRefsFromRaw(rawGroup: str, key: str) -> list[t.Ref]:
@@ -507,51 +509,49 @@ def decodeRefsFromRaw(rawGroup: str, key: str) -> list[t.Ref]:
     return res
 
 
-def indexAnchorLines(raw: str) -> tuple[list[str], dict[str, tuple[int, ...]]]:
-    """Parse raw anchor text into lines and build an offset mapping from anchor key to line indices."""
+def indexAnchorEntries(raw: str) -> dict[str, str | list[str]]:
+    """Split raw anchor text into entry chunks and map each anchor key to its chunk(s)."""
     if not raw:
-        return [], {}
-    lines = raw.split("\n")
-    n = len(lines) - 1
-    offsets: dict[str, tuple[int, ...]] = {}
-    i = 2  # Lines 0 and 1 are the ENTRY_SEPARATOR ("", "-")
-    while i < n:
-        aText = lines[i]
-        j = i + MINIMUM_ENTRY_LINES
-        while lines[j] != "-":
-            j += 1
-        nxt = j + 1
-        if aText in offsets:
-            offsets[aText] = (*offsets[aText], i)
+        return {}
+    entries: dict[str, str | list[str]] = {}
+    for chunk in raw.split(ENTRY_SEPARATOR)[1:]:
+        if not chunk:
+            continue
+        nl = chunk.find("\n")
+        aText = chunk[:nl]
+        if aText in entries:
+            prev = entries[aText]
+            if isinstance(prev, list):
+                prev.append(chunk)
+            else:
+                entries[aText] = [prev, chunk]
         else:
-            offsets[aText] = (i,)
-        i = nxt
-    return lines, offsets
+            entries[aText] = chunk
+    return entries
 
 
-def decodeRefsFromIndex(key: str, lines: list[str], indices: tuple[int, ...]) -> list[t.Ref]:
-    """Decode refs for a key from pre-split lines using the given line offset indices."""
-    res: list[t.Ref] = []
-    for i in indices:
-        j = i + MINIMUM_ENTRY_LINES
-        while lines[j] != "-":
-            j += 1
-        res.append(
-            Ref(
-                text=key,
-                displayText=lines[i + 1],
-                type=lines[i + 2],
-                spec=lines[i + 3],
-                shortname=lines[i + 4],
-                level=lines[i + 5],
-                status=lines[i + 6],
-                url=lines[i + 7],
-                export=bool(lines[i + 8]),
-                normative=bool(lines[i + 9]),
-                for_=lines[i + 10 : j],
-            ),
-        )
-    return res
+def _decodeRefChunk(key: str, chunk: str) -> t.Ref:
+    lines = chunk.split("\n")
+    return Ref(
+        text=key,
+        displayText=lines[1],
+        type=lines[2],
+        spec=lines[3],
+        shortname=lines[4],
+        level=lines[5],
+        status=lines[6],
+        url=lines[7],
+        export=bool(lines[8]),
+        normative=bool(lines[9]),
+        for_=lines[10:],
+    )
+
+
+def decodeRefsFromEntries(key: str, entries: str | list[str]) -> list[t.Ref]:
+    """Decode refs for a key from indexed entry chunk(s)."""
+    if isinstance(entries, str):
+        return [_decodeRefChunk(key, entries)]
+    return [_decodeRefChunk(key, chunk) for chunk in entries]
 
 
 def decodeAnchors(linesIter: t.Iterator[str] | str) -> defaultdict[str, list[t.Ref]]:

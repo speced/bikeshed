@@ -3,8 +3,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import html
+import itertools
 import re
-from collections import OrderedDict
 
 import lxml
 import lxml.html
@@ -13,6 +13,7 @@ from lxml.cssselect import CSSSelector
 
 from .. import constants, t
 from ..messages import die, warn
+from ..unset import UNSET
 from . import parser
 
 if t.TYPE_CHECKING:
@@ -262,8 +263,11 @@ def tagName(el: t.ElementT | None) -> str | None:
     return el.tag
 
 
+_FOLD_WS_RE = re.compile(r"[\s\xa0]+")
+
+
 def foldWhitespace(text: str) -> str:
-    return re.sub(r"(\s|\xa0)+", " ", text)
+    return _FOLD_WS_RE.sub(" ", text)
 
 
 def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
@@ -389,9 +393,6 @@ def nextSiblingElement(el: t.ElementT) -> t.ElementT | None:
             return next
 
 
-_UNSET = object()
-
-
 @t.overload
 def appendChild(parent: t.ElementT, *els: t.NodeT | None, allowEmpty: t.Literal[False] = False) -> t.ElementT: ...
 
@@ -407,20 +408,19 @@ def appendChild(parent: t.ElementT, *children: t.NodeT | None, allowEmpty: bool 
             msg = "Empty child list appended without allowEmpty=True"
             raise Exception(msg)
         return None
-    lastEl: t.ElementT | object | None = _UNSET
+    lastEl: t.ElementT | t.UnsetT | None = UNSET
     ret: t.ElementT | None = None
     for child in children:
         if child is None:
             continue
         if isinstance(child, str):
-            if lastEl is _UNSET:
+            if lastEl is UNSET:
                 try:
                     lastEl = parent[-1]
                 except IndexError:
                     lastEl = None
             if lastEl is not None:
-                lastElElem = t.cast("t.ElementT", lastEl)
-                lastElElem.tail = child if lastElElem.tail is None else lastElElem.tail + child
+                lastEl.tail = child if lastEl.tail is None else lastEl.tail + child
             else:
                 parent.text = child if parent.text is None else parent.text + child
             ret = None
@@ -479,7 +479,7 @@ def insertAfter(target: t.ElementT, *els: t.NodeT) -> t.ElementT:
 
 def copyNode(node: t.ElementT) -> t.ElementT:
     c = copy.deepcopy(node)
-    for el in findAll("[bs-line-number]", c):
+    for el in treeElements(c):
         removeAttr(el, "bs-line-number")
     return c
 
@@ -628,30 +628,27 @@ def scopingElements(startEl: t.ElementT, tags: list[str]) -> t.Generator[t.Eleme
                 yield sib
 
 
-def previousElements(startEl: t.ElementT, tag: str | None = None, *tags: str) -> list[t.ElementT]:
-    # Elements preceding the startEl in document order.
-    # Like .iter(), but in the opposite direction.
-    els: list[t.ElementT] = []
-    for el in startEl.getroottree().getroot().iter(tag, *tags):
-        if el == startEl:
-            return list(reversed(els))
-        els.append(el)
-    return els
+def treeElements(el: t.ElementT, *tags: str, oddNodes: bool = False) -> t.Iterator[t.ElementT]:
+    if oddNodes:
+        return el.iter(None, *tags)
+    if not tags:
+        return el.iter("*")
+    return el.iter(*tags)
 
 
-def childElements(parentEl: t.ElementT, oddNodes: bool = False) -> t.Generator[t.ElementT, None, None]:
+def childElements(parentEl: t.ElementT, oddNodes: bool = False) -> t.Iterator[t.ElementT]:
     tag = None if oddNodes else "*"
-    yield from parentEl.iterchildren(tag)
+    return parentEl.iterchildren(tag)
 
 
 def siblingElements(el: t.ElementT, preceding: bool = False) -> t.Iterable[t.ElementT]:
     return el.itersiblings("*", preceding=preceding)
 
 
-def ancestorElements(el: t.ElementT, self: bool = False) -> t.Generator[t.ElementT, None, None]:
+def ancestorElements(el: t.ElementT, self: bool = False) -> t.Iterator[t.ElementT]:
     if self:
-        yield el
-    yield from el.iterancestors()
+        return itertools.chain((el,), el.iterancestors())
+    return el.iterancestors()
 
 
 def childNodes(
@@ -750,8 +747,8 @@ def treeAttr(el: t.ElementT, attrName: str) -> str | None:
     # Returns attrValue or None if nothing is found.
 
     for target in ancestorElements(el, self=True):
-        if target.get(attrName) is not None:
-            return target.get(attrName)
+        if (val := target.get(attrName)) is not None:
+            return val
     return None
 
 
@@ -778,7 +775,7 @@ def closestAncestor(el: t.ElementT, pred: ElementPredT) -> t.ElementT | None:
 
 def filterAncestors(el: t.ElementT, pred: ElementPredT) -> t.Generator[t.ElementT, None, None]:
     # Returns all ancestors that match the predicate
-    for target in el.iterancestors():
+    for target in ancestorElements(el):
         if pred(target):
             yield target
 
@@ -877,17 +874,18 @@ def isOddNode(node: t.Any) -> bool:
 def isNormative(doc: t.SpecT, el: t.ElementT) -> bool:
     # Returns whether the element is "informative" or "normative" with a crude algo.
     # Currently just tests whether the element is in a class=example or class=note block, or not.
-    if el in doc.cachedNormativeEls:
-        return doc.cachedNormativeEls[el]
-    informativeClasses = ["note", "example", "non-normative", "informative", *doc.md.informativeClasses]
-    for cls in informativeClasses:
-        if hasClass(doc, el, cls):
-            doc.cachedNormativeEls[el] = False
-            return False
-    if hasClass(doc, el, "normative"):
-        doc.cachedNormativeEls[el] = True
-        return True
-    parent = parentElement(el)
+    if (cached := doc.cachedNormativeEls.get(el)) is not None:
+        return cached
+    if el.get("class"):
+        informativeClasses = ("note", "example", "non-normative", "informative", *doc.md.informativeClasses)
+        for cls in informativeClasses:
+            if hasClass(doc, el, cls):
+                doc.cachedNormativeEls[el] = False
+                return False
+        if hasClass(doc, el, "normative"):
+            doc.cachedNormativeEls[el] = True
+            return True
+    parent = el.getparent()
     if not isElement(parent):
         # Went past the root without finding any indicator,
         # so normative by default.
@@ -949,9 +947,11 @@ def fixSurroundingTypography(el: t.ElementT) -> t.ElementT:
 
 def unfixTypography(text: str) -> str:
     # Replace curly quotes with straight quotes, and emdashes with double dashes.
-    text = re.sub(r"’", r"'", text)
+    if "’" in text:
+        text = text.replace("’", "'")
     # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-    text = re.sub(r"—<wbr>", r"--", text)
+    if "—<wbr>" in text:
+        text = text.replace("—<wbr>", "--")
     return text
 
 
@@ -1005,6 +1005,10 @@ def replaceMacrosTextly(text: str, macros: t.Mapping[str, str], context: str) ->
 
 
 def fixupIDs(doc: t.SpecT, els: t.Iterable[t.ElementT]) -> None:
+    if not isinstance(els, (list, tuple, set)):
+        els = tuple(els)
+    if not els:
+        return
     addOldIDs(els)
     dedupIDs(doc)
 
@@ -1035,20 +1039,29 @@ def addOldIDs(els: t.Iterable[t.ElementT]) -> None:
         removeAttr(el, "oldids")
 
 
+_ISSUE_ID_RE = re.compile(r"issue-[0-9a-fA-F]{8}$")
+
+
 def dedupIDs(doc: t.SpecT) -> None:
-    ids: OrderedDict[str, list[t.ElementT]] = OrderedDict()
-    for el in findAll("[id]", doc):
-        ids.setdefault(t.cast(str, el.get("id")), []).append(el)
-    for dupeId, els in list(ids.items()):
-        if len(els) < 2:
-            # Only one instance, so nothing to do.
+    firstSeen: dict[str, t.ElementT] = {}
+    dupes: dict[str, list[t.ElementT]] = {}
+    for el in treeElements(doc.document):
+        elId = el.get("id")
+        if elId is None:
             continue
-        warnAboutDupes = True
-        if re.match(r"issue-[0-9a-fA-F]{8}$", dupeId):
-            # Don't warn about issues, it's okay if they have the same ID because they're identical text.
-            warnAboutDupes = False
-        if dupeId.startswith("ref-for-"):
-            warnAboutDupes = False
+        if elId in firstSeen:
+            if elId in dupes:
+                dupes[elId].append(el)
+            else:
+                dupes[elId] = [firstSeen[elId], el]
+        else:
+            firstSeen[elId] = el
+    if not dupes:
+        return
+    trans = doc.md.translateIDs
+    complaints: list[tuple[SortableLineNumber, str]] = []
+    for dupeId, els in dupes.items():
+        warnAboutDupes = not (dupeId.startswith("ref-for-") or _ISSUE_ID_RE.match(dupeId))
         complaintEls = []
         if warnAboutDupes:
             for el in els:
@@ -1058,26 +1071,34 @@ def dedupIDs(doc: t.SpecT) -> None:
         # Now dedup everything left in the list after the first one.
         dedupIndex = 1
         for el in els[1:]:
-            if el.get("data-alternate-id"):
-                altId = el.get("data-alternate-id")
-                assert altId is not None
-                if altId not in ids:
-                    el.set("id", safeID(doc, altId))
-                    ids[altId] = [el]
-                    complaintEls.remove(el)
-                    continue
+            altId = el.get("data-alternate-id")
+            if altId and altId not in firstSeen:
+                el.set("id", trans.get(altId, altId))
+                firstSeen[altId] = el
+                complaintEls.remove(el)
+                continue
             altId = f"{dupeId}{circledDigits(dedupIndex)}"
-            while altId in ids:
+            while altId in firstSeen:
                 dedupIndex += 1
                 altId = f"{dupeId}{circledDigits(dedupIndex)}"
-            el.set("id", safeID(doc, altId))
-            ids[altId] = [el]
+            dedupIndex += 1
+            el.set("id", trans.get(altId, altId))
+            firstSeen[altId] = el
 
         if len(complaintEls) > 1:
-            complaintDetails = [f"<{el.tag}> on line {approximateLineNumber(el)}" for el in complaintEls]
-            warn(
-                f"Multiple elements have the same id '{dupeId}':\n  {', '.join(complaintDetails)}\nDeduping, but this ID may not be stable across revisions.",
+            elLocations = sorted(
+                ((sortableLineNumber(approx := approximateLineNumber(el)), el, approx) for el in complaintEls),
+                key=lambda x: x[0],
             )
+            details = ", ".join(f"<{el.tag}> on line {approx}" for _, el, approx in elLocations)
+            complaints.append((elLocations[0][0], f"  '{dupeId}': {details}"))
+
+    if complaints:
+        complaints.sort(key=lambda x: x[0])
+        warn(
+            "Multiple elements have the same id; deduping, but these IDs may not be stable across revisions:\n"
+            + "\n".join(msg for _, msg in complaints),
+        )
 
 
 def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str | None:
@@ -1096,6 +1117,29 @@ def approximateLineNumber(el: t.ElementT, setIntermediate: bool = True) -> str |
     return approx
 
 
+class SortableLineNumber(t.NamedTuple):
+    line: int = 0
+    col: int = 0
+
+
+_ZERO_LINE_NUMBER = SortableLineNumber()
+
+
+def sortableLineNumber(approx: str | None) -> SortableLineNumber:
+    if not approx:
+        return _ZERO_LINE_NUMBER
+    lineStr, _, colStr = approx.lstrip("~").partition(":")
+    try:
+        line = int(lineStr)
+    except ValueError:
+        return _ZERO_LINE_NUMBER
+    try:
+        col = int(colStr)
+    except ValueError:
+        col = 0
+    return SortableLineNumber(line, col)
+
+
 def parseLineNumber(el: t.ElementT) -> int | None:
     # Gets a line number, if possible, from an element,
     # removing the column and context cruft.
@@ -1111,47 +1155,41 @@ def parseLineNumber(el: t.ElementT) -> int | None:
             return None
 
 
+_CIRCLED_DIGITS_TABLE = str.maketrans("0123456789", "⓪①②③④⑤⑥⑦⑧⑨")
+
+
 def circledDigits(num: int) -> str:
     """
     Converts a base-10 number into a string using unicode circled digits.
     That is, 123 becomes "①②③"
     """
     assert num >= 0
-    digits = ["⓪", "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
-    result = "".join(digits[int(d)] for d in str(num))
-    return result
+    return str(num).translate(_CIRCLED_DIGITS_TABLE)
 
 
 def collectIds(el: t.ElementT, ids: dict[str, t.ElementT] | None = None) -> dict[str, t.ElementT]:
     if ids is None:
         ids = {}
-    id = el.get("id", "")
-    if id and id not in ids:
-        ids[id] = el
-    for child in childElements(el):
-        collectIds(child, ids)
+    for child in treeElements(el):
+        id = child.get("id")
+        if id and id not in ids:
+            ids[id] = child
     return ids
 
 
 def collectAutolinks(el: t.ElementT, links: list[t.ElementT] | None = None) -> list[t.ElementT]:
     if links is None:
         links = []
-    if tagName(el) == "a" and not hasAttr(el, "href") and el.get("data-link-type", "") != "biblio":
-        links.append(el)
-    elif tagName(el) == "bs-link":
-        links.append(el)
-    for child in childElements(el):
-        collectAutolinks(child, links)
+    for child in treeElements(el, "a", "bs-link"):
+        if child.tag == "bs-link" or ("href" not in child.attrib and child.get("data-link-type") != "biblio"):
+            links.append(child)
     return links
 
 
 def collectSyntaxHighlightables(el: t.ElementT, els: list[t.ElementT] | None = None) -> list[t.ElementT]:
     if els is None:
         els = []
-    if tagName(el) in ("xmp", "pre", "code"):
-        els.append(el)
-    for child in childElements(el):
-        collectSyntaxHighlightables(child, els)
+    els.extend(treeElements(el, "xmp", "pre", "code"))
     return els
 
 

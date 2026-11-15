@@ -206,13 +206,13 @@ def linkTypeIn(startTypes: str | t.AbstractSet[str], targetTypes: str | t.Abstra
     # tests if the passed type is a valid dfn/link type.
     if isinstance(startTypes, str):
         startTypes = linkTypeToDfnType[startTypes]
-    else:
+    elif not isinstance(startTypes, (set, frozenset)):
         startTypes = set(startTypes)
     if isinstance(targetTypes, str):
         targetTypes = linkTypeToDfnType[targetTypes]
-    else:
+    elif not isinstance(targetTypes, (set, frozenset)):
         targetTypes = set(targetTypes)
-    return bool(startTypes & targetTypes)
+    return not startTypes.isdisjoint(targetTypes)
 
 
 # Elements that are allowed to provide definitions to Shepherd
