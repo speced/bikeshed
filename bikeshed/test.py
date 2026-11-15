@@ -29,7 +29,7 @@ class TestFilter:
     def fromOptions(options: argparse.Namespace) -> TestFilter:
         if options.manualOnly is not None:
             manualOnly = options.manualOnly
-        elif options.folders or options.files:
+        elif options.folders or options.files or options.rebase:
             manualOnly = False
         else:
             manualOnly = True

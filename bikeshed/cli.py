@@ -397,7 +397,7 @@ def main() -> None:
         "--rebase",
         default=False,
         action="store_true",
-        help="Rebase the specified files.",
+        help="Rebase the specified files. (Defaults to rebasing all tests if no filters are specified.)",
     )
     testScopeGroup = testParser.add_mutually_exclusive_group()
     testScopeGroup.add_argument(
