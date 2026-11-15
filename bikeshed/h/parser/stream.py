@@ -60,8 +60,8 @@ DEFAULT_PARSE_CONFIG = ParseConfig()
 
 @dataclass
 class Stream:
-    _chars: str
-    _len: int
+    chars: str
+    length: int
     _lineBreaks: list[int]
     startLine: int
     config: ParseConfig
@@ -72,57 +72,65 @@ class Stream:
         if depth > 10:
             msg = "HTML parsing recursed more than 10 levels deep; probably an infinite loop."
             raise RecursionError(msg)
-        self._chars = chars
-        self._len = len(chars)
-        self._lineBreaks = []
+        self.chars = chars
+        self.length = len(chars)
+        lineBreaks = []
+        idx = chars.find("\n")
+        while idx != -1:
+            lineBreaks.append(idx)
+            idx = chars.find("\n", idx + 1)
+        self._lineBreaks = lineBreaks
         self.startLine = startLine
         self.config = config
         self.depth = depth
         self.openEls = TagStack(opaqueTags=config.opaqueElements)
-        for i, char in enumerate(chars):
-            if char == "\n":
-                self._lineBreaks.append(i)
 
     def subStream(self, context: str, chars: str, startLine: int = 1) -> Stream:
         newConfig = dataclasses.replace(self.config, context=context)
         return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
 
     def __getitem__(self, key: int) -> str:
-        if key < 0 or key >= self._len:
+        if key < 0 or key >= self.length:
             return ""
-        return self._chars[key]
+        return self.chars[key]
 
     def slice(self, start: int | None, stop: int | None) -> str:
         if start is not None and start < 0:
             start = 0
         if stop is not None and stop < 0:
             stop = 0
-        return self._chars[start:stop]
+        return self.chars[start:stop]
 
     def eof(self, index: int) -> bool:
-        return index >= self._len
+        return index >= self.length
 
     def __len__(self) -> int:
-        return self._len
+        return self.length
 
     @property
     def context(self) -> str | None:
         return self.config.context
 
-    def line(self, index: int) -> int:
+    def lineIndex(self, index: int) -> int:
         # Zero-based line index
-        lineIndex = bisect.bisect_left(self._lineBreaks, index)
+        return bisect.bisect_left(self._lineBreaks, index)
+
+    def line(self, index: int, lineIndex: int | None = None) -> int:
+        if lineIndex is None:
+            lineIndex = self.lineIndex(index)
         return lineIndex + self.startLine
 
-    def col(self, index: int) -> int:
-        lineIndex = bisect.bisect_left(self._lineBreaks, index)
+    def col(self, index: int, lineIndex: int | None = None) -> int:
+        if lineIndex is None:
+            lineIndex = self.lineIndex(index)
         if lineIndex == 0:
             return index + 1
         startOfCol = self._lineBreaks[lineIndex - 1]
         return index - startOfCol
 
     def loc(self, index: int) -> str:
-        rc = f"{self.line(index)}:{self.col(index)}"
+        lineIndex = self.lineIndex(index)
+        rc = f"{self.line(index, lineIndex)}:{self.col(index, lineIndex)}"
         if self.config.context is None:
             return rc
         return f"{rc} of {self.config.context}"
@@ -130,37 +138,29 @@ class Stream:
     def skipTo(self, start: int, text: str) -> ResultT[str]:
         # Skip forward until encountering `text`.
         # Produces the text encountered before this point.
-        i = start
-        textLen = len(text)
-        while not self.eof(i):
-            if self.slice(i, i + textLen) == text:
-                break
-            i += 1
-        if self.slice(i, i + textLen) == text:
-            return Ok(self.slice(start, i), i)
-        else:
-            return Err(start)
+        i = self.chars.find(text, start)
+        if i != -1:
+            return Ok(self.chars[start:i], i)
+        return Err(start)
 
     def skipToSameLine(self, start: int, text: str) -> ResultT[str]:
         # Skips forward, but no further than the end of the current line.
-        # Produces the text encounted before this point.
-        i = start
-        textLen = len(text)
-        while not self.eof(i) and self[i] != "\n":
-            if self.slice(i, i + textLen) == text:
-                return Ok(self.slice(start, i), i)
-            i += 1
+        # Produces the text encountered before this point.
+        lineEnd = self.chars.find("\n", start)
+        i = self.chars.find(text, start) if lineEnd == -1 else self.chars.find(text, start, lineEnd)
+        if i != -1:
+            return Ok(self.chars[start:i], i)
         return Err(start)
 
     def matchRe(self, start: int, pattern: t.Pattern) -> ResultT[t.Match]:
-        match = pattern.match(self._chars, start)
+        match = pattern.match(self.chars, start)
         if match:
             return Ok(match, match.end())
         else:
             return Err(start)
 
     def searchRe(self, start: int, pattern: t.Pattern) -> ResultT[t.Match]:
-        match = pattern.search(self._chars, start)
+        match = pattern.search(self.chars, start)
         if match:
             return Ok(match, match.end())
         else:
@@ -196,7 +196,7 @@ class Stream:
         # Returns an OOB index if on the last line.
         lineIndex = self.followingLinebreakIndex(start)
         if lineIndex >= len(self._lineBreaks):
-            return len(self._chars)
+            return self.length
         else:
             return self._lineBreaks[lineIndex] + 1
 

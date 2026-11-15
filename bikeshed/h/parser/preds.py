@@ -222,118 +222,18 @@ xmlishTagnames = {
 }
 
 
-def isXMLishTagname(tagname: str) -> bool:
-    return tagname in xmlishTagnames
-
-
-def isTagnameChar(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    if ch in "-.0123456789_" or isASCIIAlpha(ch):
-        return True
-    cp = ord(ch)
-    if cp == 0xB7:
-        return True
-    if 0xC0 <= cp <= 0x1FFF:
-        return cp not in (0xD7, 0xF7, 0x37E)
-    if cp in (0x200C, 0x200D, 0x203F, 0x2040):
-        return True
-    if 0x2070 <= cp <= 0x218F:
-        return True
-    if 0x2C00 <= cp <= 0x2FEF:
-        return True
-    if 0x3001 <= cp <= 0xD7FF:
-        return True
-    if 0xF900 <= cp <= 0xFDCF:
-        return True
-    if 0xFDF0 <= cp <= 0xFFFD:
-        return True
-    if 0x10000 <= cp <= 0xEFFFF:
-        return True
-    return False
-
-
-def isAttrNameChar(ch: str) -> bool:
-    # Technically, HTML is super forgiving of attr name chars, for some reason.
-    # But since I eventually pass this into LXML, I need to abide by XML name rules,
-    # where attr names follow the same rules as tag names.
-    # For example, <foo \=val> is valid in HTML, but not in XML.
-    return isTagnameChar(ch) or ch == ":"
-    # This is the real requirements for HTML attr names:
-    # if len(ch) != 1:
-    #     return False
-    # if isWhitespace(ch) or ch in "/<>=\"'" or ord(ch) == 0:
-    #     return False
-    # return True
-
-
-def isASCII(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    cp = ord(ch)
-    return cp <= 127
-
-
-def isASCIIAlphanum(ch: str) -> bool:
-    return isASCIIAlpha(ch) or isDigit(ch)
-
-
-def isASCIIAlpha(ch: str) -> bool:
-    return isASCIILowerAlpha(ch) or isASCIIUpperAlpha(ch)
-
-
-def isASCIILowerAlpha(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    return ch in "abcdefghijklmnopqrstuvwxyz"
-
-
-def isASCIIUpperAlpha(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    return ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-
-def isDigit(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    return ch in "0123456789"
-
-
-def isHexDigit(ch: str) -> bool:
-    if len(ch) != 1:
-        return False
-    return ch in "0123456789abcdefABCDEF"
-
-
-def isWhitespace(ch: str | int) -> bool:
-    if isinstance(ch, str):
-        if len(ch) != 1:
-            return False
-        cp = ord(ch)
-    else:
-        cp = ch
-    return cp in (0x9, 0xA, 0xC, 0x20)
-
-
-def isControl(ch: str | int) -> bool:
-    if isinstance(ch, str):
-        if len(ch) != 1:
-            return False
-        cp = ord(ch)
-    else:
-        cp = ch
-    return (0 <= cp <= 0x08) or (cp == 0x0B) or (0x0D <= cp <= 0x1F) or (0x7F <= cp <= 0x9F)
-
-
-def isNoncharacter(ch: str | int) -> bool:
-    if isinstance(ch, str):
-        if len(ch) != 1:
-            return False
-        cp = ord(ch)
-    else:
-        cp = ch
-    return 0xFDD0 <= cp <= 0xFDEF or cp in (
+_ASCII_LOWER = frozenset("abcdefghijklmnopqrstuvwxyz")
+_ASCII_UPPER = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+_ASCII_ALPHA = _ASCII_LOWER | _ASCII_UPPER
+_DIGIT = frozenset("0123456789")
+_HEX_DIGIT = _DIGIT | frozenset("abcdefABCDEF")
+_ASCII_ALPHANUM = _ASCII_ALPHA | _DIGIT
+_ASCII_TAGNAME = _ASCII_ALPHANUM | frozenset("-._")
+_ASCII_ATTRNAME = _ASCII_TAGNAME | frozenset(":")
+WHITESPACE_CHARS = frozenset("\t\n\x0c ")
+_WHITESPACE_CPS = frozenset((0x9, 0xA, 0xC, 0x20))
+_NONCHARACTER_CPS = frozenset(
+    (
         0xFFFE,
         0xFFFF,
         0x1FFFE,
@@ -368,7 +268,113 @@ def isNoncharacter(ch: str | int) -> bool:
         0xFFFFF,
         0x10FFFE,
         0x10FFFF,
-    )
+    ),
+)
+
+
+def isXMLishTagname(tagname: str) -> bool:
+    return tagname in xmlishTagnames
+
+
+def isTagnameChar(ch: str) -> bool:
+    if ch in _ASCII_TAGNAME:
+        return True
+    if len(ch) != 1:
+        return False
+    cp = ord(ch)
+    if cp < 0xB7:
+        return False
+    if cp == 0xB7:
+        return True
+    if 0xC0 <= cp <= 0x1FFF:
+        return cp not in (0xD7, 0xF7, 0x37E)
+    if cp in (0x200C, 0x200D, 0x203F, 0x2040):
+        return True
+    if 0x2070 <= cp <= 0x218F:
+        return True
+    if 0x2C00 <= cp <= 0x2FEF:
+        return True
+    if 0x3001 <= cp <= 0xD7FF:
+        return True
+    if 0xF900 <= cp <= 0xFDCF:
+        return True
+    if 0xFDF0 <= cp <= 0xFFFD:
+        return True
+    if 0x10000 <= cp <= 0xEFFFF:
+        return True
+    return False
+
+
+def isAttrNameChar(ch: str) -> bool:
+    # Technically, HTML is super forgiving of attr name chars, for some reason.
+    # But since I eventually pass this into LXML, I need to abide by XML name rules,
+    # where attr names follow the same rules as tag names.
+    # For example, <foo \=val> is valid in HTML, but not in XML.
+    if ch in _ASCII_ATTRNAME:
+        return True
+    return isTagnameChar(ch)
+    # This is the real requirements for HTML attr names:
+    # if len(ch) != 1:
+    #     return False
+    # if isWhitespace(ch) or ch in "/<>=\"'" or ord(ch) == 0:
+    #     return False
+    # return True
+
+
+def isASCII(ch: str) -> bool:
+    if len(ch) != 1:
+        return False
+    return ord(ch) <= 127
+
+
+def isASCIIAlphanum(ch: str) -> bool:
+    return ch in _ASCII_ALPHANUM
+
+
+def isASCIIAlpha(ch: str) -> bool:
+    return ch in _ASCII_ALPHA
+
+
+def isASCIILowerAlpha(ch: str) -> bool:
+    return ch in _ASCII_LOWER
+
+
+def isASCIIUpperAlpha(ch: str) -> bool:
+    return ch in _ASCII_UPPER
+
+
+def isDigit(ch: str) -> bool:
+    return ch in _DIGIT
+
+
+def isHexDigit(ch: str) -> bool:
+    return ch in _HEX_DIGIT
+
+
+def isWhitespace(ch: str | int) -> bool:
+    if isinstance(ch, str):
+        return ch in WHITESPACE_CHARS
+    return ch in _WHITESPACE_CPS
+
+
+def isControl(ch: str | int) -> bool:
+    if isinstance(ch, str):
+        if len(ch) != 1:
+            return False
+        cp = ord(ch)
+    else:
+        cp = ch
+    return (0 <= cp <= 0x08) or (cp == 0x0B) or (0x0D <= cp <= 0x1F) or (0x7F <= cp <= 0x9F)
+
+
+def isNoncharacter(ch: str | int) -> bool:
+    if isinstance(ch, str):
+        if len(ch) != 1:
+            return False
+        cp = ord(ch)
+    else:
+        cp = ch
+    return 0xFDD0 <= cp <= 0xFDEF or cp in _NONCHARACTER_CPS
 
 
 charRefs = {

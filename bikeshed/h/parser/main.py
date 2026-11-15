@@ -69,6 +69,16 @@ def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> t.Ear
             if withIlcc:
                 strs.append(ilcc * node.data.count("\n"))
             continue
+        if isinstance(node, RawText):
+            s = node.text
+            if withIlcc and node.hasLCCs:
+                diff = node.height - s.count("\n")
+                if diff > 0:
+                    s += ilcc * diff
+                elif diff < 0:
+                    s += dlcc * -diff
+            strs.append(s)
+            continue
         s = str(node)
         if withIlcc:
             diff = node.height - s.count("\n")

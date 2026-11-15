@@ -17,6 +17,33 @@ ParserNodeT: t.TypeAlias = (
 )
 
 
+_VOID_ELEMENTS = frozenset(
+    (
+        "area",
+        "base",
+        "br",
+        "col",
+        "command",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "keygen",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    ),
+)
+
+_APOS_START_WORD_RE = re.compile(r"'\w")
+_APOS_WORD_CHAR_RE = re.compile(r"\w")
+_APOS_IN_WORD_RE = re.compile(r"(\w)'(\w)")
+_APOS_START_SPACE_RE = re.compile(r"'\s")
+
+
 def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
     s = f"<{tagName}"
     lineBreakAttrs = []
@@ -34,6 +61,11 @@ def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
 def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
     if "bs-line-number" in attrs:
         yield "bs-line-number", attrs["bs-line-number"]
+        if len(attrs) == 1:
+            return
+        if len(attrs) == 2 and "class" in attrs:
+            yield "class", attrs["class"]
+            return
     for k, v in sorted(attrs.items()):
         if k in ("bs-line-number", "class"):
             continue
@@ -54,15 +86,35 @@ def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
 
 @dataclass
 class ParserNode(metaclass=ABCMeta):
-    line: int
-    endLine: int
-    loc: str
-    endLoc: str
-    context: str | None
+    s: Stream = field(repr=False)
+    start: int = field(repr=False)
+    end: int = field(repr=False)
+
+    @property
+    def line(self) -> int:
+        return self.s.line(self.start)
+
+    @property
+    def endLine(self) -> int:
+        return self.line + self.height
+
+    @property
+    def loc(self) -> str:
+        return self.s.loc(self.start)
+
+    @property
+    def endLoc(self) -> str:
+        return self.s.loc(self.end)
+
+    @property
+    def context(self) -> str | None:
+        return self.s.context
 
     @property
     def height(self) -> int:
-        return self.endLine - self.line
+        if self.start == self.end:
+            return 0
+        return self.s.chars.count("\n", self.start, self.end)
 
     @abstractmethod
     def __str__(self) -> str:
@@ -72,6 +124,7 @@ class ParserNode(metaclass=ABCMeta):
 @dataclass
 class Text(ParserNode, metaclass=ABCMeta):
     text: str
+    hasLCCs: bool = field(default=False, repr=False)
 
 
 @dataclass
@@ -81,38 +134,59 @@ class RawText(Text):
     def __str__(self) -> str:
         return self.text
 
+    @property
+    def height(self) -> int:
+        if not self.hasLCCs:
+            return self.text.count("\n")
+        if self.start == self.end:
+            return 0
+        return self.s.chars.count("\n", self.start, self.end)
+
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
+        if text is None:
+            return cls(
+                s=s,
+                start=start,
+                end=end,
+                text=s.chars[start:end],
+                hasLCCs=False,
+            )
+        if start == end and "\n" not in text:
+            hasLCCs = False
+        else:
+            hasLCCs = text.count("\n") != s.chars.count("\n", start, end)
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
-            text=text if text is not None else s.slice(start, end),
+            s=s,
+            start=start,
+            end=end,
+            text=text,
+            hasLCCs=hasLCCs,
         )
 
     @classmethod
     def fromSafeText(cls, node: SafeText) -> t.Self:
         return cls(
-            line=node.line,
-            endLine=node.endLine,
-            loc=node.loc,
-            endLoc=node.endLoc,
-            context=node.context,
+            s=node.s,
+            start=node.start,
+            end=node.end,
             text=str(node),
+            hasLCCs=node.hasLCCs,
         )
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
-        if re.match(r"'\w", self.text):
-            if isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
-                self.text = "’" + self.text[1:]
-            elif isinstance(lastNode, RawText) and re.match(r"\w", lastNode.text[-1]):
+        if "'" not in self.text:
+            return self
+        if self.text[0] == "'":
+            if _APOS_START_WORD_RE.match(self.text):
+                if isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
+                    self.text = "’" + self.text[1:]
+                elif isinstance(lastNode, RawText) and _APOS_WORD_CHAR_RE.match(lastNode.text[-1]):
+                    self.text = "’" + self.text[1:]
+            elif isinstance(lastNode, EndTag) and lastNode.tag == "var" and _APOS_START_SPACE_RE.match(self.text):
                 self.text = "’" + self.text[1:]
         if "'" in self.text:
-            self.text = re.sub(r"(\w)'(\w)", r"\1’\2", self.text)
-        if isinstance(lastNode, EndTag) and lastNode.tag == "var" and re.match(r"'\s", self.text):
-            self.text = "’" + self.text[1:]
+            self.text = _APOS_IN_WORD_RE.sub(r"\1’\2", self.text)
         return self
 
     def needsLCCs(self) -> bool:
@@ -120,7 +194,7 @@ class RawText(Text):
         Whether or not the node will eventally insert an ILCC or DLCC
         to fix the line count when serializing to a string.
         """
-        return self.text.count("\n") != self.height
+        return self.hasLCCs
 
 
 @dataclass
@@ -132,13 +206,24 @@ class SafeText(Text):
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
+        if text is None:
+            return cls(
+                s=s,
+                start=start,
+                end=end,
+                text=s.chars[start:end],
+                hasLCCs=False,
+            )
+        if start == end and "\n" not in text:
+            hasLCCs = False
+        else:
+            hasLCCs = text.count("\n") != s.chars.count("\n", start, end)
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
-            text=text if text is not None else s.slice(start, end),
+            s=s,
+            start=start,
+            end=end,
+            text=text,
+            hasLCCs=hasLCCs,
         )
 
 
@@ -152,11 +237,9 @@ class Doctype(ParserNode):
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             data=data,
         )
 
@@ -180,11 +263,9 @@ class StartTag(ParserNode):
         if attrs is None:
             attrs = {}
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             tag=tag,
             attrs=attrs,
         )
@@ -223,11 +304,9 @@ class SelfClosedTag(ParserNode):
         if attrs is None:
             attrs = {}
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             tag=tag,
             attrs=attrs,
         )
@@ -235,11 +314,9 @@ class SelfClosedTag(ParserNode):
     @classmethod
     def fromStartTag(cls, tag: StartTag) -> t.Self:
         return cls(
-            line=tag.line,
-            endLine=tag.endLine,
-            loc=tag.loc,
-            endLoc=tag.endLoc,
-            context=tag.context,
+            s=tag.s,
+            start=tag.start,
+            end=tag.end,
             tag=tag.tag,
             attrs=tag.attrs,
             classes=tag.classes,
@@ -247,28 +324,9 @@ class SelfClosedTag(ParserNode):
 
     def __str__(self) -> str:
         s = startTagStrFromNode(self)
-        if self.tag in (
-            "area",
-            "base",
-            "br",
-            "col",
-            "command",
-            "embed",
-            "hr",
-            "img",
-            "input",
-            "keygen",
-            "link",
-            "meta",
-            "param",
-            "source",
-            "track",
-            "wbr",
-        ):
+        if self.tag in _VOID_ELEMENTS:
             return s
-        else:
-            return s + f"</{self.tag}>"
-        return s
+        return s + f"</{self.tag}>"
 
     def finalize(self) -> SelfClosedTag:
         if "class" in self.attrs:
@@ -288,11 +346,9 @@ class EndTag(ParserNode):
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, tag: str | StartTag) -> t.Self:
         endTag = cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             tag=tag if isinstance(tag, str) else tag.tag,
             startTag=tag if isinstance(tag, StartTag) else None,
         )
@@ -311,11 +367,9 @@ class Comment(ParserNode):
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             data=data,
         )
 
@@ -336,11 +390,9 @@ class RawElement(ParserNode):
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             tag=startTag.tag,
             startTag=startTag,
             data=data,
@@ -363,11 +415,9 @@ class SafeElement(ParserNode):
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:
         return cls(
-            line=s.line(start),
-            endLine=s.line(end),
-            loc=s.loc(start),
-            endLoc=s.loc(end),
-            context=s.context,
+            s=s,
+            start=start,
+            end=end,
             tag=startTag.tag,
             startTag=startTag,
             data=data,
@@ -392,6 +442,121 @@ def minimalEscapeAttr(text: str) -> t.SafeAttrStr:
 
 def unescapeAttr(text: t.SafeAttrStr | t.EmptyLiteralStr) -> str:
     return str(text.replace("&#34;", '"').replace("&#38;", "&"))
+
+
+_HEADING_TAGS = frozenset(("h1", "h2", "h3", "h4", "h5", "h6"))
+
+_AUTO_CLOSE_P_START_TAGS = frozenset(
+    (
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "center",
+        "details",
+        "dialog",
+        "dir",
+        "div",
+        "dl",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "header",
+        "hgroup",
+        "main",
+        "menu",
+        "nav",
+        "ol",
+        "p",
+        "search",
+        "section",
+        "summary",
+        "ul",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "pre",
+        "listing",
+        "form",
+        "plaintext",
+        "table",
+        "hr",
+        "xmp",
+    ),
+)
+
+_AUTO_CLOSE_P_END_TAGS = frozenset(
+    (
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "body",
+        "center",
+        "details",
+        "dialog",
+        "dir",
+        "div",
+        "dl",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "header",
+        "hgroup",
+        "html",
+        "main",
+        "menu",
+        "nav",
+        "ol",
+        "search",
+        "section",
+        "summary",
+        "ul",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "pre",
+        "listing",
+        "form",
+        "plaintext",
+        "table",
+        "caption",
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "td",
+        "th",
+        "li",
+        "dt",
+        "dd",
+    ),
+)
+
+_TAG_CONTEXT_REQS: dict[str, tuple[str, ...]] = {
+    "td": ("tr", "table"),
+    "th": ("tr", "table"),
+    "col": ("colgroup", "table"),
+    "tr": ("table",),
+    "tbody": ("table",),
+    "thead": ("table",),
+    "tfoot": ("table",),
+    "caption": ("table",),
+    "colgroup": ("table",),
+    "figcaption": ("figure",),
+    "legend": ("fieldset",),
+    "fieldset": ("form",),
+    "dt": ("dl",),
+    "dd": ("dl",),
+}
 
 
 @dataclass
@@ -475,7 +640,7 @@ class TagStack:
                     # but they're not actually open,
                     # that's fine
                     return
-                if node.tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+                if node.tag in _HEADING_TAGS:
                     # People put the wrong closing tag on headings all the time.
                     # Auto-close the nearest heading, whatever it is,
                     # and report it as an error.
@@ -556,46 +721,7 @@ class TagStack:
         # (Only valid HTML; real parsers do a lot more work.)
         if not self.tags:
             return
-        if tag in (
-            "address",
-            "article",
-            "aside",
-            "blockquote",
-            "center",
-            "details",
-            "dialog",
-            "dir",
-            "div",
-            "dl",
-            "fieldset",
-            "figcaption",
-            "figure",
-            "footer",
-            "header",
-            "hgroup",
-            "main",
-            "menu",
-            "nav",
-            "ol",
-            "p",
-            "search",
-            "section",
-            "summary",
-            "ul",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "pre",
-            "listing",
-            "form",
-            "plaintext",
-            "table",
-            "hr",
-            "xmp",
-        ):
+        if tag in _AUTO_CLOSE_P_START_TAGS:
             self.virtualClose(node, ["p"])
         if tag == "li":
             self.virtualClose(node, ["p"], ["ol", "ul"])
@@ -641,55 +767,9 @@ class TagStack:
         # Handle any auto-closing that occurs as a result
         # of seeing a particular end tag.
         # (Only valid HTML; real parsers do a lot more work.)
-        if tag in (
-            "address",
-            "article",
-            "aside",
-            "blockquote",
-            "body",
-            "center",
-            "details",
-            "dialog",
-            "dir",
-            "div",
-            "dl",
-            "fieldset",
-            "figcaption",
-            "figure",
-            "footer",
-            "header",
-            "hgroup",
-            "html",
-            "main",
-            "menu",
-            "nav",
-            "ol",
-            "search",
-            "section",
-            "summary",
-            "ul",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "pre",
-            "listing",
-            "form",
-            "plaintext",
-            "table",
-            "caption",
-            "thead",
-            "tbody",
-            "tfoot",
-            "tr",
-            "td",
-            "th",
-            "li",
-            "dt",
-            "dd",
-        ):
+        if not self.tags:
+            return
+        if tag in _AUTO_CLOSE_P_END_TAGS:
             self.virtualClose(node, ["p"])
         if tag in ("ol", "ul"):
             self.virtualClose(node, ["li"], ["ol", "ul"])
@@ -785,26 +865,17 @@ class TagStack:
 
     def nearestHeading(self) -> TagStackEntry | None:
         for entry in reversed(self.tags):
-            if entry.startTag.tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            if entry.startTag.tag in _HEADING_TAGS:
                 return entry
         return None
 
     def verifyTagContext(self, node: StartTag) -> None:
         # Checks that elements that can only live in certain contexts
         # actually have their correct wrappers.
-        tag = node.tag
-        reqs: list[tuple[tuple[str, ...], str]] = [
-            (("td", "th"), "tr"),
-            (("col",), "colgroup"),
-            (("td", "th", "tr", "tbody", "thead", "tfoot", "caption", "col", "colgroup"), "table"),
-            (("figcaption",), "figure"),
-            (("legend",), "fieldset"),
-            (("fieldset",), "form"),
-            (("dt", "dd"), "dl"),
-        ]
-        for tagNames, parentTag in reqs:
-            if tag in tagNames and not self.inTagContext(parentTag):
-                m.die(f"Saw a <{tag}> that wasn't in a <{parentTag}>", lineNum=node.loc)
+        if reqParents := _TAG_CONTEXT_REQS.get(node.tag):
+            for parentTag in reqParents:
+                if not self.inTagContext(parentTag):
+                    m.die(f"Saw a <{node.tag}> that wasn't in a <{parentTag}>", lineNum=node.loc)
         # FIXME: Until I integrate the markdown parser, I can't rely on this,
         # since there might be a *markdown* li/dt/dd between the element
         # and the "parent" ul.

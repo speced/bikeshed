@@ -1058,7 +1058,6 @@ def dedupIDs(doc: t.SpecT) -> None:
             firstSeen[elId] = el
     if not dupes:
         return
-    trans = doc.md.translateIDs
     complaints: list[tuple[SortableLineNumber, str]] = []
     for dupeId, els in dupes.items():
         warnAboutDupes = not (dupeId.startswith("ref-for-") or _ISSUE_ID_RE.match(dupeId))
@@ -1073,7 +1072,7 @@ def dedupIDs(doc: t.SpecT) -> None:
         for el in els[1:]:
             altId = el.get("data-alternate-id")
             if altId and altId not in firstSeen:
-                el.set("id", trans.get(altId, altId))
+                el.set("id", safeID(doc, altId))
                 firstSeen[altId] = el
                 complaintEls.remove(el)
                 continue
@@ -1082,7 +1081,7 @@ def dedupIDs(doc: t.SpecT) -> None:
                 dedupIndex += 1
                 altId = f"{dupeId}{circledDigits(dedupIndex)}"
             dedupIndex += 1
-            el.set("id", trans.get(altId, altId))
+            el.set("id", safeID(doc, altId))
             firstSeen[altId] = el
 
         if len(complaintEls) > 1:

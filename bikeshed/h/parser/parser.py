@@ -59,6 +59,8 @@ BRACKET_AUTOLINK_CHARS = "=$:[]^"
 # (Adding more just means parseAnything will break text into
 #  smaller chunks; it doesn't affect correctness.)
 POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS + constants.bqChar
+POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(POSSIBLE_NODE_START_CHARS)}]")
+ACTUAL_NODE_START_SET = frozenset("&<>`'~[{|\\—-" + constants.bqChar)
 
 
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
@@ -82,7 +84,6 @@ def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None
                 continue
             if heldLast and isinstance(lastNode, RawText):
                 lastNode.text += node.text
-                lastNode.endLine += node.height
             else:
                 lastNode = node
                 heldLast = True
@@ -221,17 +222,15 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
     """
     if s.eof(start):
         return Err(start)
-    if s[start] in POSSIBLE_NODE_START_CHARS:
+    if s.chars[start] in ACTUAL_NODE_START_SET:
         res = parseNode(s, start)
         if isOk(res):
             val, i, err = res
             if not experimental:
                 s.observeResult(res)
             return (val, i, err)
-    i = start + 1
-    end = len(s)
-    while s[i] not in POSSIBLE_NODE_START_CHARS and i < end:
-        i += 1
+    match = POSSIBLE_NODE_START_RE.search(s.chars, start + 1)
+    i = match.start() if match else s.length
     node = RawText.fromStream(s, start, i)
     return Ok(node, i)
 
@@ -250,15 +249,27 @@ def parseNode(
     if s.eof(start):
         return Err(start)
 
-    first1 = s[start]
-    first2 = s.slice(start, start + 2)
-    first3 = s.slice(start, start + 3)
+    first1 = s.chars[start]
+    if first1 not in ACTUAL_NODE_START_SET:
+        return Err(start)
 
     node: ParserNode | list[ParserNode] | None
 
-    inOpaque = s.inOpaqueElement()
-    inA = s.inTagContext("a")
-    inDfn = s.inTagContext("dfn")
+    if first1 == "-":
+        if s.slice(start, start + 3) == "--\n":
+            match, i, _ = s.matchRe(start, emdashRe)
+            if match is not None:
+                node = RawText.fromStream(s, start, i, "—\u200b")
+                return Ok(node, i)
+        return Err(start)
+
+    if first1 == "—":
+        if s.slice(start, start + 2) == "—\n":
+            match, i, _ = s.matchRe(start, emdashRe)
+            if match is not None:
+                node = RawText.fromStream(s, start, i, "—\u200b")
+                return Ok(node, i)
+        return Err(start)
 
     if first1 == constants.bqChar:
         node = RawText.fromStream(s, start, start + 1, ">")
@@ -272,11 +283,21 @@ def parseNode(
                 return Ok(node, i)
             else:
                 return Ok(ch, i)
+        return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
 
     if first1 == "<":
         node, i, _ = parseAngleStart(s, start)
         if node is not None:
             return Ok(node, i)
+        if s[start + 1] not in ("<", "{"):
+            return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
+
+    first2 = s.slice(start, start + 2)
+    first3 = s.slice(start, start + 3)
+
+    inOpaque = s.inOpaqueElement()
+    inA = s.inTagContext("a")
+    inDfn = s.inTagContext("dfn")
 
     el: ParserNode | None
     if first1 in ("`", "~"):
@@ -463,14 +484,9 @@ def parseNode(
         if first1 == "\\" and isMarkdownEscape(s, start):
             node = RawText.fromStream(s, start, start + 2, htmlifyMarkdownEscapes(s.slice(start, start + 2)))
             return Ok(node, start + 2)
-    if first2 == "—\n" or first3 == "--\n":
-        match, i, _ = s.matchRe(start, emdashRe)
-        if match is not None:
-            # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-            node = RawText.fromStream(s, start, i, "—\u200b")
-            return Ok(node, i)
 
-    if first1 in ("<", "&"):
+    if first1 == "<":
+        # Wasn't a tag or a shortcut, so catch it at the end.
         return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
 
     return Err(start)
@@ -649,6 +665,16 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
         m.die("XML Processing Instructions are invalid in HTML.", lineNum=s.loc(start))
         return Err(start)
 
+    if s[i] == "/":
+        endTag, i, _ = parseEndTag(s, start)
+        if endTag is not None:
+            if endTag.tag == "l":
+                # Should have been caught by parseLToEnd().
+                # Since it wasn't, that means there was a parse error.
+                endTag.tag = "span"
+            return Ok(endTag, i)
+        return Err(start)
+
     startTag, i, _ = parseStartTag(s, start)
     if startTag is not None:
         if isinstance(startTag, (SelfClosedTag, list)):
@@ -748,14 +774,6 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
         else:
             return Ok(startTag, i)
 
-    endTag, i, _ = parseEndTag(s, start)
-    if endTag is not None:
-        if endTag.tag == "l":
-            # Should have been caught by parseLToEnd().
-            # Since it wasn't, that means there was a parse error.
-            endTag.tag = "span"
-        return Ok(endTag, i)
-
     if s.config.repositoryLinks:
         repolink, i, _ = parseRepositoryLink(s, start)
         if repolink is not None:
@@ -782,8 +800,8 @@ def isDatablock(tag: StartTag, loc: str) -> str | None:
         return None
 
 
-def isDatablockClass(text: str) -> bool:
-    datablockClasses = [
+_DATABLOCK_CLASSES = frozenset(
+    (
         "simpledef",
         "propdef",
         "descdef",
@@ -799,8 +817,12 @@ def isDatablockClass(text: str) -> bool:
         "include",
         "include-code",
         "include-raw",
-    ]
-    return text in datablockClasses
+    ),
+)
+
+
+def isDatablockClass(text: str) -> bool:
+    return text in _DATABLOCK_CLASSES
 
 
 def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) -> None:
@@ -949,32 +971,33 @@ ATTR_SHORTCUTS = {
 def canonicalizeShortcuts(el: StartTag | SelfClosedTag) -> StartTag | SelfClosedTag:
     # Take all the invalid-HTML shortcuts and fix them.
     attrs = el.attrs
-    for oldAttr, newAttr in ATTR_SHORTCUTS.items():
-        if oldAttr in attrs:
+    if not attrs:
+        return el
+    for oldAttr in tuple(attrs):
+        if newAttr := ATTR_SHORTCUTS.get(oldAttr):
             attrs[newAttr] = attrs.pop(oldAttr)
 
     # Some of these attrs conflict with existing real attributes on some elements.
     # Instead, limit the search/transforms to the relevant elements.
     tag = el.tag
     if tag in ("dfn", "h2", "h3", "h4", "h5", "h6"):
-        for dfnType in config.dfnTypes:
-            if dfnType in attrs:
-                if attrs[dfnType] == "":
+        for dfnType, val in attrs.items():
+            if dfnType in config.dfnTypes:
+                if val == "":
                     del attrs[dfnType]
                     attrs["data-dfn-type"] = escapeAttr(dfnType)
                     break
-                elif dfnType == "type" and attrs[dfnType] in config.dfnTypes:
-                    realDfnType = attrs[dfnType]
+                elif dfnType == "type" and val in config.dfnTypes:
                     m.die(
-                        f"You used type={realDfnType}, which isn't valid. Instead use just {realDfnType} as a boolean attribute, or dfn-type={realDfnType}.",
+                        f"You used type={val}, which isn't valid. Instead use just {val} as a boolean attribute, or dfn-type={val}.",
                         lineNum=el.loc,
                     )
                     del attrs["type"]
                     break
 
     if tag in ("a", "l"):
-        for linkType in config.linkTypes:
-            if linkType in attrs:
+        for linkType in attrs:
+            if linkType in config.linkTypes:
                 del attrs[linkType]
                 attrs["data-link-type"] = escapeAttr(linkType)
                 break
@@ -993,13 +1016,21 @@ def canonicalizeShortcuts(el: StartTag | SelfClosedTag) -> StartTag | SelfClosed
     return el
 
 
+_ASCII_TAGNAME_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9._-]*")
+_ASCII_ATTRNAME_RE = re.compile(r"[a-zA-Z0-9._:-]+")
+_WHITESPACE_RE = re.compile(r"[\t\n\x0c ]+")
+_WHITESPACE_OR_BQ_RE = re.compile(r"[\t\n\x0c " + constants.bqChar + r"]+")
+_WHITESPACE_OR_BQ_CHARS = preds.WHITESPACE_CHARS | frozenset((constants.bqChar,))
+
+
 def parseTagName(s: Stream, start: int) -> ResultT[str]:
-    if not preds.isASCIIAlpha(s[start]):
+    match = _ASCII_TAGNAME_RE.match(s.chars, start)
+    if not match:
         return Err(start)
-    end = start + 1
+    end = match.end()
     while preds.isTagnameChar(s[end]):
         end += 1
-    return Ok(s.slice(start, end).lower(), end)
+    return Ok(s.chars[start:end].lower(), end)
 
 
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
@@ -1064,7 +1095,8 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
 
 
 def parseAttribute(s: Stream, start: int) -> ResultT[tuple[str, str]]:
-    i = start
+    match = _ASCII_ATTRNAME_RE.match(s.chars, start)
+    i = match.end() if match else start
     while preds.isAttrNameChar(s[i]):
         i += 1
     if i == start:
@@ -1098,57 +1130,58 @@ def parseAttribute(s: Stream, start: int) -> ResultT[tuple[str, str]]:
 def parseQuotedAttrValue(s: Stream, start: int) -> ResultT[str]:
     endChar = s[start]
     i = start + 1
-
-    # Could just append chars one-by-one,
-    # but for efficiency track segments between char refs
-    # and append the whole thing at once when I hit one.
     val = ""
-    startSeg = i
-    while s[i] != endChar:
-        if s.eof(i):
+    while True:
+        endIndex = s.chars.find(endChar, i)
+        if endIndex == -1:
             m.die("Quoted attribute was never closed", lineNum=s.loc(start))
             return Err(start)
-        if s[i] == "&":
-            startRef = i
-            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
-            if ch is None:
-                i += 1
-                continue
-            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
-            startSeg = i
-            continue
-        i += 1
-    val += s.slice(startSeg, i)
-    i += 1
-    return Ok(val, i)
+        ampIndex = s.chars.find("&", i, endIndex)
+        if ampIndex == -1:
+            val += s.chars[i:endIndex]
+            return Ok(val, endIndex + 1)
+        val += s.chars[i:ampIndex]
+        ch, i, _ = parseCharRef(s, ampIndex, context=CharRefContext.Attr)
+        if ch is None:
+            val += "&"
+            i = ampIndex + 1
+        else:
+            val += printChAsCharRef(ch)
+
+
+_UNQUOTED_ATTR_STOP_RE = re.compile(r"[\t\n\x0c >\"'<`&]")
 
 
 def parseUnquotedAttrValue(s: Stream, start: int) -> ResultT[str]:
     i = start
     val = ""
-    startSeg = i
-    while not s.eof(i):
-        if s[i] == ">":
+    while match := _UNQUOTED_ATTR_STOP_RE.search(s.chars, i):
+        stopIndex = match.start()
+        ch = s.chars[stopIndex]
+        if ch == ">" or ch in preds.WHITESPACE_CHARS:
+            val += s.chars[i:stopIndex]
+            i = stopIndex
             break
-        if preds.isWhitespace(s[i]):
-            break
-        if s[i] in "\"'<`":
-            m.die(f"Character {s[i]} (at {s.loc(i)}) is invalid in unquoted attribute values.", lineNum=s.loc(start))
+        if ch in "\"'<`":
+            m.die(
+                f"Character {ch} (at {s.loc(stopIndex)}) is invalid in unquoted attribute values.",
+                lineNum=s.loc(start),
+            )
             return Err(start)
-        if s[i] == "&":
-            startRef = i
-            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
-            if ch is None:
-                i += 1
-                continue
-            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
-            startSeg = i
-            continue
-        i += 1
+        # Otherwise ch == "&"
+        val += s.chars[i:stopIndex]
+        ref, i, _ = parseCharRef(s, stopIndex, context=CharRefContext.Attr)
+        if ref is None:
+            val += "&"
+            i = stopIndex + 1
+        else:
+            val += printChAsCharRef(ref)
+    else:
+        val += s.chars[i:]
+        i = s.length
     if i == start:
         m.die("Missing attribute value.", lineNum=s.loc(start))
         return Err(start)
-    val += s.slice(startSeg, i)
     return Ok(val, i)
 
 
@@ -1279,23 +1312,19 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str 
 
 
 def parseWhitespace(s: Stream, start: int) -> ResultT[bool]:
-    i = start
-    while preds.isWhitespace(s[i]):
-        i += 1
-    if i != start:
-        return Ok(True, i)
-    else:
+    if start >= s.length or s.chars[start] not in preds.WHITESPACE_CHARS:
         return Err(start)
+    match = _WHITESPACE_RE.match(s.chars, start)
+    assert match is not None
+    return Ok(True, match.end())
 
 
 def parseWhitespaceOrBq(s: Stream, start: int) -> ResultT[bool]:
-    i = start
-    while preds.isWhitespace(s[i]) or s[i] == constants.bqChar:
-        i += 1
-    if i != start:
-        return Ok(True, i)
-    else:
+    if start >= s.length or s.chars[start] not in _WHITESPACE_OR_BQ_CHARS:
         return Err(start)
+    match = _WHITESPACE_OR_BQ_RE.match(s.chars, start)
+    assert match is not None
+    return Ok(True, match.end())
 
 
 def parseEndTag(s: Stream, start: int) -> ResultT[EndTag]:
@@ -1342,8 +1371,11 @@ def parseComment(s: Stream, start: int) -> ResultT[Comment]:
     dataStart = i
 
     while True:
-        while s[i] != "-" and not s.eof(i):
-            i += 1
+        dashIndex = s.chars.find("--", i)
+        if dashIndex == -1:
+            m.die("Hit EOF in the middle of a comment.", lineNum=s.loc(start))
+            return Err(start)
+        i = dashIndex
         if s.slice(i, i + 3) == "-->":
             return Ok(
                 Comment.fromStream(s, start, i + 3, s.slice(dataStart, i)),
@@ -1352,11 +1384,7 @@ def parseComment(s: Stream, start: int) -> ResultT[Comment]:
         if s.slice(i, i + 4) == "--!>":
             m.die("Malformed comment - don't use a ! at the end.", lineNum=s.loc(start))
             return Err(start)
-        if s.eof(i):
-            m.die("Hit EOF in the middle of a comment.", lineNum=s.loc(start))
-            return Err(start)
         i += 1
-    assert False
 
 
 def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
@@ -1374,50 +1402,29 @@ def parseScriptToEnd(s: Stream, start: int) -> OkT[str]:
     # Call with s[i] after the opening <script> tag.
     # Returns with s[i] after the </script> tag,
     # with text contents in the Result.
-
-    i = start
-    while True:
-        while s[i] != "<" and not s.eof(i):
-            i += 1
-        if s.eof(i):
-            m.die("Hit EOF in the middle of a <script>.", lineNum=s.loc(start))
-            return Ok(s.slice(start, None), i)
-        if s.slice(i, i + 9) == "</script>":
-            return Ok(s.slice(start, i), i + 9)
-        i += 1
-    assert False
+    i = s.chars.find("</script>", start)
+    if i == -1:
+        m.die("Hit EOF in the middle of a <script>.", lineNum=s.loc(start))
+        return Ok(s.slice(start, None), len(s))
+    return Ok(s.slice(start, i), i + 9)
 
 
 def parseStyleToEnd(s: Stream, start: int) -> OkT[str]:
     # Identical to parseScriptToEnd
-
-    i = start
-    while True:
-        while s[i] != "<" and not s.eof(i):
-            i += 1
-        if s.eof(i):
-            m.die("Hit EOF in the middle of a <style>.", lineNum=s.loc(start))
-            return Ok(s.slice(start, None), i)
-        if s.slice(i, i + 8) == "</style>":
-            return Ok(s.slice(start, i), i + 8)
-        i += 1
-    assert False
+    i = s.chars.find("</style>", start)
+    if i == -1:
+        m.die("Hit EOF in the middle of a <style>.", lineNum=s.loc(start))
+        return Ok(s.slice(start, None), len(s))
+    return Ok(s.slice(start, i), i + 8)
 
 
 def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
     # Identical to parseScriptToEnd
-
-    i = start
-    while True:
-        while s[i] != "<" and not s.eof(i):
-            i += 1
-        if s.eof(i):
-            m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
-            return Ok(s.slice(start, None), i)
-        if s.slice(i, i + 6) == "</xmp>":
-            return Ok(s.slice(start, i), i + 6)
-        i += 1
-    assert False
+    i = s.chars.find("</xmp>", start)
+    if i == -1:
+        m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
+        return Ok(s.slice(start, None), len(s))
+    return Ok(s.slice(start, i), i + 6)
 
 
 def parseTitleToEnd(s: Stream, start: int) -> ResultT[str]:
@@ -1456,6 +1463,9 @@ def parseTitleToEnd(s: Stream, start: int) -> ResultT[str]:
     return Ok(val, i + 8)
 
 
+_DATABLOCK_PRE_STOP_RE = re.compile(r"</pre>|&")
+
+
 def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
     # Identical to parseScriptToEnd, except I need to
     # convert named HTML entities to numeric ones,
@@ -1465,24 +1475,21 @@ def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
     val = ""
     startSeg = i
     while True:
-        if s.eof(i):
+        match = _DATABLOCK_PRE_STOP_RE.search(s.chars, i)
+        if match is None:
             m.die("Hit EOF in the middle of a <pre> datablock.", lineNum=s.loc(start))
             return Err(start)
-        elif s.slice(i, i + 6) == "</pre>":
+        i = match.start()
+        if match.group(0) == "</pre>":
             val += s.slice(startSeg, i)
-            break
-        elif s[i] == "&":
-            startRef = i
-            ch, i, _ = parseCharRef(s, i, context=CharRefContext.DatablockPre)
-            if ch is None:
-                i += 1
-                continue
-            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
-            startSeg = i
-            continue
-        else:
+            return Ok(val, i + 6)
+        startRef = i
+        ch, i, _ = parseCharRef(s, i, context=CharRefContext.DatablockPre)
+        if ch is None:
             i += 1
-    return Ok(val, i + 6)
+            continue
+        val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
+        startSeg = i
 
 
 def parseOpaqueToEnd(s: Stream, dataStart: int, startTag: StartTag, start: int) -> ResultT[str]:
@@ -1758,10 +1765,8 @@ MAYBE_DECL_RE = re.compile(r"(@[\w-]+/)?([\w-]+)$")
 
 
 def parseMaybeDecl(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
-    rawText, colonStart, _ = s.skipTo(textStart, ":")
+    rawText, colonStart, _ = s.skipToSameLine(textStart, ":")
     if not rawText:
-        return Err(textStart)
-    if s.line(textStart) != s.line(colonStart):
         return Err(textStart)
     if "'" in rawText:
         return Err(textStart)
@@ -1825,10 +1830,9 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
     # Do some analysis on the *text* in those bounds,
     # and then, only if it looks like we need to, process the parse results.
 
-    startLine = s.line(start)
     nodes: list[ParserNode] = []
     for i in generateExperimentalNodes(s, textStart, nodes):
-        if s.line(i) > startLine + 3:
+        if s.chars.count("\n", start, i) > 3:
             m.die(
                 "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &bs';&bs'; if it wasn't intended at all.",
                 lineNum=s.loc(textStart),
@@ -2501,6 +2505,10 @@ class LinkData:
     ltype: str | None = None
 
 
+_LINK_HTML_ESCAPE_RE = re.compile(r"&[\w\d#]+;")
+_LINK_WS_OR_BQ_RE = re.compile(r"[\s" + constants.bqChar + "]+")
+
+
 def parseLinkInfo(
     s: Stream,
     innerStart: int,
@@ -2510,7 +2518,7 @@ def parseLinkInfo(
 ) -> ResultT[LinkData]:
     start = innerStart - len(startSigil)
     match, innerEnd, _ = s.searchRe(innerStart, infoRe)
-    if match is None or s.line(innerEnd) > (s.line(innerStart) + 1):
+    if match is None or match[0].count("\n") > 1:
         m.die(
             f"{startSigil}...{endSigil} autolink was opened, but couldn't find {endSigil} or | on the same or next line. Either close your autolink, or escape the initial {startSigil[0]} as &bs{startSigil[0]};",
             lineNum=s.loc(start),
@@ -2529,7 +2537,7 @@ def parseLinkInfo(
     else:
         lt = innerText
 
-    if re.search(r"&[\w\d#]+;", lt):
+    if "&" in lt and _LINK_HTML_ESCAPE_RE.search(lt):
         m.die(
             "Saw an HTML escape in the link-data portion of an autolink. Use raw characters, or switch to the HTML syntax.",
             lineNum=s.loc(start),
@@ -2540,18 +2548,17 @@ def parseLinkInfo(
     linkType = None
     # If you break an autolink across lines inside a markdown blockquote,
     # the > (turned into a bqChar) is there but should be ignored as whitespace.
-    wsPattern = r"[\s" + constants.bqChar + "]+"
     if "/" in lt:
         linkFor, _, lt = lt.rpartition("/")
         if linkFor == "":
             linkFor = "/"
         linkFor = linkFor.strip()
-        linkFor = re.sub(wsPattern, " ", linkFor)
+        linkFor = _LINK_WS_OR_BQ_RE.sub(" ", linkFor)
     if "!!" in lt:
         lt, _, linkType = lt.partition("!!")
         linkType = linkType.strip()
     lt = lt.strip()
-    lt = re.sub(wsPattern, " ", lt)
+    lt = _LINK_WS_OR_BQ_RE.sub(" ", lt)
 
     # Even tho you no longer *need* to escape [[..]] in links
     # (used for WebIDL private slots), the parser still *allows*
@@ -2574,7 +2581,6 @@ def parseLinkText(
     startTag: StartTag,
 ) -> ResultT[list[ParserNode]]:
     endingLength = len(endingSigil)
-    startLine = s.line(start)
     content: list[ParserNode] = []
     s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
     for res in generateResults(s, start):
@@ -2584,7 +2590,7 @@ def parseLinkText(
             content.extend(value)
         else:
             content.append(value)
-        if s.line(i) > startLine + 3:
+        if s.chars.count("\n", start, i) > 3:
             m.die(
                 f"{startingSigil}...{endingSigil} autolink opened at {startTag.loc} wasn't closed within 3 lines. You might have forgotten to close it; if not, switch to the HTML syntax to spread your link across that many lines.",
                 lineNum=startTag.loc,
@@ -3084,10 +3090,9 @@ def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
 
     # At this point, we're still not committed to this being
     # an autolink, so it should silently fail.
-    startLine = s.line(start)
     nodes: list[ParserNode] = []
     for i in generateExperimentalNodes(s, linkTextStart, nodes):
-        if s.line(i) > startLine + 3:
+        if s.chars.count("\n", start, i) > 3:
             return Err(start)
         if s.slice(i, i + 2) == "](":
             linkTextEnd = i

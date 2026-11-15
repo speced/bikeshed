@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import lxml.sax
 
 from ... import constants, t
@@ -60,48 +62,97 @@ HEADING_ELEMENTS = {
     "h6",
 }
 
+_AUTO_CLOSE_P_TAGS = frozenset(
+    (
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "center",
+        "details",
+        "dialog",
+        "dir",
+        "div",
+        "dl",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "header",
+        "hgroup",
+        "main",
+        "menu",
+        "nav",
+        "ol",
+        "p",
+        "search",
+        "section",
+        "summary",
+        "ul",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "pre",
+        "listing",
+        "form",
+        "plaintext",
+        "table",
+        "hr",
+        "xmp",
+    ),
+)
+
+_SPECIAL_RE = re.compile(r"[<&]")
+_TAG_NAME_END_RE = re.compile(r"[ >/]")
+
 
 def parse(s: SimpleStream, start: int) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
+    text = s.text
     i = start
     segmentStart = i
-    while not s.eof(i):
-        if s[i] == "<":
-            if segmentStart < i:
-                s.characters(s.slice(segmentStart, i))
-            if s[i + 1] == "/":
+    while match := _SPECIAL_RE.search(text, i):
+        i = match.start()
+        if segmentStart < i:
+            s.characters(text[segmentStart:i])
+        if text[i] == "<":
+            nextCh = s[i + 1]
+            if nextCh == "/":
                 i = parseEndTag(s, i)
-            elif s[i + 1] == "!":
+            elif nextCh == "!":
                 i = parseDoctype(s, i)
             else:
                 i = parseStartTag(s, i)
             segmentStart = i
-        elif s[i] == "&":
-            if segmentStart < i:
-                s.characters(s.slice(segmentStart, i))
+        else:
             escape, i = parseEscape(s, i)
             s.characters(escape)
             segmentStart = i
-        else:
-            i += 1
-    if segmentStart < i:
-        s.characters(s.slice(segmentStart, i))
+    if segmentStart < s.length:
+        s.characters(text[segmentStart:])
     return s.finish()
 
 
 def parseDoctype(s: SimpleStream, start: int) -> int:
-    i = start + 2  # skip the <!
-    while s[i] != ">":
-        i += 1
-    return i + 1
+    end = s.text.find(">", start + 2)
+    return (end + 1) if end != -1 else s.length
 
 
 def parseStartTag(s: SimpleStream, start: int) -> int:
-    i = start + 1  # skip the <
+    text = s.text
+    tagStart = start + 1  # skip the <
+    match = _TAG_NAME_END_RE.search(text, tagStart)
+    i = match.start() if match else s.length
+    tagName = text[tagStart:i]
 
-    tagStart = i
-    while s[i] not in (" ", ">", "/"):
-        i += 1
-    tagName = s.slice(tagStart, i)
+    if i < s.length and text[i] == ">":
+        if tagName in VOID_ELEMENTS:
+            s.selfClosedTag(tagName, {})
+        else:
+            s.startTag(tagName, {})
+        return i + 1
 
     attrs, i = parseAttributeList(s, i)
 
@@ -121,13 +172,12 @@ def parseStartTag(s: SimpleStream, start: int) -> int:
 
 
 def parseEndTag(s: SimpleStream, start: int) -> int:
-    i = start + 2  # skip the </
-    tagStart = i
-    while s[i] != ">":
-        i += 1
-    tagName = s.slice(tagStart, i)
-    s.endTag(tagName)
-    return i + 1
+    tagStart = start + 2  # skip the </
+    end = s.text.find(">", tagStart)
+    if end == -1:
+        end = s.length
+    s.endTag(s.text[tagStart:end])
+    return end + 1
 
 
 def parseAttributeList(s: SimpleStream, start: int) -> tuple[dict[str, str], int]:
@@ -154,68 +204,59 @@ def undoLineBreakSmuggling(attrs: dict[str, str]) -> None:
 
 
 def parseAttribute(s: SimpleStream, start: int) -> tuple[str, str, int]:
-    i = start
-    while s[i] != "=":
-        i += 1
-
-    attrName = s.slice(start, i)
+    text = s.text
+    eq = text.find("=", start)
+    attrName = text[start:eq]
     if ":" in attrName:
         _, _, attrName = attrName.partition(":")
-    i += 2  # skip the ="
-    segmentStart = i
-    attrValue = ""
-    while s[i] != '"':
-        if s[i] == "&":  # &#0000;
-            attrValue += s.slice(segmentStart, i)
-            escape, i = parseEscape(s, i)
-            attrValue += escape
-            segmentStart = i
-            continue
-        else:
-            i += 1
-    attrValue += s.slice(segmentStart, i)
-    i += 1  # skip the "
-    return (attrName, attrValue, i)
+    valStart = eq + 2  # skip the ="
+    quote = text.find('"', valStart)
+    amp = text.find("&", valStart, quote)
+    if amp == -1:
+        return (attrName, text[valStart:quote], quote + 1)
+    attrValue = text[valStart:amp]
+    i = amp
+    while True:
+        escape, i = parseEscape(s, i)
+        attrValue += escape
+        nextAmp = text.find("&", i, quote)
+        if nextAmp == -1:
+            attrValue += text[i:quote]
+            break
+        attrValue += text[i:nextAmp]
+        i = nextAmp
+    return (attrName, attrValue, quote + 1)
 
 
 def parseEscape(s: SimpleStream, start: int) -> tuple[str, int]:
+    text = s.text
     i = start + 1  # skip the &
     if s[i] == "#" and s[i + 1] == "x":
-        i += 2
-        digitStart = i
-        while s[i] != ";":
-            i += 1
+        digitStart = i + 2
+        semi = text.find(";", digitStart)
         try:
-            escape = chr(int(s.slice(digitStart, i), 16))
+            escape = chr(int(text[digitStart:semi], 16))
         except:
-            m.die(f"Couldn't parse the HTML escape '{s.slice(start, i+1)}'.")
+            m.die(f"Couldn't parse the HTML escape '{text[start : semi + 1]}'.")
             return "&", start + 1
-        i += 1  # skip the ;
-        return escape, i
+        return escape, semi + 1
     elif s[i] == "#":
-        i += 1
-        digitStart = i
-        while s[i] != ";":
-            i += 1
+        digitStart = i + 1
+        semi = text.find(";", digitStart)
         try:
-            escape = chr(int(s.slice(digitStart, i)))
+            escape = chr(int(text[digitStart:semi]))
         except:
-            m.die(f"Couldn't parse the HTML escape '{s.slice(start, i+1)}'.")
+            m.die(f"Couldn't parse the HTML escape '{text[start : semi + 1]}'.")
             return "&", start + 1
-        i += 1  # skip the ;
-        return escape, i
-    elif s.slice(i, i + 3) == "lt;":
-        i += 3
-        return "<", i
-    elif s.slice(i, i + 4) == "amp;":
-        i += 4
-        return "&", i
-    elif s.slice(i, i + 5) == "apos;":
-        i += 5
-        return "'", i
-    elif s.slice(i, i + 5) == "quot;":
-        i += 5
-        return '"', i
+        return escape, semi + 1
+    elif text[i : i + 3] == "lt;":
+        return "<", i + 3
+    elif text[i : i + 4] == "amp;":
+        return "&", i + 4
+    elif text[i : i + 5] == "apos;":
+        return "'", i + 5
+    elif text[i : i + 5] == "quot;":
+        return '"', i + 5
     else:
         return "&", i
 
@@ -226,8 +267,8 @@ def parseEscape(s: SimpleStream, start: int) -> tuple[str, int]:
 # Note that tagStack never holds the html/head/body element; those are
 # handled specially instead.
 class SimpleStream:
-    _text: str
-    _len: int
+    text: str
+    length: int
     _handler: t.Any  # Ugh, lxml doesn't give this a type
     _tagStack: list[str]
     _inHead: bool
@@ -236,8 +277,8 @@ class SimpleStream:
     _bodyAttrs: list[dict[str, str]]
 
     def __init__(self, text: str) -> None:
-        self._text = text
-        self._len = len(text)
+        self.text = text
+        self.length = len(text)
         self._handler = lxml.sax.ElementTreeContentHandler()
         self._htmlAttrs = []
         self._headAttrs = []
@@ -248,15 +289,15 @@ class SimpleStream:
         self._handler.startElement("head", {})
 
     def __getitem__(self, key: int) -> str:
-        if key < 0 or key >= self._len:
+        if key < 0 or key >= self.length:
             return ""
-        return self._text[key]
+        return self.text[key]
 
     def slice(self, start: int, end: int) -> str:
-        return self._text[start:end]
+        return self.text[start:end]
 
     def eof(self, i: int) -> bool:
-        return i >= self._len
+        return i >= self.length
 
     def finish(self) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
         if self._inHead:
@@ -364,46 +405,7 @@ class SimpleStream:
 
     def autoCloseStart(self, tagName: str) -> None:
         # auto-close special tags who get closed by another tag opening
-        if tagName in (
-            "address",
-            "article",
-            "aside",
-            "blockquote",
-            "center",
-            "details",
-            "dialog",
-            "dir",
-            "div",
-            "dl",
-            "fieldset",
-            "figcaption",
-            "figure",
-            "footer",
-            "header",
-            "hgroup",
-            "main",
-            "menu",
-            "nav",
-            "ol",
-            "p",
-            "search",
-            "section",
-            "summary",
-            "ul",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "pre",
-            "listing",
-            "form",
-            "plaintext",
-            "table",
-            "hr",
-            "xmp",
-        ):
+        if tagName in _AUTO_CLOSE_P_TAGS:
             self.virtualClose(["p"])
         if tagName == "li":
             self.virtualClose(["li"], ["ol", "ul"])
