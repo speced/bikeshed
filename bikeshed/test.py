@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 import difflib
+import http.client
 import io
 import os
 import re
 import time
 
+import kdl
 from alive_progress import alive_it
 
 from . import config, metadata, retrieve, t
@@ -18,6 +20,34 @@ if t.TYPE_CHECKING:
 
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 TEST_FILE_EXTENSIONS = (".bs", ".tar")
+
+
+@dataclasses.dataclass
+class TestMetadata:
+    networkTests: list[str] = dataclasses.field(default_factory=list)
+
+    @staticmethod
+    def fromTestDir() -> TestMetadata:
+        path = os.path.join(TEST_DIR, "metadata.kdl")
+        with open(path, encoding="utf-8") as fh:
+            data = fh.read()
+        return TestMetadata.fromKdlStr(data)
+
+    @staticmethod
+    def fromKdlStr(data: str) -> TestMetadata:
+        self = TestMetadata()
+        kdlDoc = kdl.parse(data)
+        for node in kdlDoc.getAll("network-tests"):
+            for child in node.nodes:
+                if child.name == "-" and child.args:
+                    self.networkTests.append(str(child.args[0]).strip("/"))
+                else:
+                    self.networkTests.append(child.name.strip("/"))
+        return self
+
+    def isNetworkTest(self, testName: str) -> bool:
+        normPath = "/".join(splitPath(testName))
+        return any(normPath == p or normPath.startswith(p + "/") for p in self.networkTests)
 
 
 @dataclasses.dataclass
@@ -38,7 +68,12 @@ class TestFilter:
 
 
 def testPaths(filters: TestFilter) -> list[str]:
+    testMd = TestMetadata.fromTestDir()
     tests = list(sortTests(findTestFiles(filters)))
+    if any(testMd.isNetworkTest(testNameForPath(p)) for p in tests):
+        if not probablyHaveInternet():
+            m.warn("Can't immediately see the internet, so skipping network-tests.")
+            tests = [p for p in tests if not testMd.isNetworkTest(testNameForPath(p))]
     return tests
 
 
@@ -238,3 +273,14 @@ def replaceExtension(path: str, newExt: str) -> str:
     assert newExt[0] == "."
     trunk = os.path.splitext(path)[0]
     return f"{trunk}{newExt}"
+
+
+def probablyHaveInternet() -> bool:
+    conn = http.client.HTTPSConnection("8.8.8.8", timeout=1)
+    try:
+        conn.request("HEAD", "/")
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
