@@ -427,6 +427,13 @@ def main() -> None:
         nargs="+",
         help="Only run tests whose filenames contain any of these strings as substrings.",
     )
+    testParser.add_argument(
+        "--profile",
+        dest="profile",
+        default=False,
+        action="store_true",
+        help="Time each test and print all tests and times at the end, sorted by longest-running test first.",
+    )
 
     profileParser = subparsers.add_parser(
         "profile",
@@ -855,9 +862,9 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
     m.state.dieOn = "nothing"
     filters = test.TestFilter.fromOptions(options)
     if options.rebase:
-        test.rebase(filters, md=md)
+        test.rebase(filters, md=md, profile=options.profile)
     else:
-        result = test.run(filters, md=md)
+        result = test.run(filters, md=md, profile=options.profile)
         sys.exit(0 if result else 1)
 
 

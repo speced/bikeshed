@@ -5,6 +5,7 @@ import difflib
 import io
 import os
 import re
+import time
 
 from alive_progress import alive_it
 
@@ -99,6 +100,7 @@ def sortTests(tests: t.Iterable[str]) -> t.Iterable[str]:
 def run(
     filters: TestFilter,
     md: t.MetadataManager | None = None,
+    profile: bool = False,
 ) -> bool:
     paths = testPaths(filters)
     if len(paths) == 0:
@@ -107,17 +109,20 @@ def run(
     numPassed = 0
     total = 0
     fails = []
+    times: list[tuple[float, str]] = []
     pathProgress = alive_it(paths, dual_line=True, length=20)
     try:
         for path in pathProgress:
             testName = testNameForPath(path)
             pathProgress.text(testName)  # type: ignore
             total += 1
+            start = time.perf_counter()
             consoleFh = io.StringIO()
             with m.withMessageState(fh=consoleFh, printMode="plain") as _:
                 doc = processTest(path, md)
                 testConsole = consoleFh.getvalue()
             testOutput = doc.serialize()
+            times.append((time.perf_counter() - start, testName))
             if testOutput is None:
                 m.p(m.printColor("Serialization failed.", color="red"))
                 fails.append(testName)
@@ -137,6 +142,8 @@ def run(
     except Exception as e:
         print(f"Python threw an error when running '{testName}':\n{e}")  # noqa: T201
         raise e
+    if profile:
+        printProfile(times)
     if numPassed == total:
         m.p(m.printColor("✔ All tests passed.", color="green"))
         return True
@@ -150,24 +157,35 @@ def run(
 def rebase(
     filters: TestFilter,
     md: t.MetadataManager | None = None,
+    profile: bool = False,
 ) -> bool:
     paths = testPaths(filters)
     if len(paths) == 0:
         m.p("No tests were found.")
         return True
+    times: list[tuple[float, str]] = []
     pathProgress = alive_it(paths, dual_line=True, length=20)
     try:
         for path in pathProgress:
             testName = testNameForPath(path)
             pathProgress.text(testName)  # type: ignore
+            start = time.perf_counter()
             with m.withMessageState(fh=replaceExtension(path, ".console.txt"), printMode="plain") as _:
                 doc = processTest(path, md)
             with m.messagesSilent() as _:
                 doc.finish(newline="\n")
+            times.append((time.perf_counter() - start, testName))
     except Exception as e:
         print(f"Python threw an error when running '{testName}':\n{e}")  # noqa: T201
         raise e
+    if profile:
+        printProfile(times)
     return True
+
+
+def printProfile(times: list[tuple[float, str]]) -> None:
+    for dt, testName in sorted(times, reverse=True):
+        m.p(f"{dt:6.3f}s\t{testName}")
 
 
 def processTest(
