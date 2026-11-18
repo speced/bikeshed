@@ -1,4 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -15,7 +15,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/speced/bikeshed/",
-    packages=find_packages(),
+    packages=find_namespace_packages(include=["bikeshed*"]),
     package_data={"bikeshed": ["py.typed"]},
     include_package_data=True,
     install_requires=install_requires,

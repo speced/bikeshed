@@ -31,12 +31,22 @@ jobs:
       uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+    - name: Build and install package
+      shell: bash
       run: |
-        pip install --upgrade pip wheel
-        pip install --editable .
+        python -m pip install --upgrade pip build setuptools wheel
+        python -m build --no-isolation
+        python -m pip install dist/*.whl
     - name: Test with bikeshed
-      run: bikeshed --no-update test --all
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        TESTS_DIR: ${{ github.workspace }}/tests
+      run: |
+        bikeshed --version
+        bikeshed template > /dev/null
+        bikeshed wpt --template > /dev/null
+        bikeshed --no-update test --all --test-dir "$TESTS_DIR"
 
   lint:
 
@@ -66,3 +76,7 @@ jobs:
     - name: Lint with mypy
       run: |
         mypy
+
+    - name: Check MANIFEST.in
+      run: |
+        check-manifest --no-build-isolation

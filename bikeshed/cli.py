@@ -434,6 +434,12 @@ def main() -> None:
         action="store_true",
         help="Time each test and print all tests and times at the end, sorted by longest-running test first.",
     )
+    testParser.add_argument(
+        "--test-dir",
+        dest="testDir",
+        default=None,
+        help="Path to the tests directory. (Not needed if testing from an editable install.)",
+    )
 
     profileParser = subparsers.add_parser(
         "profile",

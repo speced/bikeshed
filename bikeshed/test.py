@@ -18,7 +18,15 @@ from .Spec import Spec
 if t.TYPE_CHECKING:
     import argparse
 
-TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
+
+def defaultTestDir() -> str:
+    installedTests = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
+    if os.path.isdir(installedTests):
+        return installedTests
+    return os.path.abspath("tests")
+
+
+TEST_DIR = defaultTestDir()
 TEST_FILE_EXTENSIONS = (".bs", ".tar")
 
 
@@ -27,8 +35,8 @@ class TestMetadata:
     networkTests: list[str] = dataclasses.field(default_factory=list)
 
     @staticmethod
-    def fromTestDir() -> TestMetadata:
-        path = os.path.join(TEST_DIR, "metadata.kdl")
+    def fromTestDir(testDir: str | None = None) -> TestMetadata:
+        path = os.path.join(testDir or defaultTestDir(), "metadata.kdl")
         with open(path, encoding="utf-8") as fh:
             data = fh.read()
         return TestMetadata.fromKdlStr(data)
@@ -55,6 +63,13 @@ class TestFilter:
     folders: list[str] | None = None
     files: list[str] | None = None
     manualOnly: bool = True
+    testDir: str | None = None
+
+    @property
+    def resolvedTestDir(self) -> str:
+        if self.testDir is not None:
+            return os.path.abspath(self.testDir)
+        return defaultTestDir()
 
     @staticmethod
     def fromOptions(options: argparse.Namespace) -> TestFilter:
@@ -64,24 +79,31 @@ class TestFilter:
             manualOnly = False
         else:
             manualOnly = True
-        return TestFilter(folders=options.folders, files=options.files, manualOnly=manualOnly)
+        return TestFilter(
+            folders=options.folders,
+            files=options.files,
+            manualOnly=manualOnly,
+            testDir=getattr(options, "testDir", None),
+        )
 
 
 def testPaths(filters: TestFilter) -> list[str]:
-    testMd = TestMetadata.fromTestDir()
-    tests = list(sortTests(findTestFiles(filters)))
-    if any(testMd.isNetworkTest(testNameForPath(p)) for p in tests):
+    testDir = filters.resolvedTestDir
+    testMd = TestMetadata.fromTestDir(testDir)
+    tests = list(sortTests(findTestFiles(filters), testDir=testDir))
+    if any(testMd.isNetworkTest(testNameForPath(p, testDir)) for p in tests):
         if not probablyHaveInternet():
             m.warn("Can't immediately see the internet, so skipping network-tests.")
-            tests = [p for p in tests if not testMd.isNetworkTest(testNameForPath(p))]
+            tests = [p for p in tests if not testMd.isNetworkTest(testNameForPath(p, testDir))]
     return tests
 
 
 def findTestFiles(filters: TestFilter) -> t.Generator[str, None, None]:
-    for root, _, filenames in os.walk(TEST_DIR):
+    testDir = filters.resolvedTestDir
+    for root, _, filenames in os.walk(testDir):
         for filename in filenames:
             fullPath = os.path.join(root, filename)
-            filePath = testNameForPath(fullPath)
+            filePath = testNameForPath(fullPath, testDir)
             if not allowedPath(filePath, filters):
                 continue
             yield fullPath
@@ -122,14 +144,17 @@ def splitPath(path: str) -> list[str]:
 
 # The test name will be the path relative to the tests directory,
 # or the path as given if the test is outside of that directory.
-def testNameForPath(path: str) -> str:
-    if path.startswith(TEST_DIR):
-        return path[len(TEST_DIR) + 1 :]
+def testNameForPath(path: str, testDir: str | None = None) -> str:
+    if testDir is None:
+        testDir = defaultTestDir()
+    prefix = testDir + os.sep
+    if path.startswith(prefix):
+        return path[len(prefix) :]
     return path
 
 
-def sortTests(tests: t.Iterable[str]) -> t.Iterable[str]:
-    return sorted(tests, key=lambda x: (0 if testNameForPath(x).startswith("manual") else 1, x))
+def sortTests(tests: t.Iterable[str], testDir: str | None = None) -> t.Iterable[str]:
+    return sorted(tests, key=lambda x: (0 if testNameForPath(x, testDir).startswith("manual") else 1, x))
 
 
 def run(
@@ -137,6 +162,7 @@ def run(
     md: t.MetadataManager | None = None,
     profile: bool = False,
 ) -> bool:
+    testDir = filters.resolvedTestDir
     paths = testPaths(filters)
     if len(paths) == 0:
         m.p("No tests were found")
@@ -148,7 +174,7 @@ def run(
     pathProgress = alive_it(paths, dual_line=True, length=20)
     try:
         for path in pathProgress:
-            testName = testNameForPath(path)
+            testName = testNameForPath(path, testDir)
             pathProgress.text(testName)  # type: ignore
             total += 1
             start = time.perf_counter()
@@ -194,6 +220,7 @@ def rebase(
     md: t.MetadataManager | None = None,
     profile: bool = False,
 ) -> bool:
+    testDir = filters.resolvedTestDir
     paths = testPaths(filters)
     if len(paths) == 0:
         m.p("No tests were found.")
@@ -202,7 +229,7 @@ def rebase(
     pathProgress = alive_it(paths, dual_line=True, length=20)
     try:
         for path in pathProgress:
-            testName = testNameForPath(path)
+            testName = testNameForPath(path, testDir)
             pathProgress.text(testName)  # type: ignore
             start = time.perf_counter()
             with m.withMessageState(fh=replaceExtension(path, ".console.txt"), printMode="plain") as _:
