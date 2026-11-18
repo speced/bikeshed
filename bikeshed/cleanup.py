@@ -201,7 +201,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
             el,
             "bs-autolink-syntax",
             "data-alternate-id",
-            "nohighlight",
             "line-numbers",
             "data-opaque",
             "data-no-self-link",

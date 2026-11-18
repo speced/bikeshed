@@ -1423,7 +1423,7 @@ point.</p>
 consider an animation with a <a data-link-type="dfn" href="#step-easing-function" id="ref-for-step-easing-function①">step easing function</a> whose <a data-link-type="dfn" href="#step-position" id="ref-for-step-position①">step position</a> is <a class="css" data-link-type="value" href="#valdef-steps-start" id="ref-for-valdef-steps-start①">start</a> and which has a positive
 delay and backwards fill.</p>
     <p>For example, using CSS animation:</p>
-<pre class="highlight lang-css" highlight="css">animation: moveRight 5s 1s steps(5, start);
+<pre class="highlight lang-css" data-language="css">animation: moveRight 5s 1s steps(5, start);
 </pre>
     <p>During the delay phase, the <a data-link-type="dfn" href="#input-progress-value" id="ref-for-input-progress-value①③">input progress value</a> will be zero but if the
 <a data-link-type="dfn" href="#before-flag" id="ref-for-before-flag②">before flag</a> is set to indicate that the animation has yet to reach its
@@ -2613,12 +2613,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -2710,13 +2708,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -2852,7 +2851,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

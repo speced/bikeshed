@@ -99,12 +99,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -196,13 +194,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -338,7 +337,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

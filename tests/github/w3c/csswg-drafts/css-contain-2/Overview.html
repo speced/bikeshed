@@ -1566,7 +1566,7 @@ Strong Containment: the <a class="css property" data-link-type="property" href="
 
 
     <p>For example, assume a micropost social network had markup something like this:</p>
-<pre><code class="highlight" highlight="html">&lt;body>
+<pre><code class="highlight" data-language="html">&lt;body>
   &lt;aside>...&lt;/aside>
   &lt;section>
     &lt;h2>Messages&lt;/h2>
@@ -1800,12 +1800,12 @@ See <a data-link-type="dfn" href="#layout-containment" id="ref-for-layout-contai
 		Given the following markup and style, the image would be sized to 100px by 100px,
 		as the aspect ratio set by the <a class="css property" data-link-type="property" href="https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio" id="ref-for-propdef-aspect-ratio①">aspect-ratio</a> property takes effect.
 		
-<pre><code class="highlight lang-css" highlight="css">img {
+<pre><code class="highlight lang-css" data-language="css">img {
   width: 100px;
   aspect-ratio: 1/1;
   contain: size;
 }
-</code><code class="highlight lang-html" highlight="html">
+</code><code class="highlight lang-html" data-language="html">
 &lt;img src="https://www.example.com/300x100.jpg">
 </code></pre>
     <p>If the <a class="css property" data-link-type="property" href="https://drafts.csswg.org/css-sizing-4/#propdef-aspect-ratio" id="ref-for-propdef-aspect-ratio②">aspect-ratio</a> property had not been declared,
@@ -1909,7 +1909,7 @@ regions.</p>
      <div class="example" id="example-2b10faa8">
       <a class="self-link" href="#example-2b10faa8"></a>
 	
-<pre><code class="highlight" highlight="html">&lt;article>Lorem ipsum…&lt;/article>
+<pre><code class="highlight" data-language="html">&lt;article>Lorem ipsum…&lt;/article>
 &lt;div id=a>&lt;/div>
 &lt;aside>
   &lt;div id=b>&lt;/div>
@@ -1921,7 +1921,7 @@ regions.</p>
 &lt;/aside>
 &lt;div id=f>&lt;/div>
 </code></pre>
-<pre><code class="highlight" highlight="css">article {flow-into: foo;}
+<pre><code class="highlight" data-language="css">article {flow-into: foo;}
 #a, #b, #c, #d, #e, #f {flow-from: foo;}
 aside {contain: layout}
 </code></pre>
@@ -2103,9 +2103,9 @@ the element at the base of the subtree is treated as if it was the root of the d
 	and can refer to counters established outside of the subtree.
 	Therefore, the following code results in <q><samp>1 1.2</samp></q> being displayed:
 	
-<pre><code class="highlight" highlight="html">&lt;div>&lt;/div>
+<pre><code class="highlight" data-language="html">&lt;div>&lt;/div>
 </code></pre>
-<pre><code class="highlight" highlight="css">div {
+<pre><code class="highlight" data-language="css">div {
   contain: style;
   counter-increment: n;
 }
@@ -2836,7 +2836,7 @@ by observing the timing of layout operations.</p>
    <div class="example" id="example-1f50d3e3">
     <a class="self-link" href="#example-1f50d3e3"></a>
 	
-<pre class="highlight" highlight="html">&lt;style>
+<pre class="highlight" data-language="html">&lt;style>
 .sv {
   content-visibility: auto;
   min-height: 50px;
@@ -2859,7 +2859,7 @@ by observing the timing of layout operations.</p>
    <div class="example" id="example-52a4682e">
     <a class="self-link" href="#example-52a4682e"></a>
 	
-<pre class="highlight" highlight="html">&lt;style>
+<pre class="highlight" data-language="html">&lt;style>
 .sv {
   content-visibility: hidden;
 }
@@ -2882,7 +2882,7 @@ by observing the timing of layout operations.</p>
    <div class="example" id="example-a89bb171">
     <a class="self-link" href="#example-a89bb171"></a>
 	
-<pre class="highlight" highlight="html">&lt;style>
+<pre class="highlight" data-language="html">&lt;style>
 body {
   margin: 0;
 }
@@ -4465,12 +4465,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -4562,13 +4560,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -4704,7 +4703,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

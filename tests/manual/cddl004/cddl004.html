@@ -694,7 +694,7 @@ pre[highlight], pre.highlight {
   </nav>
   <main>
    <h2 class="heading settled" data-level="1" id="cddl"><span class="secno">1. </span><span class="content">The CDDL</span><a class="self-link" href="#cddl"></a></h2>
-<pre class="cddl def highlight" highlight="cddl">; T is always scoped to the Rule that defines it...
+<pre class="cddl def highlight" data-language="cddl">; T is always scoped to the Rule that defines it...
 <dfn class="dfn-paneled" data-dfn-type="cddl-type" data-noexport id="cddl-type-one-or-more"><code>one-or-more</code></dfn>&lt;<dfn class="dfn-paneled" data-dfn-for="one-or-more" data-dfn-type="cddl-parameter" data-noexport id="cddl-parameter-one-or-more-t"><code>T</code></dfn>> = <a data-link-type="cddl-parameter" href="#cddl-parameter-one-or-more-t" id="ref-for-cddl-parameter-one-or-more-t">T</a> / [ 2* <a data-link-type="cddl-parameter" href="#cddl-parameter-one-or-more-t" id="ref-for-cddl-parameter-one-or-more-t①">T</a> ]
 <dfn class="dfn-paneled" data-dfn-type="cddl-type" data-noexport id="cddl-type-two-or-more"><code>two-or-more</code></dfn>&lt;<dfn class="dfn-paneled" data-dfn-for="two-or-more" data-dfn-type="cddl-parameter" data-noexport id="cddl-parameter-two-or-more-t"><code>T</code></dfn>> = [ 2* <a data-link-type="cddl-parameter" href="#cddl-parameter-two-or-more-t" id="ref-for-cddl-parameter-two-or-more-t">T</a> ]
 
@@ -742,7 +742,7 @@ pre[highlight], pre.highlight {
    <li><a href="#cddl-type-usage">usage</a><span>, in § 1</span>
   </ul>
   <h2 class="heading no-num no-ref settled" id="cddl-index"><span class="content">CDDL Index</span><a class="self-link" href="#cddl-index"></a></h2>
-<pre class="cddl def highlight" highlight="cddl">; T is always scoped to the Rule that defines it...
+<pre class="cddl def highlight" data-language="cddl">; T is always scoped to the Rule that defines it...
 <a href="#cddl-type-one-or-more"><code>one-or-more</code></a>&lt;<a href="#cddl-parameter-one-or-more-t"><code>T</code></a>> = <a data-link-type="cddl-parameter" href="#cddl-parameter-one-or-more-t">T</a> / [ 2* <a data-link-type="cddl-parameter" href="#cddl-parameter-one-or-more-t">T</a> ]
 <a href="#cddl-type-two-or-more"><code>two-or-more</code></a>&lt;<a href="#cddl-parameter-two-or-more-t"><code>T</code></a>> = [ 2* <a data-link-type="cddl-parameter" href="#cddl-parameter-two-or-more-t">T</a> ]
 
@@ -1367,12 +1367,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -1464,13 +1462,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -1606,7 +1605,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

@@ -965,6 +965,8 @@ ATTR_SHORTCUTS = {
     "local-lt": "data-local-lt",
     "algorithm": "data-algorithm",
     "ignore": "data-var-ignore",
+    "highlight": "bs-highlight",
+    "nohighlight": "bs-nohighlight",
 }
 
 
@@ -2290,7 +2292,7 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
         start + 1,
         start + 1,
         "code",
-        {"class": t.SafeAttrStr("idl"), "nohighlight": ""},
+        {"class": t.SafeAttrStr("idl"), "bs-nohighlight": ""},
     ).finalize()
 
     if s[innerEnd] == "|":
@@ -2355,7 +2357,7 @@ def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
         start + 1,
         start + 1,
         "code",
-        {"class": t.SafeAttrStr("cddl"), "nohighlight": ""},
+        {"class": t.SafeAttrStr("cddl"), "bs-nohighlight": ""},
     ).finalize()
 
     if s[innerEnd] == "|":
@@ -2418,7 +2420,7 @@ def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[Par
     if linkFor is not None:
         startTag.attrs["data-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
-    startCode = StartTag.fromStream(s, start, start, "code", {"nohighlight": ""})
+    startCode = StartTag.fromStream(s, start, start, "code", {"bs-nohighlight": ""})
 
     if s[innerEnd] == "|":
         rest, nodeEnd, _ = parseLinkText(s, innerEnd + 1, "<{", "}>", startTag)

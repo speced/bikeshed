@@ -2250,7 +2250,7 @@ programs must work under all executions an implementation is allowed to create.<
    <h3 class="heading settled" data-level="1.1" id="opt-on"><span class="secno">1.1. </span><span class="content">Optimizations on Atomics</span><a class="self-link" href="#opt-on"></a></h3>
    <p>Atomics themselves can be optimized. A non-contentious example is constant
 propagation into atomics without other intervening atomics:</p>
-<pre class="highlight" highlight="cpp">void inc(std::atomic&lt;int> *y) {
+<pre class="highlight" data-language="cpp">void inc(std::atomic&lt;int> *y) {
   *y += 1;
 }
 
@@ -2261,24 +2261,24 @@ void two() {
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">std::atomic&lt;int> x;
+<pre class="highlight" data-language="cpp">std::atomic&lt;int> x;
 void two() {
   x += 2;
 }
 </pre>
    <p>The above optimization adds atomicity but cannot hinder forward progress, and is
 therefore correct. This leads to further optimizations such as using the locked
-<code class="highlight" highlight="c++">inc</code>/<code class="highlight" highlight="c++">dec</code> instructions instead of locked
-<code class="highlight" highlight="c++">add</code>/<code class="highlight" highlight="c++">sub</code> when adding/subtracting <code class="highlight" highlight="c++">1</code> to an
+<code class="highlight" data-language="cpp">inc</code>/<code class="highlight" data-language="cpp">dec</code> instructions instead of locked
+<code class="highlight" data-language="cpp">add</code>/<code class="highlight" data-language="cpp">sub</code> when adding/subtracting <code class="highlight" data-language="cpp">1</code> to an
 atomic on x86:</p>
-<pre class="highlight" highlight="cpp">std::atomic&lt;int> x;
+<pre class="highlight" data-language="cpp">std::atomic&lt;int> x;
 void inc(int val) {
   x += 1;
   x += val;
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="asm"><c- nl>_Z3inci:</c->
+<pre class="highlight"><c- nl>_Z3inci:</c->
   <c- e>lock</c-> <c- nf>incl</c-> <c- no>x</c-><c- p>(</c-><c- g>%rip</c-><c- p>)</c->
   <c- e>lock</c-> <c- nf>addl</c-> <c- g>%edi</c-><c- p>,</c-> <c- no>x</c-><c- p>(</c-><c- g>%rip</c-><c- p>)</c->
   <c- nf>retq</c->
@@ -2286,21 +2286,21 @@ void inc(int val) {
    <p>In a similar vein, some opportunities for strength reduction will show up
 because non-trivial code gets inlined which then exposes fairly silly code, such
 as in the following trivial example:</p>
-<pre class="highlight" highlight="cpp">template&lt;typename T>
+<pre class="highlight" data-language="cpp">template&lt;typename T>
 bool silly(std::atomic&lt;T> *x, T expected, T desired) {
   x->compare_exchange_strong(expected, desired); // Inlined.
   return expected == desired;
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">template&lt;typename T>
+<pre class="highlight" data-language="cpp">template&lt;typename T>
 bool silly(std::atomic&lt;T> *x, T expected, T desired) {
   return x->compare_exchange_strong(expected, desired);
 }
 </pre>
-   <p>The following works for any memory order but <code class="highlight" highlight="c++">release</code> and
-<code class="highlight" highlight="c++">acq_rel</code>:</p>
-<pre class="highlight" highlight="cpp">template&lt;typename T>
+   <p>The following works for any memory order but <code class="highlight" data-language="cpp">release</code> and
+<code class="highlight" data-language="cpp">acq_rel</code>:</p>
+<pre class="highlight" data-language="cpp">template&lt;typename T>
 bool optme(std::atomic&lt;T> *x, T desired) {
   T expected = desired;
   return x->compare_exchange_strong(expected, desired
@@ -2308,7 +2308,7 @@ bool optme(std::atomic&lt;T> *x, T desired) {
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">template&lt;typename T>
+<pre class="highlight" data-language="cpp">template&lt;typename T>
 bool optme(std::atomic&lt;T> *x, T desired) {
   return x->load(std::memory_order_seq_cst) == desired;
 }
@@ -2317,7 +2317,7 @@ bool optme(std::atomic&lt;T> *x, T desired) {
 as a <em>release sequence</em> as defined in section 1.10 of the C++ standard.</p>
    <p>Similarly, while keeping the resulting memory order stronger or equal to the
 individual ones, the following can occur:</p>
-<pre class="highlight" highlight="cpp">template&lt;typename T>
+<pre class="highlight" data-language="cpp">template&lt;typename T>
 T optmetoo(std::atomic&lt;T> *x, T y) {
   T z = x->load();
   x->store(y);
@@ -2325,7 +2325,7 @@ T optmetoo(std::atomic&lt;T> *x, T y) {
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">template&lt;typename T>
+<pre class="highlight" data-language="cpp">template&lt;typename T>
 T optmetoo(std::atomic&lt;T> *x, T y) {
   return x->exchange(y);
 }
@@ -2334,17 +2334,17 @@ T optmetoo(std::atomic&lt;T> *x, T y) {
 models may benefit from having write-after-read operations to the same location
 instead of having an atomic exchange.</p>
    <p>Other simple optimizations can also occur because of inlining and constant
-propagation such as turning <code class="highlight" highlight="c++">atomic&lt;T>::fetch_and(~(T)0)</code> into
-<code class="highlight" highlight="c++">atomic&lt;T>::load()</code>. The same applies for
-<code class="highlight" highlight="c++">fetch_or(0)</code> and <code class="highlight" highlight="c++">fetch_xor(0)</code>, as well as
-<code class="highlight" highlight="c++">fetch_and(0)</code> becoming <code class="highlight" highlight="c++">store(0)</code>.</p>
-   <p>As a slightly different example, the value for <code class="highlight" highlight="c++">std::is_lock_free</code>
+propagation such as turning <code class="highlight" data-language="cpp">atomic&lt;T>::fetch_and(~(T)0)</code> into
+<code class="highlight" data-language="cpp">atomic&lt;T>::load()</code>. The same applies for
+<code class="highlight" data-language="cpp">fetch_or(0)</code> and <code class="highlight" data-language="cpp">fetch_xor(0)</code>, as well as
+<code class="highlight" data-language="cpp">fetch_and(0)</code> becoming <code class="highlight" data-language="cpp">store(0)</code>.</p>
+   <p>As a slightly different example, the value for <code class="highlight" data-language="cpp">std::is_lock_free</code>
 can be determined at compile time for some architectures, but for others the
 compiler can’t know the value for all sub-architectures and cannot return a
 compile-time constant. The compiler may be given a specific sub-architecture
 flag to work around this (restricting which machines the code will execute
 correctly on) or must defer to feature detection followed by patching when the
-program is loaded. This is the case, for example, for x86’s <code class="highlight" highlight="c++">LOCK
+program is loaded. This is the case, for example, for x86’s <code class="highlight" data-language="cpp">LOCK
 CMPXCHG16B</code> instruction which is used to implement lock-free 16-byte
 operations.</p>
    <p>These optimizations aren’t traditionally performed when using inline assembly
@@ -2352,9 +2352,9 @@ and showcases the strengths of hoisting abstractions to the language level.</p>
    <p>The reader for <a href="https://en.wikipedia.org/wiki/Seqlock">seqlock</a>
 bounds ticket acquisition and release with a load and a fence. This lets the
 data reads get reordered in-between ticket acquire/release by using
-<code class="highlight" highlight="c++">relaxed</code> memory ordering for data. The algorithm retries if the
+<code class="highlight" data-language="cpp">relaxed</code> memory ordering for data. The algorithm retries if the
 ticket changed or data was being modified by the writer:</p>
-<pre class="highlight" highlight="cpp">std::tuple&lt;T, T> reader() {
+<pre class="highlight" data-language="cpp">std::tuple&lt;T, T> reader() {
   T d1, d2;
   unsigned seq0, seq1;
   do {
@@ -2375,13 +2375,13 @@ void writer(T d1, T d2) {
   seq.store(seq0 + 2, std::memory_order_release);
 }
 </pre>
-   <p>The reader’s last ticket load effectively act as a <code class="highlight" highlight="c++">release</code> load,
+   <p>The reader’s last ticket load effectively act as a <code class="highlight" data-language="cpp">release</code> load,
 which doesn’t exist in the current memory model but would better express the
 intent of the code while allowing subsequent operations to be moved into the
 critical section if profitable. Hans Boehm <a href="http://www.hpl.hp.com/techreports/2012/HPL-2012-68.pdf">suggests</a> using
-a <code class="highlight" highlight="c++">release</code> fetch-add of zero, and shows that on x86 the code can be
+a <code class="highlight" data-language="cpp">release</code> fetch-add of zero, and shows that on x86 the code can be
 written as follows:</p>
-<pre class="highlight" highlight="cpp">T d1, d2;
+<pre class="highlight" data-language="cpp">T d1, d2;
 unsigned seq0, seq1;
 do {
   seq0 = seq.load(std::memory_order_acquire);
@@ -2391,7 +2391,7 @@ do {
 } while (seq0 != seq1 || seq0 &amp; 1);
 </pre>
    <p>This rewritten code then generates the following x86 assembly:</p>
-<pre class="highlight" highlight="asm"><c- nl>.LBB0_1:</c->
+<pre class="highlight"><c- nl>.LBB0_1:</c->
       <c- nf>movl</c->    <c- no>seq</c-><c- p>(</c-><c- g>%rip</c-><c- p>),</c-> <c- g>%esi</c->
       <c- nf>movl</c->    <c- no>data1</c-><c- p>(</c-><c- g>%rip</c-><c- p>),</c-> <c- g>%ecx</c->
       <c- nf>movl</c->    <c- no>data2</c-><c- p>(</c-><c- g>%rip</c-><c- p>),</c-> <c- g>%eax</c->
@@ -2404,14 +2404,14 @@ do {
       <c- nf>testl</c->   <c- g>%edx</c-><c- p>,</c-> <c- g>%edx</c->
       <c- nf>jne</c->     <c- no>.LBB0_1</c->
 </pre>
-   <p>This x86 assembly reduces contention by replacing <code class="highlight" highlight="c++">fetch_add</code>—an
+   <p>This x86 assembly reduces contention by replacing <code class="highlight" data-language="cpp">fetch_add</code>—an
 instruction requiring exclusive cache line access—to a simple
-<code class="highlight" highlight="c++">movl</code>. This optimization is currently only known to be correct on
+<code class="highlight" data-language="cpp">movl</code>. This optimization is currently only known to be correct on
 x86, is probably correct for other architectures, and is <a href="https://reviews.llvm.org/D5091">currently implemented
 in LLVM</a>.</p>
-   <p>Similar to the above <code class="highlight" highlight="c++">release</code> fetch-add of zero serving as a
-<code class="highlight" highlight="c++">release</code> load, one could also use an <code class="highlight" highlight="c++">acquire</code> exchange
-when an <code class="highlight" highlight="c++">acquire</code> store is desired.</p>
+   <p>Similar to the above <code class="highlight" data-language="cpp">release</code> fetch-add of zero serving as a
+<code class="highlight" data-language="cpp">release</code> load, one could also use an <code class="highlight" data-language="cpp">acquire</code> exchange
+when an <code class="highlight" data-language="cpp">acquire</code> store is desired.</p>
    <p>Traditional compiler optimizations, such as dead store elimination, can be
 performed on atomic operations, even sequentially consistent ones. Optimizers
 have to be careful to avoid doing so across synchronization points because
@@ -2420,9 +2420,9 @@ traditional optimizations have to consider more intervening instructions than
 they usually would when considering optimizations to atomic operations. In the
 case of dead store elimination it isn’t sufficient to prove that an atomic store
 post-dominates and aliases another to eliminate the other store.</p>
-   <p>A trickier example is fusion of <code class="highlight" highlight="c++">relaxed</code> atomic operations, even
+   <p>A trickier example is fusion of <code class="highlight" data-language="cpp">relaxed</code> atomic operations, even
 when interleaved:</p>
-<pre class="highlight" highlight="cpp">std::atomic&lt;int> x, y;
+<pre class="highlight" data-language="cpp">std::atomic&lt;int> x, y;
 void relaxed() {
   x.fetch_add(1, std::memory_order_relaxed);
   y.fetch_add(1, std::memory_order_relaxed);
@@ -2431,14 +2431,14 @@ void relaxed() {
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">std::atomic&lt;int> x, y;
+<pre class="highlight" data-language="cpp">std::atomic&lt;int> x, y;
 void relaxed() {
   x.fetch_add(2, std::memory_order_relaxed);
   y.fetch_add(2, std::memory_order_relaxed);
 }
 </pre>
    <p>We aren’t aware of compilers performing this optimization yet, but <a href="https://llvm.org/bugs/show_bug.cgi?id=16477">it is being
-discussed</a>. <code class="highlight" highlight="c++">std::atomic_signal_fence</code> could be used to prevent
+discussed</a>. <code class="highlight" data-language="cpp">std::atomic_signal_fence</code> could be used to prevent
 this reordering and fusion, or one could use a stronger memory ordering for the
 operations: this optimization is only valid on relaxed operations which aren’t
 ordered with respect to each other.</p>
@@ -2448,7 +2448,7 @@ virtual overrides when we can enumerate them, and can be used to carve out
 different <a href="http://www.hpl.hp.com/techreports/2011/HPL-2011-57.pdf">inteference-free
 regions</a>.</p>
    <p>Fence instructions are generated as a consequence of C++'s
-<code class="highlight" highlight="c++">std::atomic_thread_fence</code> as well as, on some architectures, atomic
+<code class="highlight" data-language="cpp">std::atomic_thread_fence</code> as well as, on some architectures, atomic
 operations. Fence instructions tend to be expensive, and removing redundant ones
 as well as positioning them optimally leads to great performance gains, while
 keeping the code correct and simple. This is <a href="https://reviews.llvm.org/D5758">currently under review in LLVM</a>.</p>
@@ -2457,8 +2457,8 @@ keeping the code correct and simple. This is <a href="https://reviews.llvm.org/D
    <h3 class="heading settled" data-level="1.2" id="opt-around"><span class="secno">1.2. </span><span class="content">Optimizations Around Atomics</span><a class="self-link" href="#opt-around"></a></h3>
    <p>Compilers can optimize non-atomic memory accesses before and after atomic
 accesses. A somewhat surprising example is that the following code can be (<a href="https://reviews.llvm.org/D4845">and is</a>!) transformed as shown, where
-<code class="highlight" highlight="c++">x</code> is a non-atomic global.</p>
-<pre class="highlight" highlight="cpp">int x = 0;
+<code class="highlight" data-language="cpp">x</code> is a non-atomic global.</p>
+<pre class="highlight" data-language="cpp">int x = 0;
 std::atomic&lt;int> y;
 int dso() {
   x = 0;
@@ -2469,7 +2469,7 @@ int dso() {
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">int x = 0;
+<pre class="highlight" data-language="cpp">int x = 0;
 std::atomic&lt;int> y;
 int dso() {
   // Dead store eliminated.
@@ -2482,17 +2482,17 @@ int dso() {
    <p>The intuition behind the dead store elimination optimization is that the only
 way another thread could have observed the dead store elimination is if their
 code had been racy in the first place: only a
-<code class="highlight" highlight="c++">release</code>/<code class="highlight" highlight="c++">acquire</code> pair could have been synchronized with
+<code class="highlight" data-language="cpp">release</code>/<code class="highlight" data-language="cpp">acquire</code> pair could have been synchronized with
 another thread that observed the store (see <a href="http://www.di.ens.fr/~zappa/readings/pldi13.pdf">this paper</a> for
 details). Sequentially consistent accesses are
-<code class="highlight" highlight="c++">acquire</code>/<code class="highlight" highlight="c++">release</code>, the key in this example is having the
-<code class="highlight" highlight="c++">release</code> store come before the <code class="highlight" highlight="c++">acquire</code> load and
+<code class="highlight" data-language="cpp">acquire</code>/<code class="highlight" data-language="cpp">release</code>, the key in this example is having the
+<code class="highlight" data-language="cpp">release</code> store come before the <code class="highlight" data-language="cpp">acquire</code> load and
 synchronize with another thread (which the loop does by observing changes in
-<code class="highlight" highlight="c++">y</code>).</p>
+<code class="highlight" data-language="cpp">y</code>).</p>
    <p>The following code, with a different store/load ordering and using
-<code class="highlight" highlight="c++">release</code>/<code class="highlight" highlight="c++">acquire</code> memory ordering, can also be
+<code class="highlight" data-language="cpp">release</code>/<code class="highlight" data-language="cpp">acquire</code> memory ordering, can also be
 transformed as shown (but currently isn’t, at least in LLVM).</p>
-<pre class="highlight" highlight="cpp">int x = 0;
+<pre class="highlight" data-language="cpp">int x = 0;
 std::atomic&lt;int> y;
 int rlo() {
   x = 0;
@@ -2503,7 +2503,7 @@ int rlo() {
 }
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">int x = 0;
+<pre class="highlight" data-language="cpp">int x = 0;
 std::atomic&lt;int> y;
 int rlo() {
   // Dead store eliminated.
@@ -2514,12 +2514,12 @@ int rlo() {
 }
 </pre>
    <p>The above example’s load can be eliminated because there was no synchronization
-with another thread: even if the <code class="highlight" highlight="c++">release</code> is followed by an
-<code class="highlight" highlight="c++">acquire</code> the compiler is allowed to assume that the stored value
+with another thread: even if the <code class="highlight" data-language="cpp">release</code> is followed by an
+<code class="highlight" data-language="cpp">acquire</code> the compiler is allowed to assume that the stored value
 wasn’t modified before the subsequent load, and that the load is therefore
 redundant.</p>
    <p>Whereas the following code must (and does!) remain the same:</p>
-<pre class="highlight" highlight="cpp">int x = 0;
+<pre class="highlight" data-language="cpp">int x = 0;
 std::atomic&lt;int> y;
 int no() {
   x = 0;
@@ -2531,15 +2531,15 @@ int no() {
 </pre>
    <p>Other optimizations such as global value ordering across atomics can be applied.</p>
    <h3 class="heading settled" data-level="1.3" id="mutex"><span class="secno">1.3. </span><span class="content">Mutex: Safer than Atomics?</span><a class="self-link" href="#mutex"></a></h3>
-   <p>The same optimization potential applies to C++'s <code class="highlight" highlight="c++">std::mutex</code>:
-locking a mutex is equivalent to <code class="highlight" highlight="c++">acquire</code> memory ordering, and
-unlocking a mutex is equivalent to <code class="highlight" highlight="c++">release</code> memory ordering. Using a
+   <p>The same optimization potential applies to C++'s <code class="highlight" data-language="cpp">std::mutex</code>:
+locking a mutex is equivalent to <code class="highlight" data-language="cpp">acquire</code> memory ordering, and
+unlocking a mutex is equivalent to <code class="highlight" data-language="cpp">release</code> memory ordering. Using a
 mutex correctly is slightly easier because the API is simpler than atomic’s API.</p>
    <p>Some current implementations rely on pthread’s mutex, which may not expose all
 optimization opportunities because the compiler may not know how to handle the
 slow-path futex (usually a syscall), or because the implementation is in a
 different translation unit. The optimization difficulties can be overcome by
-teaching the compiler to treat <code class="highlight" highlight="c++">std::mutex</code> or pthread specially, or
+teaching the compiler to treat <code class="highlight" data-language="cpp">std::mutex</code> or pthread specially, or
 by <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4195.pdf">making
 it practical to implement mutexes in pure C++</a>. Optimization across
 translation units, such as through link-time optimizations, or optimizations
@@ -2550,31 +2550,31 @@ relying on escape analysis, can also help expose more opportunities.</p>
 that they are not accessed in other threads concurrently. This is spelled out in
 the C++11 standard in section 1.10 ¶22. For example the following transformation
 could occur:</p>
-<pre class="highlight" highlight="cpp">// Some code, but no synchronization.
+<pre class="highlight" data-language="cpp">// Some code, but no synchronization.
 *p = 1; // Can be on stack, heap or global.
 </pre>
    <p>Becomes:</p>
-<pre class="highlight" highlight="cpp">// ...
+<pre class="highlight" data-language="cpp">// ...
 *p = RAX; // Spill temporary value.
 // ...
 RAX = *p; // Restore temporary value.
 // ...
 *p = 1;
 </pre>
-   <p>Since we write to <code class="highlight" highlight="c++">*p</code> and there is no synchronization operations,
-other threads do not read/write <code class="highlight" highlight="c++">*p</code> without exercising undefined
+   <p>Since we write to <code class="highlight" data-language="cpp">*p</code> and there is no synchronization operations,
+other threads do not read/write <code class="highlight" data-language="cpp">*p</code> without exercising undefined
 behavior. We can therefore use it as scratch storage—and thus reduce stack frame
 size—without changing the observable behavior of the program. This requires
 escape analysis: the compiler must see the full scope of memory location
-<code class="highlight" highlight="c++">p</code>, or must know that leaf functions don’t capture <code class="highlight" highlight="c++">p</code>
+<code class="highlight" data-language="cpp">p</code>, or must know that leaf functions don’t capture <code class="highlight" data-language="cpp">p</code>
 and aren’t used concurrently, for this optimization to be valid.</p>
    <h3 class="heading settled" data-level="1.5" id="arch"><span class="secno">1.5. </span><span class="content">Architecture and Implementation Specific Optimizations</span><a class="self-link" href="#arch"></a></h3>
    <p>Optimizations can sometimes be made per-architecture, or even per specific
 implementation of an architecture. Compilers can usually be told to target
 specific architectures, CPUs or attributes using flags such as
-<code class="highlight" highlight="c++">-march</code>, <code class="highlight" highlight="c++">-mcpu</code>, <code class="highlight" highlight="c++">-mattr</code>.</p>
-   <p>Spinloops are usually implemented with an <code class="highlight" highlight="c++">acquire</code> load, which are
-equivalent to a <code class="highlight" highlight="c++">relaxed</code> load followed by an <code class="highlight" highlight="c++">acquire</code>
+<code class="highlight" data-language="cpp">-march</code>, <code class="highlight" data-language="cpp">-mcpu</code>, <code class="highlight" data-language="cpp">-mattr</code>.</p>
+   <p>Spinloops are usually implemented with an <code class="highlight" data-language="cpp">acquire</code> load, which are
+equivalent to a <code class="highlight" data-language="cpp">relaxed</code> load followed by an <code class="highlight" data-language="cpp">acquire</code>
 fence in the loop. On some architecture implementations it may make sense to
 hoist the fence outside the loop, but how and when to do this is architecture
 specific. In a similar way, mutexes usually want to be implemented as a spinloop
@@ -2582,11 +2582,11 @@ with exponential randomized backoff followed by a futex. The right
 implementation of mutexes is highly platform-dependent.</p>
    <p>Instructions can also be implemented in manners that are nominally incorrect for
 the architecture in general, but happen to be correct for specific
-implementations of the architecture. For example, <code class="highlight" highlight="c++">release</code> fences
-should lower to <code class="highlight" highlight="c++">dmb ish</code> on ARM, but <a href="http://lists.llvm.org/pipermail/llvm-commits/Week-of-Mon-20130701/thread.html#179911">on
-Apple’s Swift processor</a> they lower to <code class="highlight" highlight="c++">dmb ishst</code> instead, which
+implementations of the architecture. For example, <code class="highlight" data-language="cpp">release</code> fences
+should lower to <code class="highlight" data-language="cpp">dmb ish</code> on ARM, but <a href="http://lists.llvm.org/pipermail/llvm-commits/Week-of-Mon-20130701/thread.html#179911">on
+Apple’s Swift processor</a> they lower to <code class="highlight" data-language="cpp">dmb ishst</code> instead, which
 would be incorrect on other ARM processors. Some ARM processors can go even
-further and remove all <code class="highlight" highlight="c++">dmb</code> which aren’t system-wide because their
+further and remove all <code class="highlight" data-language="cpp">dmb</code> which aren’t system-wide because their
 memory model is much stronger than ARM’s prescribed model.</p>
    <p>Some architectures support transactional memory. A compiler can use this
 knowledge to make many consecutive atomic writes into a single atomic
@@ -2605,7 +2605,7 @@ often emulate multi-core systems using cooperative thread switching—leading to
 predictable interleaving which is easier to optimize for the simulator.</p>
    <h3 class="heading settled" data-level="1.6" id="volatile"><span class="secno">1.6. </span><span class="content">Volatility</span><a class="self-link" href="#volatile"></a></h3>
    <p>Atomic operations are unsuitable to express that memory locations can be
-externally modified. Indeed, <code class="highlight" highlight="c++">volatile</code> (or <code class="highlight" highlight="c++">volatile
+externally modified. Indeed, <code class="highlight" data-language="cpp">volatile</code> (or <code class="highlight" data-language="cpp">volatile
 atomic</code>) should be used in these circumstances.</p>
    <p>Shared memory isn’t explicitly defined by the C++ standard, yet programmers
 often use operating system APIs to map the same physical memory location onto
@@ -2876,12 +2876,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -2973,13 +2971,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -3115,7 +3114,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

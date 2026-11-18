@@ -2342,7 +2342,7 @@ Scoped Selectors</span><a class="self-link" href="#scoping"></a></h3>
 		relative to the <code>element</code> it’s called on.
 
 
-    <p>A call like <code class="highlight" highlight="javascript">widget.querySelector("a")</code>
+    <p>A call like <code class="highlight" data-language="javascript">widget.querySelector("a")</code>
 		will thus only find <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element" id="ref-for-the-a-element">a</a></code> elements inside of the <code>widget</code> element,
 		ignoring any other <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-a-element" id="ref-for-the-a-element①">a</a></code>s that might be scattered throughout the document.</p>
    </div>
@@ -2985,7 +2985,7 @@ The Defined Pseudo-class: <a class="css" data-link-type="maybe" href="#defined-p
 		so the following example will always match:
 
 		
-<pre class="highlight" highlight="css">p:defined { ... }</pre>
+<pre class="highlight" data-language="css">p:defined { ... }</pre>
     <p><a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element" id="ref-for-custom-element">Custom elements</a>, on the other hand,
 		start out <em>un</em>defined,
 		and only become defined when <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/custom-elements.html#element-definition" id="ref-for-element-definition">properly registered</a>.
@@ -3734,7 +3734,7 @@ The Focus-Indicated Pseudo-class: <a class="css" data-link-type="maybe" href="#f
 		where page focus is.
 
 		
-<pre class="highlight" highlight="css">:root {
+<pre class="highlight" data-language="css">:root {
   --focus-gold: #ffbf47;
 }
 
@@ -7132,12 +7132,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -7229,13 +7227,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -7371,7 +7370,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

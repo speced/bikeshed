@@ -836,7 +836,7 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
       
      <p>FastCorp Inc. have a carousel of images at the top of a page with the first image visible and the remaining images
         images off screen. The markup of this carousel may look as follows:</p>
-<pre class="highlight" highlight="html">&lt;ul class="carousel">
+<pre class="highlight" data-language="html">&lt;ul class="carousel">
      <br> &lt;!-- The first image is visible -->
      <br> &lt;img src="img/carousel-1.jpg">
      <br> &lt;!-- The other carousel images are not -->
@@ -851,7 +851,7 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
     <div class="example" id="example-a033861b" title="Example 1">
      <a class="self-link" href="#example-a033861b"></a>
 
-<pre class="highlight" highlight="html">&lt;ul class="carousel">
+<pre class="highlight" data-language="html">&lt;ul class="carousel">
      <br> &lt;!-- The first image is visible -->
      <br> &lt;img src="img/carousel-1.jpg" importance="high">
      <br> &lt;!-- The other carousel images are not -->
@@ -872,7 +872,7 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
      <p>FastCorp Inc. have a web app with a mix of resources that are critical and non-critical to the initial experience.
         They want to signify the importance of their primary script without using rel=preload, which would contend with their render blocking stylesheet:
       </p>
-<pre class="highlight" highlight="html">&lt;link rel="stylesheet" href="https://foo.com/main.css">
+<pre class="highlight" data-language="html">&lt;link rel="stylesheet" href="https://foo.com/main.css">
 &lt;script src="main.js" importance="high">&lt;/script>
 </pre>
     </div>
@@ -881,7 +881,7 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
     <div class="example" id="example-e0df26fe" title="Preload">
      <a class="self-link" href="#example-e0df26fe"></a>
   
-<pre class="highlight" highlight="html">&lt;link rel="preload" as="script" href="critical-script.js">
+<pre class="highlight" data-language="html">&lt;link rel="preload" as="script" href="critical-script.js">
      <br>&lt;link rel="preload" as="style" href="theme.css" importance="low" 
 onload="this.rel=stylesheet">
 </pre>
@@ -899,7 +899,7 @@ onload="this.rel=stylesheet">
         importance of these resources is low so that requests for them don’t contend with network requests for more important
         resources. They can accomplish this by annotating these requests with an <code>importance</code> of <code>low</code>:
       </p>
-<pre class="highlight" highlight="html">&lt;script src="https://foo.com/non-critical.js" importance="low">&lt;/script>
+<pre class="highlight" data-language="html">&lt;script src="https://foo.com/non-critical.js" importance="low">&lt;/script>
 
 &lt;script src="https://foo.com/ads.js" importance="low">&lt;/script>
 
@@ -917,7 +917,7 @@ onload="this.rel=stylesheet">
         there are several resources loaded for each of these pages, the image is the main content users are interested in.
         Related images are the next most important. They want to indicate this importance to the browser:
       </p>
-<pre class="highlight" highlight="html">&lt;main>
+<pre class="highlight" data-language="html">&lt;main>
   &lt;img src="family.jpg" importance="high">
 &lt;/main>
 
@@ -948,7 +948,7 @@ onload="this.rel=stylesheet">
     <div class="example" id="example-f84cb255" title="Example 4">
      <a class="self-link" href="#example-f84cb255"></a>
       
-<pre class="highlight" highlight="html">&lt;script>
+<pre class="highlight" data-language="html">&lt;script>
      <br> // Critical Fetch request for article content
      <br> fetch('/api/articles.json').then(/*...*/)
      <br>
@@ -965,7 +965,7 @@ onload="this.rel=stylesheet">
     <div class="example" id="example-9e5db22a" title="Example 5">
      <a class="self-link" href="#example-9e5db22a"></a>
       
-<pre class="highlight" highlight="html">&lt;script>
+<pre class="highlight" data-language="html">&lt;script>
      <br> // Critical Fetch request for article content
      <br> fetch('/api/articles.json', { importance: 'high' }).then(/*...*/)
      <br>
@@ -982,7 +982,7 @@ onload="this.rel=stylesheet">
     <div class="example" id="example-9f82fd1a" title="Example 5">
      <a class="self-link" href="#example-9f82fd1a"></a>
       
-<pre class="highlight" highlight="html">Link: &lt;/app/style.css>; importance=high     <br>
+<pre class="highlight" data-language="html">Link: &lt;/app/style.css>; importance=high     <br>
 Link: &lt;/app/script.js>; importance=low</pre>
     </div>
     <p>As above examples illustrate, importance can be specified via declarative markup, Link HTTP header (<a data-link-type="biblio" href="#biblio-rfc5988" title="Web Linking">[RFC5988]</a>), 
@@ -1780,12 +1780,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -1877,13 +1875,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -2019,7 +2018,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

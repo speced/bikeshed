@@ -2160,23 +2160,23 @@ pre[highlight], pre.highlight {
    <p>We consider that C++ Modules must solve componentization and provide build time speedups. However, packaging or a binary distribution system sound out of scope. At the same time, C++ Modules shouldn’t prevent any of those ideas from flourishing independently. We think that the current model meets both requirements, as explained in more detail in this paper.</p>
    <p>The addition of layers and abstractions won’t ever be free. We ask the reader to keep that in mind while balancing the tradeoffs.</p>
    <h2 class="heading settled" data-level="2" id="preamble-config-dep"><span class="secno">2. </span><span class="content">Module preamble, configuration, and dependency scanning</span><a class="self-link" href="#preamble-config-dep"></a></h2>
-   <p>The module preamble consists of a set of module import declarations (module imports and header imports) and is terminated by the first non import decl. Module imports never import macros, while macros from header imports are visible directly after the closing '<code class="highlight" highlight="c++">;</code>'.  The macros that are imported from headers can influence subsequent import logic. Includes can appear within the preamble as long as they only expand into import decls.</p>
+   <p>The module preamble consists of a set of module import declarations (module imports and header imports) and is terminated by the first non import decl. Module imports never import macros, while macros from header imports are visible directly after the closing '<code class="highlight" data-language="cpp">;</code>'.  The macros that are imported from headers can influence subsequent import logic. Includes can appear within the preamble as long as they only expand into import decls.</p>
    <p>In C++17, dependency scanning requires a correct preprocessor. The current state of modules is no different.  It is no slower to determine the dependencies of a modular C++ file than a normal C++ file today, and current proposals aimed at restricting the preamble wouldn’t make a scanner any faster.</p>
-   <p>After scanning the preamble, there may be an <code class="highlight" highlight="c++">#include</code> later in the file, but since this is uncommon a scanner can do a quick scan for <code class="highlight" highlight="c++">#<em style="font-size:50%">white-space</em>include</code> and fall back to preprocessing the entire file if required.</p>
+   <p>After scanning the preamble, there may be an <code class="highlight" data-language="cpp">#include</code> later in the file, but since this is uncommon a scanner can do a quick scan for <code class="highlight" data-language="cpp">#<em style="font-size:50%">white-space</em>include</code> and fall back to preprocessing the entire file if required.</p>
    <h3 class="heading settled" data-level="2.1" id="config"><span class="secno">2.1. </span><span class="content">Module configuration</span><a class="self-link" href="#config"></a></h3>
    <p>An important topic is whether to ship module artifacts, but it’s not clear whether that’s actually feasible because of how modules are configured at build time.</p>
-   <p>For example, implementations allow configuration macros via <code class="highlight" highlight="c++">-D</code>, which is useful for specifying dynamic library import/export (within in a build) or platform-specific constants (when a library needs special handling for each platform).  Each variation in configuration macros needs a different module build artifact.</p>
-   <p>Another potential issue in shipping module artifacts consistently handling command-line flags controlling diagnostics.  Suppose you build module <code class="highlight" highlight="c++">A</code> with <code class="highlight" highlight="c++">-Wno-error</code>. Next, someone tries to invoke the compiler with <code class="highlight" highlight="c++">-Werror</code> while re-using module <code class="highlight" highlight="c++">A</code>. What should happen here? Should the compiler accept that? Should the user give up because their workflow isn’t supported? This can get tricky for delayed diagnostics in template instantiations, where the declaration is in the module and the instantiation is in a user of the module.</p>
+   <p>For example, implementations allow configuration macros via <code class="highlight" data-language="cpp">-D</code>, which is useful for specifying dynamic library import/export (within in a build) or platform-specific constants (when a library needs special handling for each platform).  Each variation in configuration macros needs a different module build artifact.</p>
+   <p>Another potential issue in shipping module artifacts consistently handling command-line flags controlling diagnostics.  Suppose you build module <code class="highlight" data-language="cpp">A</code> with <code class="highlight" data-language="cpp">-Wno-error</code>. Next, someone tries to invoke the compiler with <code class="highlight" data-language="cpp">-Werror</code> while re-using module <code class="highlight" data-language="cpp">A</code>. What should happen here? Should the compiler accept that? Should the user give up because their workflow isn’t supported? This can get tricky for delayed diagnostics in template instantiations, where the declaration is in the module and the instantiation is in a user of the module.</p>
    <p>A mechanism like the <a href="https://github.com/llvm/llvm-project/blob/e3f105c651c88002f33df117b8f2c8f8ed003993/clang/lib/Frontend/CompilerInvocation.cpp#L3344">artifact hashing</a> in Clang Modules is an example of how to solve this problem. When building a module with Clang Modules, the hash for the artifact location consists of: command line macros, language options, and a set of similar compiler flags. Changes in any of those by a subsequent compiler invocation typically triggers a new module build.</p>
    <p>None of the above prevents fine-grained memoization. Indeed, the current Clang approach can evolve to consider configurations at a finer granularity. Our experience so far makes it unclear whether this use case is worth addressing.</p>
    <h3 class="heading settled" data-level="2.2" id="dep"><span class="secno">2.2. </span><span class="content">Dependency scanning can be fast</span><a class="self-link" href="#dep"></a></h3>
-   <p>The LLVM project is investing in <a href="https://reviews.llvm.org/D53354">a prototype which provides dependency scanning</a> for headers with 4–10× speed up over <code class="highlight" highlight="c++">-Eonly</code> preprocessing. There’s a clear path to compute C++ Modules dependencies using this approach. We are therefore confident that tooling can be done fast and reliably.</p>
+   <p>The LLVM project is investing in <a href="https://reviews.llvm.org/D53354">a prototype which provides dependency scanning</a> for headers with 4–10× speed up over <code class="highlight" data-language="cpp">-Eonly</code> preprocessing. There’s a clear path to compute C++ Modules dependencies using this approach. We are therefore confident that tooling can be done fast and reliably.</p>
    <p>If you think about Clang Modules as a legacy header only C++ modules, the approach should be straightforward to relate. This is how it works:</p>
    <ul>
     <li data-md>
-     <p>Each header file has its source code minimized, by trimming down anything that is not <code class="highlight" highlight="c++">#define</code>, <code class="highlight" highlight="c++">#include</code>, <code class="highlight" highlight="c++">#import</code>, <code class="highlight" highlight="c++">@import</code>, see <a href="https://reviews.llvm.org/D55463">the code</a> for a detailed explanation.</p>
+     <p>Each header file has its source code minimized, by trimming down anything that is not <code class="highlight" data-language="cpp">#define</code>, <code class="highlight" data-language="cpp">#include</code>, <code class="highlight" data-language="cpp">#import</code>, <code class="highlight" data-language="cpp">@import</code>, see <a href="https://reviews.llvm.org/D55463">the code</a> for a detailed explanation.</p>
     <li data-md>
-     <p>An <code class="highlight" highlight="c++">#include</code> triggers a lookup to find out if a header is part of a module. If it is, every header that maps to the same module is bundled and serialized into a <code class="highlight" highlight="c++">.pcm</code> (precompiled module). The mapping is done using external files called <a href="https://clang.llvm.org/docs/Modules.html">module maps</a>. Each <code class="highlight" highlight="c++">#include</code> of a header in a previously serialized bundle with the same configuration is essentially free.</p>
+     <p>An <code class="highlight" data-language="cpp">#include</code> triggers a lookup to find out if a header is part of a module. If it is, every header that maps to the same module is bundled and serialized into a <code class="highlight" data-language="cpp">.pcm</code> (precompiled module). The mapping is done using external files called <a href="https://clang.llvm.org/docs/Modules.html">module maps</a>. Each <code class="highlight" data-language="cpp">#include</code> of a header in a previously serialized bundle with the same configuration is essentially free.</p>
     <li data-md>
      <p>While traversing the mapping above, installed listeners register necessary dependencies.</p>
    </ul>
@@ -5850,11 +5850,11 @@ pre[highlight], pre.highlight {
    </svg>
    <ul>
     <li data-md>
-     <p>2440 <code class="highlight" highlight="c++">.cpp</code> files which <em>import</em> modules. None of those are part of a module themselves, since there’s no similar concept of a <em>module implementation unit</em>.</p>
+     <p>2440 <code class="highlight" data-language="cpp">.cpp</code> files which <em>import</em> modules. None of those are part of a module themselves, since there’s no similar concept of a <em>module implementation unit</em>.</p>
     <li data-md>
-     <p>173 module files (<code class="highlight" highlight="c++">.pcm</code>) including all different configurations for a given module. For instance, <code class="highlight" highlight="c++">LLVM_Utils</code> shows up 5 times, covering 5 different configurations.</p>
+     <p>173 module files (<code class="highlight" data-language="cpp">.pcm</code>) including all different configurations for a given module. For instance, <code class="highlight" data-language="cpp">LLVM_Utils</code> shows up 5 times, covering 5 different configurations.</p>
     <li data-md>
-     <p>14330 <em>import</em> edges modeling the total import relationships between <code class="highlight" highlight="c++">.cpp</code> to <code class="highlight" highlight="c++">.pcm</code>, and <code class="highlight" highlight="c++">.pcm</code> to <code class="highlight" highlight="c++">.pcm</code>.</p>
+     <p>14330 <em>import</em> edges modeling the total import relationships between <code class="highlight" data-language="cpp">.cpp</code> to <code class="highlight" data-language="cpp">.pcm</code>, and <code class="highlight" data-language="cpp">.pcm</code> to <code class="highlight" data-language="cpp">.pcm</code>.</p>
     <li data-md>
      <p>The longest import path has 12 hops, illustrated below.</p>
    </ul>
@@ -5966,7 +5966,7 @@ pre[highlight], pre.highlight {
      </g>
     </svg>
    </div>
-   <p>Most of the speed benefit from using these modules come from re-using the artifacts for these 5 configurations across 2440 C++ TUs. In a clean build of LLVM using Clang Modules, we see about a 30% speedup (<code class="highlight" highlight="c++">10m10s</code> vs <code class="highlight" highlight="c++">13m44s</code>) using <code class="highlight" highlight="c++">ninja -j6</code>. A more complete survey including different configurations should cover more accurate performance results, but this illustrates one data point commonly found at a developer’s desk.</p>
+   <p>Most of the speed benefit from using these modules come from re-using the artifacts for these 5 configurations across 2440 C++ TUs. In a clean build of LLVM using Clang Modules, we see about a 30% speedup (<code class="highlight" data-language="cpp">10m10s</code> vs <code class="highlight" data-language="cpp">13m44s</code>) using <code class="highlight" data-language="cpp">ninja -j6</code>. A more complete survey including different configurations should cover more accurate performance results, but this illustrates one data point commonly found at a developer’s desk.</p>
    <p>It’s possible to build a strawperson example which performs poorly, but this is an example of a real C++ project that benefits from the reuse of some form of module artifacts.</p>
    <p>This example uses Clang’s implicit modules in which each compiler invocation lazily builds the modules it depends on, and often time multiple compiler invocations are building the same module.  Building modules lazily doesn’t solve the problem of the added build dependencies.  You still have to build the same number of modules before you can proceed with the translation unit, only now multiple TUs are doing duplicate work instead of sharing it.  There’s also no real parallelism exposed because the preamble must be the first thing and no real parsing work will be done until the dependencies have been compiled.</p>
    <h2 class="heading settled" data-level="4" id="stl"><span class="secno">4. </span><span class="content">Standard Library</span><a class="self-link" href="#stl"></a></h2>
@@ -6224,12 +6224,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -6321,13 +6319,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -6463,7 +6462,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

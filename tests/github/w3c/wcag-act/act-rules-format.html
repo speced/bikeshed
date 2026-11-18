@@ -1197,13 +1197,13 @@ pre[highlight], pre.highlight {
     <header>Example of HTML test cases for a rule that checks if <code>img</code> elements have a text alternative:</header>
     <blockquote>
      <p>Example of a <code>passed</code> outcome:</p>
-<pre class="highlight language-html" highlight="html">&lt;img alt="W3C Logo" src="image/w3c.png">
+<pre class="highlight language-html" data-language="html">&lt;img alt="W3C Logo" src="image/w3c.png">
 </pre>
      <p>Example of a <code>failed</code> outcome:</p>
-<pre class="highlight language-html" highlight="html">&lt;img src="image/w3c.png">
+<pre class="highlight language-html" data-language="html">&lt;img src="image/w3c.png">
 </pre>
      <p>Example of an <code>inapplicable</code> outcome:</p>
-<pre class="highlight language-html" highlight="html">&lt;input type="image" alt="W3C Logo" src="image/w3c.png">
+<pre class="highlight language-html" data-language="html">&lt;input type="image" alt="W3C Logo" src="image/w3c.png">
 </pre>
     </blockquote>
    </aside>
@@ -1344,7 +1344,7 @@ pre[highlight], pre.highlight {
      <p>Example 5: Assumed <u class="link-error property" data-lt="Context" title="LINK ERROR: No &apos;property&apos; refs found for &apos;context&apos;.">Context</u> for this section</p>
    </ul>
    <p><strong>Example 1:</strong> Minimal outcome for one <u class="link-error property" data-lt="Assertion" title="LINK ERROR: No &apos;property&apos; refs found for &apos;assertion&apos;.">Assertion</u></p>
-<pre class="highlight language-javascript" highlight="javascript">{
+<pre class="highlight language-javascript" data-language="javascript">{
   "@context": "context.json",
   "@type": "Assertion",
   "assertedBy": "https://example.org/MyTool",
@@ -1357,7 +1357,7 @@ pre[highlight], pre.highlight {
 }
 </pre>
    <p><strong>Example 2:</strong> Results for more than one <u class="link-error property" data-lt="Assertion" title="LINK ERROR: No &apos;property&apos; refs found for &apos;assertion&apos;.">Assertion</u></p>
-<pre class="highlight language-javascript" highlight="javascript">{
+<pre class="highlight language-javascript" data-language="javascript">{
   "@context": "context.json",
   "@graph": [{
     "@type": "Assertion",
@@ -1381,7 +1381,7 @@ pre[highlight], pre.highlight {
 }
 </pre>
    <p><strong>Example 3:</strong> Aggregating based on <u class="link-error property" data-lt="Requirement" title="LINK ERROR: No &apos;property&apos; refs found for &apos;requirement&apos;.">Requirement</u> (eg. WCAG Success Criteria)</p>
-<pre class="highlight language-javascript" highlight="javascript">{
+<pre class="highlight language-javascript" data-language="javascript">{
   "@context": "context.json",
   "@type": "Assertion",
   "assertedBy": "https://example.org/MyTool",
@@ -1409,7 +1409,7 @@ pre[highlight], pre.highlight {
 }
 </pre>
    <p><strong>Example 4:</strong> Aggregating based on 'Test Subject' (eg. for a website)</p>
-<pre class="highlight language-javascript" highlight="javascript">{
+<pre class="highlight language-javascript" data-language="javascript">{
   "@context": "context.json",
   "@type": "Assertion",
   "assertedBy": {
@@ -1461,7 +1461,7 @@ pre[highlight], pre.highlight {
 }
 </pre>
    <p><strong>Example 5:</strong> Assumed <u class="link-error property" data-lt="Context" title="LINK ERROR: No &apos;property&apos; refs found for &apos;context&apos;.">Context</u> for this section</p>
-<pre class="highlight language-javascript" highlight="javascript">{
+<pre class="highlight language-javascript" data-language="javascript">{
   "@vocab": "http://www.w3.org/ns/earl#",
 
   "cnt": "http://www.w3.org/2011/content#",
@@ -2250,12 +2250,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -2347,13 +2345,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -2489,7 +2488,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

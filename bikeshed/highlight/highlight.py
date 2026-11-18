@@ -29,10 +29,12 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
         if lang is False:
             # Element was already highlighted, but needs styles
             doc.extraJC.addLegacySyntaxHighlighting()
+        elif lang == "none":
+            el.set("data-language", "none")
         elif lang:
             if doc.highlightGrammars.hasGrammar(lang):
                 usedGrammarLangs.add(lang)
-                el.set("highlight", lang)
+                el.set("data-language", lang)
                 h.addClass(doc, el, "highlight")
             else:
                 if lang not in doc.md.legacyHighlights and lang not in warnedLegacyLangs:
@@ -61,19 +63,26 @@ def addSyntaxHighlighting(doc: t.SpecT) -> None:
 
 def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[False] | None:
     # Either returns a normalized highlight lang,
+    # "none" indicating highlighting was explicitly suppressed,
     # False indicating the element was already highlighted,
     # or None indicating the element shouldn't be highlighted.
-    attr, lang = h.closestAttr(el, "nohighlight", "highlight")
+    attr, lang = h.closestAttr(el, "bs-nohighlight", "bs-highlight")
     lang = normalizeLanguageName(lang)
     if el.tag == "code":
         # If an ancestor <pre> triggers highlighting, don't *also* trigger it
         # on a <code> descendant.
         pre = h.closestAncestor(el, lambda x: h.tagName(x) in ("pre", "xmp"))
-        if pre is not None and determineHighlightLang(doc, pre):
-            return None
-    if attr == "nohighlight":
+        if pre is not None:
+            preLang = determineHighlightLang(doc, pre)
+            if preLang and preLang != "none":
+                if h.hasOnlyChild(pre) is el and h.hasAttr(el, "bs-nohighlight"):
+                    return "none"
+                return None
+    if attr == "bs-nohighlight":
+        if wouldOtherwiseHighlight(doc, el):
+            return "none"
         return None
-    if attr == "highlight":
+    if attr == "bs-highlight":
         return lang
     # Highlight-by-default, if applicable.
     if el.tag in ["pre", "xmp"]:
@@ -81,7 +90,17 @@ def determineHighlightLang(doc: t.SpecT, el: t.ElementT) -> str | t.Literal[Fals
             return "webidl"
         if h.hasClass(doc, el, "cddl"):
             return "cddl"
-    return doc.md.defaultHighlight
+    return normalizeLanguageName(doc.md.defaultHighlight)
+
+
+def wouldOtherwiseHighlight(doc: t.SpecT, el: t.ElementT) -> bool:
+    if h.treeAttr(el, "bs-highlight"):
+        return True
+    if el.tag in ("pre", "xmp") and (h.hasClass(doc, el, "idl") or h.hasClass(doc, el, "cddl")):
+        return True
+    if doc.md.defaultHighlight:
+        return True
+    return False
 
 
 @dataclasses.dataclass
@@ -155,9 +174,11 @@ def normalizeLanguageName(lang: str | None) -> str | None:
 def normalizeHighlightMarkers(doc: t.SpecT) -> None:
     # Translate Prism-style highlighting into Pygment-style
     for el in h.findAll("[class*=language-], [class*=lang-]", doc):
+        if h.hasAttr(el, "bs-highlight"):
+            continue
         match = re.search(r"(?:lang|language)-(\w+)", el.get("class") or "")
         if match:
-            el.set("highlight", match.group(1))
+            el.set("bs-highlight", match.group(1))
 
 
 def addLineWrappers(doc: t.SpecT, el: t.ElementT, options: LineNumberOptions) -> t.ElementT:

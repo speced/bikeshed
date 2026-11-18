@@ -657,17 +657,17 @@ pre[highlight], pre.highlight {
   <main>
    <h2 class="heading settled" data-level="1" id="inside"><span class="secno">1. </span><span class="content">Markup Inside Highlight Tokens</span><a class="self-link" href="#inside"></a></h2>
    <p>Markup elements (e.g. <code>&lt;span></code>, <code>&lt;mark></code>) nested inside single tokens like keywords, identifiers, and strings:</p>
-<pre class="highlight" highlight="javascript">func<span>ti</span>on my<span>Func</span>tion() {
+<pre class="highlight" data-language="javascript">func<span>ti</span>on my<span>Func</span>tion() {
     con<mark>st</mark> str = "hel<span>lo</span> world";
 }
 </pre>
    <h2 class="heading settled" data-level="2" id="coincident"><span class="secno">2. </span><span class="content">Markup Coincident with Highlight Tokens</span><a class="self-link" href="#coincident"></a></h2>
    <p>Markup elements whose boundaries exactly match token boundaries:</p>
-<pre class="highlight" highlight="javascript"><a href="https://example.com/const">const</a> <dfn class="dfn-paneled" data-dfn-type="dfn" data-export id="myidentifier">myIdentifier</dfn> = <mark>true</mark>;
+<pre class="highlight" data-language="javascript"><a href="https://example.com/const">const</a> <dfn class="dfn-paneled" data-dfn-type="dfn" data-export id="myidentifier">myIdentifier</dfn> = <mark>true</mark>;
 </pre>
    <h2 class="heading settled" data-level="3" id="crossing"><span class="secno">3. </span><span class="content">Markup Crossing Highlight Boundaries</span><a class="self-link" href="#crossing"></a></h2>
    <p>Markup elements spanning across multiple tokens or starting/ending mid-token:</p>
-<pre class="highlight" highlight="javascript"><a href="https://example.com/test">let a =</a> 1;
+<pre class="highlight" data-language="javascript"><a href="https://example.com/test">let a =</a> 1;
 foo<mark>bar + baz</mark>qux();
 /* A comment with <em>markup crossing</em> the comment */
 </pre>
@@ -1274,12 +1274,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -1371,13 +1369,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -1513,7 +1512,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

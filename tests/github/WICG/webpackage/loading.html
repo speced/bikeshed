@@ -1204,7 +1204,7 @@ introduces an extension to the HTTP <a data-link-type="http-header" href="https:
     <p>The following is an example HTTP response for
 <code>https://feed.example/sxg.publisher.example/page.html.wbn</code> showing the right
 Link headers to let a browser prefetch subresources.</p>
-<pre class="highlight language-http" highlight="http">Content-Type: application/signed-exchange;v=b3
+<pre class="highlight language-http">Content-Type: application/signed-exchange;v=b3
 Link: &lt;https://feed.example/sxg.publisher.example/lib.js.sxg>;
     rel="alternate";
     type="application/signed-exchange";
@@ -2689,7 +2689,7 @@ If a <a data-link-type="dfn" href="https://w3c.github.io/network-error-logging/#
 <code>distributor.example</code>, this step  will send the following JSON data to
 describe an invalid signature:
 
-<pre class="highlight" highlight="json">{
+<pre class="highlight" data-language="json">{
   "type": "network-error",
   "url": "https://publisher.example/article.html",
   "age": 234,
@@ -4341,12 +4341,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -4438,13 +4436,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -4580,7 +4579,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

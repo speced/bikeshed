@@ -2225,15 +2225,15 @@ Evaluating Media Features in a Range Context</span><a class="self-link" href="#m
     <a class="self-link" href="#example-d3333f79"></a>
 	The following examples result in a green background on all visual devices:
 
-<pre><code class="highlight lang-css" highlight="css">@media not (width &lt;= -100px) {
+<pre><code class="highlight lang-css" data-language="css">@media not (width &lt;= -100px) {
   body { background: green; }
 }
 </code></pre>
-<pre><code class="highlight lang-css" highlight="css">@media (height > -100px) {
+<pre><code class="highlight lang-css" data-language="css">@media (height > -100px) {
   body { background: green; }
 }
 </code></pre>
-<pre><code class="highlight lang-css" highlight="css">@media not (resolution: -300dpi) {
+<pre><code class="highlight lang-css" data-language="css">@media not (resolution: -300dpi) {
   body { background: green; }
 }
 </code></pre>
@@ -3349,7 +3349,7 @@ Color Display Quality: the <u class="link-error property" data-lt="color-gamut" 
 		in the range of DCI P3:
 
 		
-<pre class="highlight lang-css" highlight="css">@media (color-gamut: p3) { … }
+<pre class="highlight lang-css" data-language="css">@media (color-gamut: p3) { … }
 </pre>
    </div>
    <p class="note" role="note"><span class="marker">Note:</span> An output device can return true for multiple values of this media feature,
@@ -3484,7 +3484,7 @@ Detecting inverted colors on the display: the <u class="link-error property" dat
 			their counter measures and the UA’s would be at risk of cancelling each other.</p>
    </dl>
    <p>User agents must add the following rule to their <a data-link-type="dfn" href="https://drafts.csswg.org/css-cascade-5/#cascade-origin-ua" id="ref-for-cascade-origin-ua">UA style sheet</a>:</p>
-<pre><code class="highlight lang-css" highlight="css">@media (inverted-colors) {
+<pre><code class="highlight lang-css" data-language="css">@media (inverted-colors) {
   img:not(picture>img), picture, video { filter: invert(100%); }
 }
 </code></pre>
@@ -4266,12 +4266,12 @@ Detecting the desire for increased or decreased color contrast from elements on 
 		as appropriate.
 
 
-    <p>Using an unqualified <code class="highlight lang-css" highlight="css">@media (prefers-contrast) { … }</code>
+    <p>Using an unqualified <code class="highlight lang-css" data-language="css">@media (prefers-contrast) { … }</code>
 		to apply high contrast styles is incorrect and user-hostile,
 		as it would also impose high contrast styles to people who have requested the exact opposite.</p>
     <p>However, it is also common to reduce visual clutter
 		in response to both high and low contrast preferences.
-		In that case, it is appropriate to use <code class="highlight lang-css" highlight="css">@media (prefers-contrast) { … }</code>
+		In that case, it is appropriate to use <code class="highlight lang-css" data-language="css">@media (prefers-contrast) { … }</code>
 		without specifying <a class="css" data-link-type="maybe" href="#valdef-media-prefers-contrast-more" id="ref-for-valdef-media-prefers-contrast-more">more</a> or <a class="css" data-link-type="maybe" href="#valdef-media-prefers-contrast-less" id="ref-for-valdef-media-prefers-contrast-less">less</a>,
 		to do things like replacing background images with plain colors,
 		turning off decorative gradients,
@@ -6334,12 +6334,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -6431,13 +6429,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -6573,7 +6572,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

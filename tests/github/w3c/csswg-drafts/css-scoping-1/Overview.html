@@ -1671,7 +1671,7 @@ Serialized Tree-Scoped References</span><a class="self-link" href="#shadow-names
 		given the following document
 		(using the imaginary &lt;::shadow>&lt;/::shadow> markup
 		to indicate an element’s <a data-link-type="dfn" href="https://dom.spec.whatwg.org/#concept-shadow-tree" id="ref-for-concept-shadow-tree③⑨">shadow tree</a>):</p>
-<pre class="highlight" highlight="html">&lt;p class=outer>Here's some text in the outer document's "foo" font.
+<pre class="highlight" data-language="html">&lt;p class=outer>Here's some text in the outer document's "foo" font.
 &lt;style>
   @font-face {
     font-family: foo;
@@ -1715,7 +1715,7 @@ Serialized Tree-Scoped References</span><a class="self-link" href="#shadow-names
 		sees the two elements as having the same value for <a class="css property" data-link-type="property" href="https://drafts.csswg.org/css-fonts-4/#propdef-font-family" id="ref-for-propdef-font-family④">font-family</a>,
 		because the <a data-link-type="dfn" href="https://dom.spec.whatwg.org/#concept-tree-root" id="ref-for-concept-tree-root⑧">root</a>-reference part of a <a data-link-type="dfn" href="#css-tree-scoped-reference" id="ref-for-css-tree-scoped-reference⑦">tree-scoped reference</a>
 		is not preserved by serialization.
-		If it were to set <code class="highlight" highlight="javascript">innerDefault.style.fontFamily = defaultFont;</code>
+		If it were to set <code class="highlight" data-language="javascript">innerDefault.style.fontFamily = defaultFont;</code>
 		(thus setting the <span class="property" id="ref-for-propdef-font-family⑤">font-family</span> property of the element’s attribute stylesheet,
 		which lives in the shadow tree),
 		the <code>.inner-default</code> element would suddenly switch
@@ -2995,12 +2995,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -3092,13 +3090,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -3234,7 +3233,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();

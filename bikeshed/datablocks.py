@@ -873,7 +873,7 @@ def transformIncludeCode(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT 
     h.addClass(doc, ret, "include-code")
     ret.set("path", path)
     if highlight:
-        ret.set("highlight", highlight)
+        ret.set("bs-highlight", highlight)
     if lineStart:
         ret.set("line-start", lineStart)
     if show:

@@ -697,7 +697,7 @@ pre[highlight], pre.highlight {
    </ol>
   </nav>
   <main>
-<pre class="def highlight idl" highlight="webidl">enum <dfn class="dfn-paneled idl-code" data-dfn-type="enum" data-export id="enumdef-barenum"><code>BarEnum</code></dfn> { <dfn class="dfn-paneled idl-code" data-dfn-for="BarEnum" data-dfn-type="enum-value" data-export id="dom-barenum"><code>""</code></dfn>, <dfn class="dfn-paneled idl-code" data-dfn-for="BarEnum" data-dfn-type="enum-value" data-export id="dom-barenum-bar"><code>"bar"</code></dfn> };
+<pre class="def highlight idl" data-language="webidl">enum <dfn class="dfn-paneled idl-code" data-dfn-type="enum" data-export id="enumdef-barenum"><code>BarEnum</code></dfn> { <dfn class="dfn-paneled idl-code" data-dfn-for="BarEnum" data-dfn-type="enum-value" data-export id="dom-barenum"><code>""</code></dfn>, <dfn class="dfn-paneled idl-code" data-dfn-for="BarEnum" data-dfn-type="enum-value" data-export id="dom-barenum-bar"><code>"bar"</code></dfn> };
 interface <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="foo"><code>Foo</code></dfn> {
   attribute <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-DOMString" id="ref-for-idl-DOMString">DOMString</a> <dfn class="dfn-paneled idl-code" data-dfn-for="Foo" data-dfn-type="attribute" data-export data-type="DOMString" id="dom-foo-foo"><code>foo</code></dfn>;
  attribute <a data-link-type="idl-name" href="#enumdef-barenum" id="ref-for-enumdef-barenum">BarEnum</a> <dfn class="dfn-paneled idl-code" data-dfn-for="Foo" data-dfn-type="attribute" data-export data-type="BarEnum" id="dom-foo-bar"><code>bar</code></dfn>;
@@ -754,7 +754,7 @@ interface <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-expor
    <dd>Edgar Chen; Timothy Gu. <a href="https://webidl.spec.whatwg.org/"><cite>Web IDL Standard</cite></a>. Living Standard. URL: <a href="https://webidl.spec.whatwg.org/">https://webidl.spec.whatwg.org/</a>
   </dl>
   <h2 class="heading no-num no-ref settled" id="idl-index"><span class="content">IDL Index</span></h2>
-<pre class="def highlight idl" highlight="webidl">enum <a href="#enumdef-barenum"><code>BarEnum</code></a> { <a href="#dom-barenum"><code>""</code></a>, <a href="#dom-barenum-bar"><code>"bar"</code></a> };
+<pre class="def highlight idl" data-language="webidl">enum <a href="#enumdef-barenum"><code>BarEnum</code></a> { <a href="#dom-barenum"><code>""</code></a>, <a href="#dom-barenum-bar"><code>"bar"</code></a> };
 interface <a href="#foo"><code>Foo</code></a> {
   attribute <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-DOMString">DOMString</a> <a data-type="DOMString" href="#dom-foo-foo"><code>foo</code></a>;
  attribute <a data-link-type="idl-name" href="#enumdef-barenum">BarEnum</a> <a data-type="BarEnum" href="#dom-foo-bar"><code>bar</code></a>;
@@ -1372,12 +1372,10 @@ const getLanguageClass = element => [...element.classList]
 
 const getLanguage = codeBlock => {
   const pre = codeBlock.parentElement;
-  const language = codeBlock.getAttribute("highlight")
+  const language = codeBlock.dataset.language
     || getLanguageClass(codeBlock)
-    || codeBlock.dataset.language
-    || pre?.getAttribute("highlight")
-    || (pre ? getLanguageClass(pre) : "")
     || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
     || "";
 
   return language.toLowerCase();
@@ -1469,13 +1467,14 @@ const getRules = rule => {
 
 const highlightAll = async ({
   root = document,
-  selector = "[highlight], pre.highlight, code.highlight, pre > code",
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
   languageAliases
 } = {}) => {
   const elements = [...root.querySelectorAll(selector)];
   const codeBlocks = elements.filter(el => {
     if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
-    return getLanguage(el);
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
   });
   const languages = codeBlocks.map(codeBlock =>
     normalizeLanguage(getLanguage(codeBlock), languageAliases)
@@ -1611,7 +1610,9 @@ const highlightAll = async ({
   };
 
   codeBlocks.forEach((codeBlock, index) => {
-    const grammar = grammars.languages[languages[index]];
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
     if (!grammar) return;
 
     codeBlock.normalize();
