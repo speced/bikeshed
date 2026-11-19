@@ -83,13 +83,6 @@ so running these before submitting a PR is important.
         is a substring of their filename.
         (That is, exact matches not required.)
 
-* To run Playwright visual tests and tests of client-side user interaction,
-    * NodeJS and docker must be installed first.
-    * Then, to run all `*_pwtest.js` scripts and compare with existing  __screenshots__ in the same directory, run the following.
-        * `npm run pwtests`
-    * To update the screenshots after you make changes that should affect the screenshots, run this instead:
-        * `npm run pwtests-update`
-
 
 Managing Requirements
 ---------------------
