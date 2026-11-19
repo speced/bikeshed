@@ -107,7 +107,7 @@ def validUrlUnit(char: str) -> bool:
 
 
 def textContent(el: t.ElementT, exact: bool = False) -> str:
-    # If exact is False, then any elements with data-deco attribute
+    # If exact is False, then any elements with bs-deco attribute
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
     if len(el) == 0:
@@ -123,7 +123,7 @@ def textContentIgnoringDecorative(el: t.ElementT) -> str:
     for child in childNodes(el):
         if isinstance(child, str):
             s += child
-        elif child.get("data-deco") is None:
+        elif child.get("bs-deco") is None:
             s += textContentIgnoringDecorative(child)
     return s
 
@@ -1030,13 +1030,13 @@ def uniqueID(*s: str) -> str:
 
 def addOldIDs(els: t.Iterable[t.ElementT]) -> None:
     for el in els:
-        oldIdAttr = el.get("oldids")
-        if not oldIdAttr:
+        if not (oldIdAttr := el.get("bs-oldids")):
             continue
         oldIDs = [id.strip() for id in oldIdAttr.strip().split(",")]
         for oldID in oldIDs:
             prependChild(el, E.span({"id": oldID, "class": "bs-old-id"}))
-        removeAttr(el, "oldids")
+        # Remove so repeated addOldIDs()/fixupIDs() passes don't duplicate spans.
+        removeAttr(el, "bs-oldids")
 
 
 _ISSUE_ID_RE = re.compile(r"issue-[0-9a-fA-F]{8}$")
@@ -1064,13 +1064,13 @@ def dedupIDs(doc: t.SpecT) -> None:
         complaintEls = []
         if warnAboutDupes:
             for el in els:
-                if el.get("data-silently-dedup") is not None:
+                if el.get("bs-silently-dedup") is not None:
                     continue
                 complaintEls.append(el)
         # Now dedup everything left in the list after the first one.
         dedupIndex = 1
         for el in els[1:]:
-            altId = el.get("data-alternate-id")
+            altId = el.get("bs-alternate-id")
             if altId and altId not in firstSeen:
                 el.set("id", safeID(doc, altId))
                 firstSeen[altId] = el

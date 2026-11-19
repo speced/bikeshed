@@ -28,7 +28,7 @@ def processWptElements(doc: t.SpecT) -> None:
             if not prefixPreloaded and pathPrefix and not pathPrefix.startswith("https:"):
                 testData.testsForPrefix(normalizePathSegment(pathPrefix))
                 prefixPreloaded = True
-            skipExistenceCheck = el.get("skip-existence-check") is not None
+            skipExistenceCheck = el.get("bs-skip-existence-check") is not None
             for testName in testNames:
                 if not skipExistenceCheck and testData.get(testName) is None:
                     m.warn(f"Couldn't find WPT test '{testName}' - did you misspell something?", el=el)
@@ -72,7 +72,7 @@ def processWptElements(doc: t.SpecT) -> None:
             m.die(f"Only one <wpt-rest> element allowed per document, you have {len(wptRestElements)}.")
             wptRestElements = wptRestElements[0:1]
         else:
-            localPrefix = wptRestElements[0].get("pathprefix")
+            localPrefix = wptRestElements[0].get("bs-pathprefix")
             if localPrefix is not None:
                 pathPrefix = localPrefix
             if pathPrefix is None:
@@ -140,7 +140,6 @@ def createHTML(
     elif doc.md.wptDisplay in ("inline", "open", "closed"):
         blockEl.tag = "details"
         h.addClass(doc, blockEl, "wpt-tests-block")
-        h.removeAttr(blockEl, "pathprefix")
         h.removeAttr(blockEl, "title")
         blockEl.set("lang", "en")
         blockEl.set("dir", "ltr")
@@ -288,7 +287,7 @@ def testNamesFromEl(el: t.ElementT, pathPrefix: str | None = None) -> list[str]:
     if not text:
         return []
     testNames = []
-    localPrefix = el.get("pathprefix")
+    localPrefix = el.get("bs-pathprefix")
     if localPrefix is not None:
         pathPrefix = localPrefix
     pathPrefix = normalizePathSegment(pathPrefix)

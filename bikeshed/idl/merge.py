@@ -166,10 +166,10 @@ def _evaluateOrigElement(
 
 
 CANON_ATTRIBUTES = [
-    "data-idl-type",
+    "bs-idl-type",
     "data-link-type",
-    "data-idl-for",
-    "data-link-for",
+    "bs-idl-for",
+    "bs-link-for",
 ]
 
 
@@ -208,17 +208,14 @@ def _replacePostWithOrig(orig: _OrigElement, post: _PostElement) -> None:
 def _translateAttribute(el: t.ElementT, attrname: str) -> str:
     """
     Attributes on <idl> don't know whether they'll be on a link or dfn,
-    so they're spelled data-idl-foo.
-    Translate them to data-link-foo or data-dfn-foo.
+    so they're spelled bs-idl-foo.
+    Translate them to data-link-type/bs-link-for or data-dfn-foo.
     """
-    if not attrname.startswith("data-idl-"):
-        return attrname
-    suffix = attrname[len("data-idl-") :]
-    if el.tag == "a":
-        prefix = "data-link-"
-    else:
-        prefix = "data-dfn-"
-    return prefix + suffix
+    if attrname == "bs-idl-type":
+        return "data-link-type" if el.tag == "a" else "data-dfn-type"
+    if attrname == "bs-idl-for":
+        return "bs-link-for" if el.tag == "a" else "data-dfn-for"
+    return attrname
 
 
 def _reconstructOrigElement(orig: _OrigElement, fullText: str) -> t.ElementT:

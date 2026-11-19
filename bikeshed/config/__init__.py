@@ -1,7 +1,6 @@
 from .BoolSet import BoolSet
 from .dfnTypes import (
     adjustKey,
-    anchorishElements,
     cddlTypes,
     cssTypes,
     dfnClassToType,

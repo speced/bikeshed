@@ -900,7 +900,6 @@ class TagStackEntry:
             self.startTag.tag in opaqueTags
             or self.startTag.tag in ("pre", "xmp", "script", "style")
             or "bs-opaque" in self.startTag.attrs
-            or "data-opaque" in self.startTag.attrs
         ):
             self.isOpaque = True
         else:

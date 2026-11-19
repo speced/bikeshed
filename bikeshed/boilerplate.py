@@ -287,8 +287,8 @@ def addStyles(doc: t.SpecT) -> None:
 
 
 def addCustomBoilerplate(doc: t.SpecT) -> None:
-    for el in h.findAll("[boilerplate]", doc):
-        tag = el.get("boilerplate", "")
+    for el in h.findAll("[bs-boilerplate]", doc):
+        tag = el.get("bs-boilerplate", "")
         if doc.fillContainers[tag]:
             h.replaceContents(doc.fillContainers[tag][0], el)
             h.removeNode(el)
@@ -396,7 +396,11 @@ def addExplicitIndexes(doc: t.SpecT) -> None:
     # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
     for el in h.findAll("index", doc):
-        status = el.get("status")
+        status = el.get("bs-link-status")
+        if status == "ED":
+            status = "current"
+        elif status == "TR":
+            status = "snapshot"
         if status and status not in config.specStatuses:
             m.die(
                 f"<index> has unknown value '{status}' for status. Must be {config.englishFromList(config.specStatuses)}.",
@@ -416,9 +420,9 @@ def addExplicitIndexes(doc: t.SpecT) -> None:
         else:
             elTypes = None
 
-        if el.get("data-link-spec"):
+        if el.get("bs-link-spec"):
             # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
-            specs = sorted({x.strip() for x in el.get("data-link-spec", "").split(",")})
+            specs = sorted({x.strip() for x in el.get("bs-link-spec", "").split(",")})
             for s in list(specs):
                 if s not in doc.refs.specs:
                     m.die(f"Unknown spec name '{s}' on {h.outerHTML(el)}", el=el)
@@ -586,10 +590,10 @@ def addIndexOfExternallyDefinedTerms(doc: t.SpecT, container: t.ElementT) -> Non
             printableSpec = specName
 
         attrs = {
-            "data-lt": specName,
+            "bs-lt": specName,
             "data-link-type": "biblio",
-            "data-biblio-type": "informative",
-            "data-okay-to-fail": "true",
+            "bs-biblio-type": "informative",
+            "bs-okay-to-fail": "true",
         }
         specLi = h.appendChild(
             ul,
@@ -693,7 +697,7 @@ def addPropertyIndex(doc: t.SpecT) -> None:
     def createRow(prop: dict[str, str], linkType: str, for_: str | None = None) -> t.ElementT:
         attrs = {"data-link-type": linkType}
         if for_:
-            attrs["data-link-for"] = for_
+            attrs["bs-link-for"] = for_
         return h.E.tr(
             h.E.th({"scope": "row"}, h.E.a(attrs, prop["Name"])),
             *[h.E.td(prop.get(column, "")) for column in columns[1:]],
@@ -822,7 +826,7 @@ def addCDDLSection(doc: t.SpecT) -> None:
     # Specs such as WebDriver BiDi define two sets of CDDL definitions for
     # the local and remote ends of the protocol. These modules need to be
     # defined with a dfn of type "cddl-module". CDDL blocks can then reference
-    # one or more modules through a "data-cddl-module" attribute.
+    # one or more modules through a "bs-cddl-module" (from "data-cddl-module") attribute.
     # When modules are defined, CDDL blocks that do not reference a module
     # are considered to apply to all modules. In particular, they do not create
     # a "default" module
@@ -835,7 +839,7 @@ def addCDDLSection(doc: t.SpecT) -> None:
     for module in cddlModules:
         cddlBlocks = []
         for block in allCddlBlocks:
-            forModules = [x.strip() for x in block.get("data-cddl-module", "").split(",")]
+            forModules = [x.strip() for x in block.get("bs-cddl-module", "").split(",")]
             if (len(forModules) == 1 and forModules[0] == "") or any(name in forModules for name in module[1]):
                 cddlBlocks.append(block)
         if len(cddlBlocks) == 0:
@@ -947,8 +951,7 @@ def addTOCSection(doc: t.SpecT) -> None:
     container = t.cast("t.ElementT", containers[1])
     for el in h.findAll(".content a, .content dfn", container):
         el.tag = "span"
-        if "href" in el.attrib:
-            del el.attrib["href"]
+        h.removeAttr(el, "href", "data-link-type")
     for el in h.findAll(".content [id]", container):
         del el.attrib["id"]
     for el in h.findAll("ol:empty", container):
@@ -1079,7 +1082,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
                 doc.md.mailingList,
             ),
             " with subject line “",
-            h.E.kbd("[", mac["shortname"], "] ", h.E.i({"data-lt": ""}, "… message topic …")),
+            h.E.kbd("[", mac["shortname"], "] ", h.E.i("… message topic …")),
             "”",
         )
         if doc.md.mailingListArchives:
@@ -1258,7 +1261,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
             h.appendChild(
                 dl,
                 h.E.dt(
-                    {"id": h.safeID(doc, id), "data-no-self-link": ""},
+                    {"id": h.safeID(doc, id), "bs-no-self-link": ""},
                     "[" + formatBiblioTerm(ref.linkText) + "]",
                 ),
             )
@@ -1283,7 +1286,7 @@ def addReferencesSection(doc: t.SpecT) -> None:
             h.appendChild(
                 dl,
                 h.E.dt(
-                    {"id": h.safeID(doc, id), "data-no-self-link": ""},
+                    {"id": h.safeID(doc, id), "bs-no-self-link": ""},
                     "[" + formatBiblioTerm(ref.linkText) + "]",
                 ),
             )

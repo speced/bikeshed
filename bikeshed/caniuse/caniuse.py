@@ -21,7 +21,7 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
     lastUpdated = datetime.utcfromtimestamp(canIUseData.updated).date().isoformat()
 
     panels = []
-    elements = h.findAll("[caniuse]", doc)
+    elements = h.findAll("[bs-caniuse]", doc)
     if not elements:
         return []
     validateCanIUseURLs(doc, canIUseData, elements)
@@ -31,14 +31,13 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
             m.die(f"Elements with `caniuse` attribute need to have an ID as well. Got:\n{h.serializeTag(dfn)}", el=dfn)
             continue
 
-        featId = dfn.get("caniuse", "").lower()
-        if not featId:
+        if not (featId := dfn.get("bs-caniuse")):
             continue
+        featId = featId.lower()
         feature = canIUseData.getFeature(featId)
         if not feature:
             m.die(f"Unrecognized Can I Use feature ID: {featId}", el=dfn)
             continue
-        del dfn.attrib["caniuse"]
 
         h.addClass(doc, dfn, "caniuse-paneled")
         panel = canIUsePanelFor(
@@ -58,7 +57,7 @@ def addCanIUsePanels(doc: t.SpecT) -> list[t.ElementT]:
 
 def canIUsePanelFor(id: str, feature: CIUFeature, update: str) -> t.ElementT:
     panel = h.E.details(
-        {"class": "caniuse-status unpositioned", "data-deco": ""},
+        {"class": "caniuse-status unpositioned", "bs-deco": ""},
         h.E.summary({}, "CanIUse"),
     )
     mainPara = h.E.p({"class": "support"}, h.E.b({}, _t("Support:")))
@@ -116,7 +115,7 @@ def validateCanIUseURLs(doc: t.SpecT, canIUseData: CIUData, elements: list[t.Ele
     # otherwise, you're missing some features.
     docFeatures = set()
     for el in elements:
-        canIUseAttr = el.get("caniuse")
+        canIUseAttr = el.get("bs-caniuse")
         assert canIUseAttr is not None
         featureID = canIUseAttr.lower()
         docFeatures.add(featureID)

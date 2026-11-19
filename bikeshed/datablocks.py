@@ -159,7 +159,7 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
     tbody = h.appendChild(table, h.E.tbody())
 
     if "Name" in parsedAttrs:
-        table.set("data-link-for-hint", h.escapeAttr(parsedAttrs["Name"].split(",")[0].strip()))
+        table.set("bs-link-for-hint", h.escapeAttr(parsedAttrs["Name"].split(",")[0].strip()))
     if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
@@ -226,7 +226,7 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
                 )
         elif key == "Logical property group":
             h.wrapContents(th, h.E.a({"href": "https://drafts.csswg.org/css-logical-1/#logical-property-group"}))
-            h.wrapContents(td, h.E.a({"data-link-type": "property", "data-okay-to-fail": ""}))
+            h.wrapContents(td, h.E.a({"data-link-type": "property", "bs-okay-to-fail": ""}))
 
     return table
 
@@ -297,7 +297,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
                     attributeList,
                     h.E.li(
                         {},
-                        h.E.a({"data-link-type": "dfn", "data-element-attr-group": ""}, group),
+                        h.E.a({"data-link-type": "dfn", "bs-element-attr-group": ""}, group),
                     ),
                 )
             del parsedAttrs["Attribute groups"]
@@ -312,7 +312,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
                     attributeList,
                     h.E.li(
                         {},
-                        h.E.a({"data-link-type": "element-attr", "data-link-for": dataFor}, att),
+                        h.E.a({"data-link-type": "element-attr", "bs-link-for": dataFor}, att),
                     ),
                 )
         # Give a dummy value to signal that it was specified
@@ -375,7 +375,7 @@ def transformArgumentdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT 
             {},
             "Arguments for the ",
             h.E.a(
-                {"data-link-type": "idl", "data-lt": method, "data-link-for": interface},
+                {"data-link-type": "idl", "bs-lt": method, "bs-link-for": interface},
                 f"{interface}.{method}",
             ),
             " method.",
@@ -817,9 +817,9 @@ def transformInclude(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
 
     ret = h.transferAttributes(el, h.E.pre())
     h.addClass(doc, ret, "include")
-    ret.set("path", path)
+    ret.set("bs-path", path)
     for i, (macroName, macroVal) in enumerate(macros.items()):
-        ret.set(f"macro-{i}", f"{macroName} {macroVal}")
+        ret.set(f"bs-macro-{i}", f"{macroName} {macroVal}")
     return ret
 
 
@@ -871,17 +871,17 @@ def transformIncludeCode(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT 
 
     ret = h.transferAttributes(el, h.E.pre())
     h.addClass(doc, ret, "include-code")
-    ret.set("path", path)
+    ret.set("bs-path", path)
     if highlight:
         ret.set("bs-highlight", highlight)
     if lineStart:
-        ret.set("line-start", lineStart)
+        ret.set("bs-line-start", lineStart)
     if show:
-        ret.set("data-code-show", ",".join(show))
+        ret.set("bs-code-show", ",".join(show))
     if lineHighlight:
-        ret.set("line-highlight", ",".join(lineHighlight))
+        ret.set("bs-line-highlight", ",".join(lineHighlight))
     if lineNumbers:
-        ret.set("line-numbers", "")
+        ret.set("bs-line-numbers", "")
     return ret
 
 
@@ -901,7 +901,7 @@ def transformIncludeRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
 
     ret = h.transferAttributes(el, h.E.pre())
     h.addClass(doc, ret, "include-raw")
-    ret.set("path", path)
+    ret.set("bs-path", path)
     return ret
 
 
@@ -1068,7 +1068,7 @@ def formatElementdefTables(doc: t.SpecT) -> None:
     for table in h.findAll("table.elementdef", doc):
         elements = h.findAll("tr:first-child dfn", table)
         elementsFor = " ".join(h.textContent(x) for x in elements)
-        for el in h.findAll("a[data-element-attr-group]", table):
+        for el in h.findAll("a[bs-element-attr-group]", table):
             groupName = h.textContent(el).strip()
             groupAttrs = sorted(
                 doc.refs.queryAllRefs(linkType="element-attr", linkFor=groupName),
@@ -1082,7 +1082,7 @@ def formatElementdefTables(doc: t.SpecT) -> None:
                 continue
             el.tag = "details"
             h.clearContents(el)
-            h.removeAttr(el, "data-element-attr-group", "data-dfn-type")
+            h.removeAttr(el, "data-link-type")
             ul = h.appendChild(el, h.E.summary(h.E.a({"data-link-type": "dfn"}, groupName)), h.E.ul())
             for ref in groupAttrs:
                 id = "element-attrdef-" + config.simplifyText(h.textContent(elements[0])) + "-" + ref.text

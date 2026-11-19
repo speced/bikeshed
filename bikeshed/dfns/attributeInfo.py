@@ -19,14 +19,14 @@ def addAttributeInfoSpans(doc: t.SpecT) -> None:
         dfn = h.find("dfn", dt)
         if dfn is None:
             continue
-        if h.find("span[data-attribute-info], span[data-dict-member-info]", dt) is not None:
+        if h.find("span[bs-attribute-info], span[bs-dict-member-info]", dt) is not None:
             # Already has a span, nothing to add
             continue
         dfnType = dfn.get("data-dfn-type")
         if dfnType == "attribute":
-            attrName = "data-attribute-info"
+            attrName = "bs-attribute-info"
         elif dfnType == "dict-member":
-            attrName = "data-dict-member-info"
+            attrName = "bs-dict-member-info"
         else:
             continue
         spanFor = h.firstLinkTextFromElement(dfn)
@@ -40,11 +40,11 @@ def addAttributeInfoSpans(doc: t.SpecT) -> None:
         # If there's whitespace after the dfn, clear it out
         if h.emptyText(dfn.tail, wsAllowed=True):
             dfn.tail = None
-        h.insertAfter(dfn, ", ", h.E.span({attrName: "", "for": spanFor}))
+        h.insertAfter(dfn, ", ", h.E.span({attrName: "", "bs-for": spanFor}))
 
 
 def fillAttributeInfoSpans(doc: t.SpecT) -> None:
-    for el in h.findAll("span[data-attribute-info], span[data-dict-member-info]", doc):
+    for el in h.findAll("span[bs-attribute-info], span[bs-dict-member-info]", doc):
         if not h.isEmpty(el):
             # Manually filled, bail
             return
@@ -65,24 +65,24 @@ class TargetInfo:
 
 
 def getTargetInfo(doc: t.SpecT, el: t.ElementT) -> TargetInfo | None:
-    if el.get("data-attribute-info") is not None:
+    if el.get("bs-attribute-info") is not None:
         refType = "attribute"
     else:
         refType = "dict-member"
 
-    referencedAttribute = el.get("for")
+    referencedAttribute = el.get("bs-for")
     if not referencedAttribute:
         m.die("Missing for='' reference in attribute info span.", el=el)
         return None
     if "/" in referencedAttribute:
         interface, referencedAttribute = referencedAttribute.split("/")
         targets = h.findAll(
-            'a[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType),
+            'a[data-link-type={2}][bs-lt="{0}"][bs-link-for="{1}"]'.format(referencedAttribute, interface, refType),
             doc,
         )
     else:
         targets = h.findAll(
-            f'a[data-link-type={refType}][data-lt="{referencedAttribute}"]',
+            f'a[data-link-type={refType}][bs-lt="{referencedAttribute}"]',
             doc,
         )
 
@@ -95,14 +95,14 @@ def getTargetInfo(doc: t.SpecT, el: t.ElementT) -> TargetInfo | None:
 
     target = targets[0]
 
-    type = target.get("data-type", "").strip()
+    type = target.get("bs-type", "").strip()
     if type.endswith("?"):
         nullable = True
         type = type[:-1]
     else:
         nullable = False
-    default = target.get("data-default")
-    readonly = target.get("data-readonly") is not None
+    default = target.get("bs-default")
+    readonly = target.get("bs-readonly") is not None
     return TargetInfo(type, nullable, readonly, default)
 
 

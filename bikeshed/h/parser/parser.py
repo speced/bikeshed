@@ -615,7 +615,7 @@ def parseRepositoryLink(
     else:
         text = f"issue #{num}"
         issueID = f"#{num}"
-    startTag = StartTag.fromStream(s, start, start + 1, "a", {"data-remote-issue-id": escapeAttr(issueID)})
+    startTag = StartTag.fromStream(s, start, start + 1, "a", {"bs-remote-issue-id": escapeAttr(issueID)})
     return Ok(
         [startTag, SafeText.fromStream(s, start + 1, i - 1, text), EndTag.fromStream(s, i - 1, i, startTag)],
         i,
@@ -685,6 +685,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Ok(nodes, i)
             else:
                 startTag.tag = "span"
+                if "data-link-type" in startTag.attrs:
+                    startTag.attrs["bs-link-type"] = startTag.attrs.pop("data-link-type")
         el: ParserNode | None
         if startTag.tag == "title" and not s.openEls.inTagContext("svg"):
             text, endI, _ = parseTitleToEnd(s, i)
@@ -947,26 +949,62 @@ def bqCharPreviouslyOnLine(s: Stream, i: int) -> bool:
 ATTR_SHORTCUTS = {
     "export": "data-export",
     "noexport": "data-noexport",
-    "link-spec": "data-link-spec",
-    "spec": "data-link-spec",
-    "link-status": "data-link-status",
-    "status": "data-link-status",
+    "link-spec": "bs-link-spec",
+    "data-link-spec": "bs-link-spec",
+    "spec": "bs-link-spec",
+    "link-status": "bs-link-status",
+    "data-link-status": "bs-link-status",
+    "status": "bs-link-status",
     "dfn-for": "data-dfn-for",
-    "link-for": "data-link-for",
-    "link-for-hint": "data-link-for-hint",
+    "link-for": "bs-link-for",
+    "data-link-for": "bs-link-for",
+    "link-for-hint": "bs-link-for-hint",
+    "data-link-for-hint": "bs-link-for-hint",
     "dfn-type": "data-dfn-type",
-    "link-type": "data-link-type",
-    "dfn-force": "data-dfn-force",
-    "force": "data-dfn-force",
-    "section": "data-section",
-    "attribute-info": "data-attribute-info",
-    "dict-member-info": "data-dict-member-info",
-    "lt": "data-lt",
+    "dfn-force": "bs-dfn-force",
+    "data-dfn-force": "bs-dfn-force",
+    "force": "bs-dfn-force",
+    "section": "bs-section",
+    "data-section": "bs-section",
+    "attribute-info": "bs-attribute-info",
+    "data-attribute-info": "bs-attribute-info",
+    "dict-member-info": "bs-dict-member-info",
+    "data-dict-member-info": "bs-dict-member-info",
     "local-lt": "data-local-lt",
     "algorithm": "data-algorithm",
-    "ignore": "data-var-ignore",
+    "ignore": "bs-ignore",
+    "data-var-ignore": "bs-ignore",
     "highlight": "bs-highlight",
     "nohighlight": "bs-nohighlight",
+    "line-numbers": "bs-line-numbers",
+    "no-line-numbers": "bs-no-line-numbers",
+    "line-start": "bs-line-start",
+    "line-highlight": "bs-line-highlight",
+    "nocrossorigin": "bs-nocrossorigin",
+    "data-opaque": "bs-opaque",
+    "caniuse": "bs-caniuse",
+    "no-autosize": "bs-no-autosize",
+    "include-if": "bs-include-if",
+    "exclude-if": "bs-exclude-if",
+    "tracking-vector": "bs-tracking-vector",
+    "heading": "bs-heading",
+    "oldids": "bs-oldids",
+    "assert": "bs-assert",
+    "skip-existence-check": "bs-skip-existence-check",
+    "pathprefix": "bs-pathprefix",
+    "data-remote-issue-id": "bs-remote-issue-id",
+    "data-no-self-link": "bs-no-self-link",
+    "data-silently-dedup": "bs-silently-dedup",
+    "data-okay-to-fail": "bs-okay-to-fail",
+    "data-biblio-type": "bs-biblio-type",
+    "data-biblio-status": "bs-biblio-status",
+    "data-biblio-display": "bs-biblio-display",
+    "data-biblio-obsolete": "bs-biblio-obsolete",
+    "boilerplate": "bs-boilerplate",
+    "data-no-idl": "bs-no-idl",
+    "data-no-cddl": "bs-no-cddl",
+    "data-cddl-module": "bs-cddl-module",
+    "data-deco": "bs-deco",
 }
 
 
@@ -1004,16 +1042,35 @@ def canonicalizeShortcuts(el: StartTag | SelfClosedTag) -> StartTag | SelfClosed
                 attrs["data-link-type"] = escapeAttr(linkType)
                 break
 
+    if tag in ("a", "l", "bs-link"):
+        if "link-type" in attrs:
+            attrs["data-link-type"] = attrs.pop("link-type")
+    else:
+        if "link-type" in attrs:
+            attrs["bs-link-type"] = attrs.pop("link-type")
+        if "data-link-type" in attrs:
+            attrs["bs-link-type"] = attrs.pop("data-link-type")
+
+    if tag in config.dfnElements:
+        if "lt" in attrs:
+            attrs["data-lt"] = attrs.pop("lt")
+    else:
+        if "lt" in attrs:
+            attrs["bs-lt"] = attrs.pop("lt")
+        if "data-lt" in attrs:
+            attrs["bs-lt"] = attrs.pop("data-lt")
+
+    if tag in ("a", "l") and "for" in attrs:
+        attrs["bs-link-for"] = attrs.pop("for")
+
     if (
-        tag in ("a", "l")
-        or (tag == "dfn" and "data-var-ignore" not in attrs)
+        (tag == "dfn" and "bs-ignore" not in attrs)
         or (tag in ("h2", "h3", "h4", "h5", "h6") and "data-dfn-type" in attrs)
-    ):
-        if "for" in attrs:
-            if tag in ("a", "l"):
-                attrs["data-link-for"] = attrs.pop("for")
-            else:
-                attrs["data-dfn-for"] = attrs.pop("for")
+    ) and "for" in attrs:
+        attrs["data-dfn-for"] = attrs.pop("for")
+
+    if tag == "span" and ("bs-attribute-info" in attrs or "bs-dict-member-info" in attrs) and "for" in attrs:
+        attrs["bs-for"] = attrs.pop("for")
 
     return el
 
@@ -1643,27 +1700,27 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
                 failNode = SafeText.fromStream(s, start, nodeEnd)
                 return Ok(failNode, nodeEnd)
             attrs["data-link-type"] = escapeAttr(linkType)
-            attrs["data-lt"] = escapeAttr(lt)
+            attrs["bs-lt"] = escapeAttr(lt)
             if linkFor is not None:
-                attrs["data-link-for"] = escapeAttr(linkFor)
+                attrs["bs-link-for"] = escapeAttr(linkFor)
             text = f"<'{lt}'>"
             break
 
         match = PROD_FUNC_RE.match(text)
         if match:
             attrs["data-link-type"] = t.SafeAttrStr("function")
-            attrs["data-lt"] = escapeAttr(match[2])
+            attrs["bs-lt"] = escapeAttr(match[2])
             if match[1] is not None:
-                attrs["data-link-for"] = escapeAttr(match[1])
+                attrs["bs-link-for"] = escapeAttr(match[1])
             text = f"<{match[2]}>"
             break
 
         match = PROD_ATRULE_RE.match(text)
         if match:
             attrs["data-link-type"] = t.SafeAttrStr("at-rule")
-            attrs["data-lt"] = escapeAttr(match[2])
+            attrs["bs-lt"] = escapeAttr(match[2])
             if match[1] is not None:
-                attrs["data-link-for"] = escapeAttr(match[1])
+                attrs["bs-link-for"] = escapeAttr(match[1])
             text = f"<{match[2]}>"
             break
 
@@ -1671,9 +1728,9 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
         if match:
             for_, term, rangeStart, rangeEnd = match.groups()
             attrs["data-link-type"] = t.SafeAttrStr("type")
-            attrs["data-lt"] = escapeAttr(f"<{term}>")
+            attrs["bs-lt"] = escapeAttr(f"<{term}>")
             if for_ is not None:
-                attrs["data-link-for"] = escapeAttr(for_)
+                attrs["bs-link-for"] = escapeAttr(for_)
             if rangeStart is not None:
                 formattedStart, numStart = parseRangeComponent(s, textStart + match.start(3), rangeStart)
                 formattedEnd, numEnd = parseRangeComponent(s, textStart + match.start(4), rangeEnd)
@@ -1696,10 +1753,10 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
         match = TYPEWITHARGS_RE.match(text)
         if match:
             for_, term, arg = match.groups()
-            attrs["data-lt"] = escapeAttr(f"<{term}>")
+            attrs["bs-lt"] = escapeAttr(f"<{term}>")
             attrs["data-link-type"] = t.SafeAttrStr("type")
             if for_ is not None:
-                attrs["data-link-for"] = escapeAttr(for_)
+                attrs["bs-link-for"] = escapeAttr(for_)
             if "<<" in arg:
                 arg = arg.replace("<<", "<").replace(">>", ">")
             text = f"<{term}[{arg}]>"
@@ -1805,11 +1862,11 @@ def parseMaybeDecl(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
             "bs-autolink-syntax": escapeAttr(autolinkSyntax),
             "class": t.SafeAttrStr("css"),
             "data-link-type": t.SafeAttrStr("propdesc"),
-            "data-lt": escapeAttr(propdescname),
+            "bs-lt": escapeAttr(propdescname),
         },
     )
     if for_:
-        startTag.attrs["data-link-for"] = escapeAttr(for_)
+        startTag.attrs["bs-link-for"] = escapeAttr(for_)
         startTag.attrs["data-link-type"] = t.SafeAttrStr("descriptor")
     startTag.finalize()
 
@@ -1910,7 +1967,7 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
             "class": t.SafeAttrStr("css"),
             "bs-autolink-syntax": escapeAttr(s.slice(start, nodeEnd)),
             "data-link-type": escapeAttr(linkType),
-            "data-lt": escapeAttr(valueName),
+            "bs-lt": escapeAttr(valueName),
         },
     )
     if probablyAutolink:
@@ -1927,7 +1984,7 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
             )
             m.say("(See https://speced.github.io/bikeshed/#autolink-limits )")
         if for_:
-            startTag.attrs["data-link-for"] = escapeAttr(for_)
+            startTag.attrs["bs-link-for"] = escapeAttr(for_)
     startTag.finalize()
 
     s.observeShorthandOpen(startTag, ("''", "''"))
@@ -2050,12 +2107,12 @@ def parseCSSPropdesc(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
             {
                 "class": t.SafeAttrStr("property"),
                 "data-link-type": escapeAttr(linkType),
-                "data-lt": escapeAttr(lt),
+                "bs-lt": escapeAttr(lt),
                 "bs-autolink-syntax": escapeAttr("'" + innerText + "'"),
             },
         )
         if linkFor is not None:
-            startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+            startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     nodeEnd = innerEnd + 1
@@ -2096,12 +2153,12 @@ def parseAutolinkDfn(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
         "a",
         {
             "data-link-type": t.SafeAttrStr("dfn"),
-            "data-lt": escapeAttr(lt),
+            "bs-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[=" + innerText + "=]"),
         },
     )
     if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+        startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     if s[innerEnd] == "|":
@@ -2149,12 +2206,12 @@ def parseAutolinkAbstract(s: Stream, start: int) -> ResultT[SafeText | list[Pars
         "a",
         {
             "data-link-type": t.SafeAttrStr("abstract-op"),
-            "data-lt": escapeAttr(lt),
+            "bs-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[$" + innerText + "$]"),
         },
     )
     if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+        startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     if s[innerEnd] == "|":
@@ -2202,12 +2259,12 @@ def parseAutolinkHeader(s: Stream, start: int) -> ResultT[SafeText | list[Parser
         "a",
         {
             "data-link-type": t.SafeAttrStr("http-header"),
-            "data-lt": escapeAttr(lt),
+            "bs-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("[:" + innerText + ":]"),
         },
     )
     if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+        startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     startTick = RawText.fromStream(s, start, start, "`")
@@ -2279,12 +2336,12 @@ def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserN
         "a",
         {
             "data-link-type": escapeAttr(linkType),
-            "data-lt": escapeAttr(lt),
+            "bs-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s.slice(start, innerEnd + 2)),
         },
     )
     if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+        startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     startCode = StartTag.fromStream(
@@ -2344,12 +2401,12 @@ def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
         "a",
         {
             "data-link-type": t.SafeAttrStr(linkType),
-            "data-lt": escapeAttr(lt),
+            "bs-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr(s.slice(start, innerEnd + 2)),
         },
     )
     if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+        startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
     startCode = StartTag.fromStream(
@@ -2413,12 +2470,12 @@ def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[Par
         "a",
         {
             "data-link-type": t.SafeAttrStr(linkType),
-            "data-lt": escapeAttr(lt),
+            "bs-lt": escapeAttr(lt),
             "bs-autolink-syntax": escapeAttr("<{" + innerText + "}>"),
         },
     )
     if linkFor is not None:
-        startTag.attrs["data-link-for"] = escapeAttr(linkFor)
+        startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
     startCode = StartTag.fromStream(s, start, start, "code", {"bs-nohighlight": ""})
 
@@ -2626,9 +2683,9 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
     lt = match[2]
     modifierSequence = match[3].strip()
     attrs: t.SafeAttrDict = {
-        "data-lt": escapeAttr(lt),
+        "bs-lt": escapeAttr(lt),
         "data-link-type": t.SafeAttrStr("biblio"),
-        "data-biblio-type": t.SafeAttrStr("normative" if normative else "informative"),
+        "bs-biblio-type": t.SafeAttrStr("normative" if normative else "informative"),
         "bs-autolink-syntax": escapeAttr(s.slice(nodeStart, innerEnd) + "]]"),
     }
 
@@ -2641,8 +2698,8 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
     if modifierSequence != "":
         for modifier in re.split(r"\s+", modifierSequence):
             if modifier in ("current", "snapshot"):
-                if "data-biblio-status" not in attrs:
-                    attrs["data-biblio-status"] = t.SafeAttrStr(modifier)
+                if "bs-biblio-status" not in attrs:
+                    attrs["bs-biblio-status"] = t.SafeAttrStr(modifier)
                 else:
                     m.die(
                         f"Biblio shorthand [{lt} ...] contains multiple current/snapshot keywords. Please use only one.",
@@ -2650,8 +2707,8 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
                     )
                     return failureResult
             elif modifier in ("inline", "index", "direct"):
-                if "data-biblio-display" not in attrs:
-                    attrs["data-biblio-display"] = t.SafeAttrStr(modifier)
+                if "bs-biblio-display" not in attrs:
+                    attrs["bs-biblio-display"] = t.SafeAttrStr(modifier)
                 else:
                     m.die(
                         f"Biblio shorthand [{lt} ...] contains multiple inline/index/direct keywords. Please use only one.",
@@ -2659,8 +2716,8 @@ def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]
                     )
                     return failureResult
             elif modifier == "obsolete":
-                if "data-biblio-obsolete" not in attrs:
-                    attrs["data-biblio-obsolete"] = ""
+                if "bs-biblio-obsolete" not in attrs:
+                    attrs["bs-biblio-obsolete"] = ""
                 else:
                     m.die(
                         f"Biblio shorthand [{lt} ...] contains multiple 'obsolete' keywords. Please use only one.",
@@ -2706,7 +2763,7 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             innerStart,
             "a",
             {
-                "data-section": "",
+                "bs-section": "",
                 "href": escapeAttr(section),
                 "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
@@ -2719,8 +2776,8 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             innerStart,
             "span",
             {
-                "spec-section": escapeAttr(justPage + "#"),
-                "data-link-spec": escapeAttr(spec),
+                "bs-spec-section": escapeAttr(justPage + "#"),
+                "bs-link-spec": escapeAttr(spec),
                 "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )
@@ -2732,8 +2789,8 @@ def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str
             innerStart,
             "span",
             {
-                "spec-section": escapeAttr(section),
-                "data-link-spec": escapeAttr(spec),
+                "bs-spec-section": escapeAttr(section),
+                "bs-link-spec": escapeAttr(spec),
                 "bs-autolink-syntax": escapeAttr(f"[[{match[0]}]]"),
             },
         )

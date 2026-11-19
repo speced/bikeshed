@@ -114,7 +114,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
 
         # Remove duplicate linking texts.
         if (
-            el.tag in config.anchorishElements
+            el.tag in config.dfnElements
             and el.get("data-lt") is not None
             and el.get("data-lt") == h.textContent(el, exact=True)
         ):
@@ -134,8 +134,7 @@ def cleanupHTML(doc: t.SpecT) -> None:
             el.tag = "span"
             el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
         # For any <div assert> elements, add a unique ID based on its contents.
-        if el.tag == "div" and el.get("assert") is not None:
-            h.removeAttr(el, "assert")
+        if el.tag == "div" and el.get("bs-assert") is not None:
             el.set("id", h.safeID(doc, "assert-" + h.hashContents(el)))
 
         # Add ARIA role of "note" to class="note" elements
@@ -166,48 +165,8 @@ def cleanupHTML(doc: t.SpecT) -> None:
                 flattenEls.append(el)
 
         # Remove a bunch of attributes
-        if el.get("data-attribute-info") is not None or el.get("data-dict-member-info") is not None:
-            h.removeAttr(el, "data-attribute-info", "data-dict-member-info", "for")
-        if el.tag in ["a", "span"]:
-            h.removeAttr(
-                el,
-                "data-link-for",
-                "data-link-for-hint",
-                "data-link-status",
-                "data-link-spec",
-                "data-section",
-                "data-biblio-type",
-                "data-biblio-status",
-                "data-okay-to-fail",
-                "data-lt",
-            )
-        if el.tag != "a":
-            h.removeAttr(el, "data-link-for", "data-link-type")
         if el.tag not in config.dfnElements:
-            h.removeAttr(el, "data-dfn-for", "data-dfn-type", "data-export", "data-noexport")
-        if el.tag == "var":
-            h.removeAttr(el, "data-var-ignore")
-        # Strip the control attributes
-        if el.tag == "pre":
-            h.removeAttr(
-                el,
-                "path",
-                "line-start",
-                "data-code-show",
-                "line-highlight",
-                "line-numbers",
-            )
-        h.removeAttr(
-            el,
-            "bs-autolink-syntax",
-            "data-alternate-id",
-            "line-numbers",
-            "data-opaque",
-            "data-no-self-link",
-            "caniuse",
-            "data-silently-dedup",
-            "nocrossorigin",
-        )
+            h.removeAttr(el, "data-dfn-for", "data-dfn-type", "data-export", "data-noexport", "data-lt")
 
         # Remove the internal-use-only detail of whether export/noexport is manual or default
         if el.get("data-export"):
@@ -237,7 +196,7 @@ def forceCrossorigin(doc: t.SpecT) -> None:
     if not doc.md.forceCrossorigin:
         return
     for el in h.findAll("link, script[src], audio, video, img", doc):
-        if el.get("crossorigin") is not None or h.treeAttr(el, "nocrossorigin") is not None:
+        if el.get("crossorigin") is not None or h.treeAttr(el, "bs-nocrossorigin") is not None:
             continue
         el.set("crossorigin", "")
 
@@ -249,8 +208,7 @@ def addImageSize(doc: t.SpecT) -> None:
     for el in imgElements:
         if el.get("width") or el.get("height"):
             continue
-        if el.get("no-autosize") is not None:
-            h.removeAttr(el, "no-autosize")
+        if el.get("bs-no-autosize") is not None:
             continue
         src = el.get("src")
         srcset = el.get("srcset")

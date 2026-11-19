@@ -602,8 +602,8 @@ def dedupBiblioReferences(doc: t.SpecT) -> None:
 def processBiblioLinks(doc: t.SpecT) -> None:
     biblioLinks = h.findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
-        if el.get("data-lt"):
-            linkText = el.get("data-lt", "")
+        if el.get("bs-lt"):
+            linkText = el.get("bs-lt", "")
         else:
             linkText = h.textContent(el)
         linkText = h.foldWhitespace(linkText)
@@ -612,11 +612,11 @@ def processBiblioLinks(doc: t.SpecT) -> None:
         if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]
 
-        refStatus = h.treeAttr(el, "data-biblio-status") or doc.md.defaultRefStatus
+        refStatus = h.treeAttr(el, "bs-biblio-status") or doc.md.defaultRefStatus
 
-        okayToFail = el.get("data-okay-to-fail") is not None
+        okayToFail = el.get("bs-okay-to-fail") is not None
 
-        allowObsolete = el.get("data-biblio-obsolete") is not None
+        allowObsolete = el.get("bs-biblio-obsolete") is not None
 
         ref = doc.refs.getBiblioRef(
             linkText,
@@ -635,6 +635,7 @@ def processBiblioLinks(doc: t.SpecT) -> None:
                     el=el,
                 )
             el.tag = "span"
+            h.removeAttr(el, "data-link-type")
             continue
 
         # Need to register that I have a preferred way to refer to this biblio,
@@ -657,12 +658,12 @@ def processBiblioLinks(doc: t.SpecT) -> None:
             doc.refs.preferredBiblioNames[ref.linkText] = linkText
             # Use it on the current ref. Future ones will use the preferred name automatically.
             ref.linkText = linkText
-        registerBiblioUsage(doc, ref, el=el, type=el.get("data-biblio-type"))
+        registerBiblioUsage(doc, ref, el=el, type=el.get("bs-biblio-type"))
 
         id = config.simplifyText(ref.linkText)
         el.set("href", "#biblio-" + id)
 
-        biblioDisplay = el.get("data-biblio-display", doc.md.defaultBiblioDisplay)
+        biblioDisplay = el.get("bs-biblio-display", doc.md.defaultBiblioDisplay)
         if biblioDisplay == "inline":
             if (
                 el.text == f"[{linkText}]"

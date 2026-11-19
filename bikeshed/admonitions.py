@@ -19,9 +19,8 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
         el.set("id", h.safeID(doc, "issue-" + h.hashContents(el)))
     for el in h.findAll(".example:not([id])", doc):
         el.set("id", h.safeID(doc, "example-" + h.hashContents(el)))
-    for el in h.findAll("[data-remote-issue-id]", doc):
-        remoteIssueID = el.get("data-remote-issue-id", "").strip()
-        del el.attrib["data-remote-issue-id"]
+    for el in h.findAll("[bs-remote-issue-id]", doc):
+        remoteIssueID = el.get("bs-remote-issue-id", "").strip()
         # Eventually need to support a way to trigger other repo url structures,
         # but defaulting to GH is fine for now.
         githubMatch = re.match(r"([\w-]+)/([\w-]+)#(\d+)$", remoteIssueID)
@@ -32,7 +31,7 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
             text = f"[{org}/{repo} Issue #{num}]"
             remoteIssueURL = f"https://github.com/{org}/{repo}/issues/{num}"
             if doc.md.inlineGithubIssues:
-                el.set("data-inline-github", f"{org} {repo} {num}")
+                el.set("bs-inline-github", f"{org} {repo} {num}")
         elif numberMatch:
             if isinstance(doc.md.repository, repository.GithubRepository):
                 remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
@@ -41,7 +40,7 @@ def processIssuesAndExamples(doc: t.SpecT) -> None:
                 if doc.md.inlineGithubIssues:
                     org = doc.md.repository.user
                     repo = doc.md.repository.repo
-                    el.set("data-inline-github", f"{org} {repo} {num}")
+                    el.set("bs-inline-github", f"{org} {repo} {num}")
             elif doc.md.issueTrackerTemplate:
                 text = f"[Issue {remoteIssueID}]"
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
@@ -82,10 +81,9 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
     # Collect all the inline issues in the document
     inlineIssues = []
     GitHubIssue = namedtuple("GitHubIssue", ["user", "repo", "num", "el"])
-    for el in h.findAll("[data-inline-github]", doc):
-        user, repo, num = el.get("data-inline-github", "").split()
+    for el in h.findAll("[bs-inline-github]", doc):
+        user, repo, num = el.get("bs-inline-github", "").split()
         inlineIssues.append(GitHubIssue(user, repo, num, el=el))
-        h.removeAttr(el, "data-inline-github")
     if not inlineIssues:
         return
 
@@ -207,7 +205,7 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
 
 def addNoteHeaders(doc: t.SpecT) -> None:
     # Finds <foo heading="bar"> and turns it into a marker-heading
-    for el in h.findAll("[heading]", doc):
+    for el in h.findAll("[bs-heading]", doc):
         h.addClass(doc, el, "no-marker")
         if h.hasClass(doc, el, "note"):
             preText = _t("NOTE: ")
@@ -219,9 +217,8 @@ def addNoteHeaders(doc: t.SpecT) -> None:
             preText = ""
         lineNum = lineNumberFromBsLineNumber(el.get("bs-line-number"))
         parseConfig = h.ParseConfig.fromSpec(doc=doc, context="heading='' attribute")
-        parsedHeading = h.parseHTML(h.parseText(el.get("heading", ""), parseConfig, startLine=lineNum, context=el))
+        parsedHeading = h.parseHTML(h.parseText(el.get("bs-heading", ""), parseConfig, startLine=lineNum, context=el))
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
-        h.removeAttr(el, "heading")
 
 
 def lineNumberFromBsLineNumber(value: str | None) -> int:

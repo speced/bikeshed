@@ -9,7 +9,7 @@ def addTrackingVector(doc: t.SpecT) -> None:
     if doc.md.trackingVectorClass is None:
         return
 
-    els = h.findAll("[tracking-vector]", doc)
+    els = h.findAll("[bs-tracking-vector]", doc)
 
     if len(els) == 0:
         return
@@ -56,7 +56,6 @@ def addTrackingVector(doc: t.SpecT) -> None:
                 ),
             ),
         )
-        h.removeAttr(el, "tracking-vector")
 
 
 def trackingVectorImage(

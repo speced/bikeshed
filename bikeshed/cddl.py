@@ -59,8 +59,8 @@ class CDDLMarker(cddlparser.ast.Marker):
 
     def _wrapCddl(self, cddlType: str, name: str, lt: str, dfnFor: str | None = None) -> str:
         if dfnFor is None:
-            return f'<cddl data-cddl-type="{cddlType}" data-lt="{h.escapeAttr(lt)}">{name}</cddl>'
-        return f'<cddl data-cddl-type="{cddlType}" data-cddl-for="{h.escapeAttr(dfnFor)}" data-lt="{h.escapeAttr(lt)}">{name}</cddl>'
+            return f'<cddl bs-cddl-type="{cddlType}" bs-lt="{h.escapeAttr(lt)}">{name}</cddl>'
+        return f'<cddl bs-cddl-type="{cddlType}" bs-cddl-for="{h.escapeAttr(dfnFor)}" bs-lt="{h.escapeAttr(lt)}">{name}</cddl>'
 
     def serializeValue(self, prefix: str, value: str, suffix: str, node: cddlparser.ast.Value) -> str:
         name = prefix + value + suffix
@@ -111,7 +111,7 @@ class CDDLMarker(cddlparser.ast.Marker):
                 self.currentParameters.update(p.name for p in parent.name.parameters.parameters)
             if parent.assign.type in _EXTEND_ASSIGN_TOKENS:
                 # The definition extends a base definition
-                return f'<a data-link-type="cddl-type" data-link-for="/">{name}</a>'
+                return f'<a data-link-type="cddl-type" bs-link-for="/">{name}</a>'
             if self._recordDefinition("type", name):
                 return self._wrapCddl("type", name, name)
             # Duplicate found, don't create a dfn
@@ -121,8 +121,8 @@ class CDDLMarker(cddlparser.ast.Marker):
             if not parent.hasColon:
                 # The key is actually a reference to a type
                 if name in _PRELUDE_TYPES:
-                    return f'<a data-link-type="cddl-type" data-link-for="/" data-link-spec="rfc8610">{name}</a>'
-                return f'<a data-link-type="cddl-type" data-link-for="/">{name}</a>'
+                    return f'<a data-link-type="cddl-type" bs-link-for="/" bs-link-spec="rfc8610">{name}</a>'
+                return f'<a data-link-type="cddl-type" bs-link-for="/">{name}</a>'
             assert parent.parentNode is not None
             forName = self._getFor(parent.parentNode)
             if forName is None:
@@ -147,13 +147,13 @@ class CDDLMarker(cddlparser.ast.Marker):
             return name
         elif name in _PRELUDE_TYPES:
             # Link types that come from the CDDL prelude in RFC 8610
-            return f'<a data-link-type="cddl-type" data-link-for="/" data-link-spec="rfc8610">{name}</a>'
+            return f'<a data-link-type="cddl-type" bs-link-for="/" bs-link-spec="rfc8610">{name}</a>'
         elif name in self.currentParameters:
             # Name is a reference to a generic parameter
             assert self.currentRule is not None
-            return f'<a data-link-type="cddl-parameter" data-link-for="{h.escapeAttr(self.currentRule.name.name)}">{name}</a>'
+            return f'<a data-link-type="cddl-parameter" bs-link-for="{h.escapeAttr(self.currentRule.name.name)}">{name}</a>'
         else:
-            return f'<a data-link-type="cddl" data-link-for="/">{name}</a>'
+            return f'<a data-link-type="cddl" bs-link-for="/">{name}</a>'
 
     def _getFor(self, node: cddlparser.ast.CDDLNode) -> str | None:
         """
@@ -186,7 +186,7 @@ def findCDDLBlocks(doc: t.SpecT) -> list[t.ElementT]:
     return [
         el
         for el in h.treeElements(doc.document, "pre", "xmp")
-        if el.get("data-no-cddl") is None and h.hasClass(doc, el, "cddl")
+        if el.get("bs-no-cddl") is None and h.hasClass(doc, el, "cddl")
     ]
 
 
@@ -219,12 +219,12 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
     for el in list(h.treeElements(pre, "cddl")):
         # Prefix CDDL types with "cddl-" to avoid confusion with other
         # types (notably CSS ones such as "value")
-        cddlType = "cddl-" + (el.get("data-cddl-type") or "")
-        cddlFor = el.get("data-cddl-for")
+        cddlType = "cddl-" + (el.get("bs-cddl-type") or "")
+        cddlFor = el.get("bs-cddl-for")
         linkFors: t.Sequence[str | None] | None = config.splitForValues(cddlFor)
         if linkFors is None:
             linkFors = [None]
-        elLt = el.get("data-lt")
+        elLt = el.get("bs-lt")
 
         ref = None
         matchedText = ""
@@ -245,13 +245,14 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
             if ref is not None:
                 break
 
-        h.removeAttr(el, "data-cddl-type")
         if ref is None:
             el.tag = "dfn"
             el.set("data-dfn-type", cddlType)
+            if elLt is not None:
+                el.set("data-lt", elLt)
+                h.removeAttr(el, "bs-lt")
             if cddlFor:
                 el.set("data-dfn-for", cddlFor)
-                del el.attrib["data-cddl-for"]
         else:
             # Copy over the auto-generated linking text to the manual dfn.
             dfn = ref.el
@@ -265,10 +266,9 @@ def markupCDDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
             # Reset the <cddl> element to be a link to the manual dfn.
             el.tag = "a"
             el.set("data-link-type", cddlType)
-            el.set("data-lt", matchedText)
+            el.set("bs-lt", matchedText)
             if cddlFor:
-                el.set("data-link-for", cddlFor)
-                del el.attrib["data-cddl-for"]
+                el.set("bs-link-for", cddlFor)
             if el.get("id"):
                 # ID was defensively added by the Marker.
                 del el.attrib["id"]

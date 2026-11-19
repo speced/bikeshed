@@ -19,7 +19,7 @@ def fixIntraDocumentReferences(doc: t.SpecT) -> None:
     for el in h.findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         href = t.cast(str, el.get("href"))
         targetID = parse.unquote(href[1:])
-        if el.get("data-section") is not None and targetID not in headingIDs:
+        if el.get("bs-section") is not None and targetID not in headingIDs:
             m.die(f"Couldn't find target document section {targetID}:\n{h.outerHTML(el)}", el=el)
             continue
         if targetID not in ids:
@@ -42,21 +42,21 @@ def fixIntraDocumentReferences(doc: t.SpecT) -> None:
 
 
 def fixInterDocumentReferences(doc: t.SpecT) -> None:
-    for el in h.findAll("[spec-section]", doc):
-        if el.get("data-link-spec") is None:
+    for el in h.findAll("[bs-spec-section]", doc):
+        if el.get("bs-link-spec") is None:
             m.die(
                 f"Spec-section autolink doesn't have a 'spec' attribute:\n{h.outerHTML(el)}",
                 el=el,
             )
             continue
-        spec = el.get("data-link-spec", "").lower()
-        if el.get("spec-section") is None:
+        spec = el.get("bs-link-spec", "").lower()
+        if el.get("bs-spec-section") is None:
             m.die(
                 f"Spec-section autolink doesn't have a 'spec-section' attribute:\n{h.outerHTML(el)}",
                 el=el,
             )
             continue
-        section = el.get("spec-section", "")
+        section = el.get("bs-spec-section", "")
         if spec in doc.refs.specs:
             # Bikeshed recognizes the spec
             fillInterDocumentReferenceFromShepherd(doc, el, spec, section)
@@ -95,7 +95,8 @@ def fillInterDocumentReferenceFromShepherd(doc: t.SpecT, el: t.ElementT, specNam
     if h.isEmpty(el):
         h.appendChild(el, h.E.cite("{spec}".format(**heading)))
         h.appendChild(el, " §\u202f{number} {text}".format(**heading))
-    h.removeAttr(el, "data-link-spec", "spec-section")
+    # Remove so the second fixInterDocumentReferences() pass doesn't reprocess this link.
+    h.removeAttr(el, "bs-spec-section")
 
     # Mark this as a used biblio ref
     biblioRef = doc.refs.getBiblioRef(
@@ -126,7 +127,8 @@ def fillInterDocumentReferenceFromSpecref(doc: t.SpecT, el: t.ElementT, spec: st
     el.set("href", bib.url + section)
     if h.isEmpty(el):
         el.text = bib.title + " §\u202f" + section[1:]
-    h.removeAttr(el, "data-link-spec", "spec-section")
+    # Remove so the second fixInterDocumentReferences() pass doesn't reprocess this link.
+    h.removeAttr(el, "bs-spec-section")
 
     # Mark this as a used biblio ref
     biblio.registerBiblioUsage(doc, bib, el=el)
@@ -154,11 +156,11 @@ def _getInheritedLinkAttrs(
     pType, pStatus, pFor, pSpec, pForHint = _getInheritedLinkAttrs(el.getparent(), cache)
     attrib = el.attrib
     res = _LinkAttrTupleT(
-        attrib.get("data-link-type", pType),
-        attrib.get("data-link-status", pStatus),
-        attrib.get("data-link-for", pFor),
-        attrib.get("data-link-spec", pSpec),
-        attrib.get("data-link-for-hint", pForHint),
+        attrib.get("bs-link-type", attrib.get("data-link-type", pType)),
+        attrib.get("bs-link-status", pStatus),
+        attrib.get("bs-link-for", pFor),
+        attrib.get("bs-link-spec", pSpec),
+        attrib.get("bs-link-for-hint", pForHint),
     )
     cache[el] = res
     return res
@@ -174,10 +176,10 @@ def determineLinkType(
     Determines the linkType for the element and returns it.
     The inherited type and text content can be passed if you already have them, otherwise it'll compute them fresh.
     """
-    # 1. Look at data-link-type
+    # 1. Look at data-link-type (on <a>) or bs-link-type (inherited from ancestors)
     linkType = el.get("data-link-type", typeFromParent)
     if linkType is UNSET:
-        linkType = h.treeAttr(el, "data-link-type")
+        _, linkType = h.closestAttr(el, "bs-link-type", "data-link-type")
     if linkType:
         if linkType in config.linkTypes:
             return linkType
@@ -205,7 +207,7 @@ def determineLinkText(el: t.ElementT, *, linkType: str | None = None, contents: 
     Determines the linking text for the element and returns it.
     linkType and text content can be passed if you already have them, otherwise it'll compute them fresh.
     """
-    rawLt = el.get("data-lt")
+    rawLt = el.get("bs-lt")
     if rawLt:
         linkText = rawLt
     else:
@@ -242,16 +244,16 @@ def classifyLink(
         attrCache = {}
     attrib = el.attrib
     pType, pStatus, pFor, pSpec, pForHint = _getInheritedLinkAttrs(el.getparent(), attrCache)
-    if "data-link-status" not in attrib and pStatus is not None:
-        el.set("data-link-status", pStatus)
-    if "data-link-for" not in attrib and pFor is not None:
-        el.set("data-link-for", pFor)
-    if "data-link-spec" not in attrib and pSpec is not None:
-        el.set("data-link-spec", pSpec)
-    if "data-link-for-hint" not in attrib and pForHint is not None:
-        el.set("data-link-for-hint", pForHint)
+    if "bs-link-status" not in attrib and pStatus is not None:
+        el.set("bs-link-status", pStatus)
+    if "bs-link-for" not in attrib and pFor is not None:
+        el.set("bs-link-for", pFor)
+    if "bs-link-spec" not in attrib and pSpec is not None:
+        el.set("bs-link-spec", pSpec)
+    if "bs-link-for-hint" not in attrib and pForHint is not None:
+        el.set("bs-link-for-hint", pForHint)
 
-    if not (attrib.get("data-link-type") or pType) and not attrib.get("data-lt"):
+    if not (attrib.get("data-link-type") or pType) and not attrib.get("bs-lt"):
         contents = h.textContent(el)
     else:
         contents = None
@@ -259,7 +261,7 @@ def classifyLink(
     el.set("data-link-type", linkType)
 
     linkText = determineLinkText(el, linkType=linkType, contents=contents)
-    el.set("data-lt", linkText)
+    el.set("bs-lt", linkText)
 
     return linkType, linkText
 
@@ -276,7 +278,7 @@ def processAutolinks(doc: t.SpecT) -> None:
         if el.tag == "bs-link":
             el.tag = "a"
         # Explicitly empty linking text indicates this shouldn't be an autolink.
-        if el.get("data-lt") == "":
+        if el.get("bs-lt") == "":
             continue
 
         linkType, linkText = classifyLink(el, linkAttrCache)
@@ -289,11 +291,11 @@ def processAutolinks(doc: t.SpecT) -> None:
         # where there are several valid ways to set up the dfn
         # and my autogenerated links want to make sure that they'll link successfully
         # to any variant that the spec author uses.
-        linkFors = config.splitForValues(el.get("data-link-for"))
+        linkFors = config.splitForValues(el.get("bs-link-for"))
 
         # Status used to use ED/TR, so convert those if they appear,
         # and verify
-        status = el.get("data-link-status")
+        status = el.get("bs-link-status")
         if status == "ED":
             status = "current"
         elif status == "TR":
@@ -305,16 +307,16 @@ def processAutolinks(doc: t.SpecT) -> None:
             continue
 
         # Some links are okay to fail, and so should do so silently.
-        okayToFail = el.get("data-okay-to-fail") is not None
+        okayToFail = el.get("bs-okay-to-fail") is not None
         ignorable = linkText.lower() in doc.md.ignoredTerms
 
         ref = doc.refs.getRef(
             text=linkText,
             linkType=linkType,
-            spec=el.get("data-link-spec"),
+            spec=el.get("bs-link-spec"),
             status=status,
             linkFor=linkFors,
-            linkForHint=el.get("data-link-for-hint"),
+            linkForHint=el.get("bs-link-for-hint"),
             explicitFor=doc.md.assumeExplicitFor,
             el=el,
             error=not okayToFail and not ignorable,
@@ -323,6 +325,7 @@ def processAutolinks(doc: t.SpecT) -> None:
         if isinstance(ref, str):
             # Error message, annotate the link with it and continue.
             el.tag = "u"
+            h.removeAttr(el, "data-link-type")
             h.addClass(doc, el, "link-error")
             el.set("title", f"LINK ERROR: {ref}")
             continue
@@ -376,8 +379,6 @@ def processAutolinks(doc: t.SpecT) -> None:
                 el.tag = "css"
                 if el.get("data-link-type"):
                     del el.attrib["data-link-type"]
-                if el.get("data-lt"):
-                    del el.attrib["data-lt"]
             elif el.get("bs-unwrap-on-link-fail") is not None:
                 # Optional link that found nothing: leave the text as if it had never been a link.
                 h.replaceWithContents(el)
@@ -397,7 +398,7 @@ def decorateAutolink(doc: t.SpecT, el: t.ElementT, linkType: str, linkText: str,
             el.set("id", f"ref-for-{id}")
         else:
             el.set("id", "ref-for-something")
-        el.set("data-silently-dedup", "")
+        el.set("bs-silently-dedup", "")
 
     # Get all the values that the type expands to, add it as a title.
     if linkType == "type":
@@ -457,7 +458,7 @@ def addSelfLinks(doc: t.SpecT) -> None:
         if list(el.iterancestors("figure")):
             # Skipping - element is inside a figure and is part of an example.
             continue
-        if el.get("data-no-self-link") is not None:
+        if el.get("bs-no-self-link") is not None:
             continue
         if el.tag == "details":
             summary = h.find("summary", el)

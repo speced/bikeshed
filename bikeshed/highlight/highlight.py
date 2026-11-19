@@ -115,16 +115,15 @@ class LineNumberOptions:
 
 
 def determineLineNumbers(doc: t.SpecT, el: t.ElementT) -> LineNumberOptions:
-    lAttr, _ = h.closestAttr(el, "no-line-numbers", "line-numbers")
-    if lAttr == "no-line-numbers" or el.tag == "code":
+    lAttr, _ = h.closestAttr(el, "bs-no-line-numbers", "bs-line-numbers")
+    if lAttr == "bs-no-line-numbers" or el.tag == "code":
         addLineNumbers = False
-    elif lAttr == "line-numbers":
+    elif lAttr == "bs-line-numbers":
         addLineNumbers = True
     else:
         addLineNumbers = doc.md.lineNumbers
 
-    ls = el.get("line-start")
-    if ls is None:
+    if (ls := el.get("bs-line-start")) is None:
         lineStart = 1
     else:
         try:
@@ -133,11 +132,8 @@ def determineLineNumbers(doc: t.SpecT, el: t.ElementT) -> LineNumberOptions:
             m.die(f"line-start attribute must have an integer value. Got '{ls}'.", el=el)
             lineStart = 1
 
-    lh = el.get("line-highlight")
     lineHighlights = set()
-    if lh is None:
-        pass
-    else:
+    if (lh := el.get("bs-line-highlight")) is not None:
         lh = re.sub(r"\s*", "", lh)
         for item in lh.split(","):
             if "-" in item:

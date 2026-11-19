@@ -101,7 +101,7 @@ def _nodesFromProduction(prod: widlparser.productions.Production | widlparser.pr
         elif prod.record:
             assert prod.key_type is not None
             return [
-                h.E.a({"data-link-type": "dfn", "data-link-spec": "webidl"}, "record"),
+                h.E.a({"data-link-type": "dfn", "bs-link-spec": "webidl"}, "record"),
                 "<",
                 *_nodesFromProduction(prod.key_type),
                 ", ",

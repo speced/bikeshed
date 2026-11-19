@@ -27,8 +27,8 @@ from . import messages as m
 
 
 def processConditionals(doc: t.SpecT, container: t.ElementT | None = None) -> None:
-    for el in h.findAll("[include-if], [exclude-if], if-wrapper", container if container is not None else doc):
-        if el.tag == "if-wrapper" and not h.hasAnyAttr(el, "include-if", "exclude-if"):
+    for el in h.findAll("[bs-include-if], [bs-exclude-if], if-wrapper", container if container is not None else doc):
+        if el.tag == "if-wrapper" and not h.hasAnyAttr(el, "bs-include-if", "bs-exclude-if"):
             m.die(
                 "<if-wrapper> elements must have an include-if and/or exclude-if attribute.",
                 el=el,
@@ -37,11 +37,11 @@ def processConditionals(doc: t.SpecT, container: t.ElementT | None = None) -> No
             continue
 
         removeEl = False
-        if h.hasAttr(el, "include-if"):
-            if not any(evalConditions(doc, el, el.get("include-if", ""))):
+        if (inCond := el.get("bs-include-if")) is not None:
+            if not any(evalConditions(doc, el, inCond)):
                 removeEl = True
-        if not removeEl and h.hasAttr(el, "exclude-if"):
-            if any(evalConditions(doc, el, el.get("exclude-if", ""))):
+        if not removeEl and (exCond := el.get("bs-exclude-if")) is not None:
+            if any(evalConditions(doc, el, exCond)):
                 removeEl = True
 
         if removeEl:
@@ -53,9 +53,8 @@ def processConditionals(doc: t.SpecT, container: t.ElementT | None = None) -> No
             h.replaceNode(el, *h.childNodes(el, clear=True))
             continue
 
-        # Otherwise, go ahead and just remove the include/exclude-if attributes,
-        # since they're non-standard
-        h.removeAttr(el, "include-if", "exclude-if")
+        # Remove so repeated processConditionals() passes don't re-evaluate this element.
+        h.removeAttr(el, "bs-include-if", "bs-exclude-if")
 
 
 def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Generator[bool, None, None]:
@@ -70,7 +69,7 @@ def evalConditions(doc: t.SpecT, el: t.ElementT, conditionString: str) -> t.Gene
             else:
                 yield False
         elif cond.type == "boilerplate":
-            yield (h.find(f'[boilerplate="{h.escapeCSSIdent(cond.value)}"]', doc) is not None)
+            yield (h.find(f'[bs-boilerplate="{h.escapeCSSIdent(cond.value)}"]', doc) is not None)
         else:
             m.die(
                 f"Program error, some type of include/exclude-if condition wasn't handled: '{cond!r}'. Please report!",

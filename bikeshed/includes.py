@@ -30,13 +30,12 @@ def processInclusions(doc: t.SpecT) -> None:
 def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
     macros = {}
     for i in itertools.count(0):
-        macroLine = el.get("macro-" + str(i))
+        macroLine = el.get("bs-macro-" + str(i))
         if macroLine is None:
             break
         k, _, v = macroLine.partition(" ")
         macros[k.lower()] = v
-    if el.get("path"):
-        path = el.get("path")
+    if path := el.get("bs-path"):
         assert path is not None
         includedInputSource = doc.inputSource.relative(path)
         if includedInputSource is None:
@@ -59,9 +58,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         # can't use just content, because then you can't do the same thing twice.
         # combined does a good job unless you purposely pervert it
         hash = hashlib.md5((path + "".join(lines)).encode("ascii", "xmlcharrefreplace")).hexdigest()
-        if el.get("hash"):
-            hashAttr = el.get("hash")
-            assert hashAttr is not None
+        if hashAttr := el.get("bs-hash"):
             # This came from another included file, check if it's a loop-include
             if hash in hashAttr:
                 # WHOOPS
@@ -69,7 +66,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
                 h.removeNode(el)
                 return
             hash += " " + hashAttr
-        depth = int(el.get("depth") or "0")
+        depth = int(el.get("bs-depth") or "0")
         if depth > 100:
             # Just in case you slip past the nesting restriction
             m.die("Nesting depth > 100, literally wtf are you doing.", el=el)
@@ -86,8 +83,8 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         subtree = h.parseInto(h.E.div(), text)
         datablocks.transformDataBlocks(doc, subtree)
         for childInclude in h.findAll("pre.include", subtree):
-            childInclude.set("hash", hash)
-            childInclude.set("depth", str(depth + 1))
+            childInclude.set("bs-hash", hash)
+            childInclude.set("bs-depth", str(depth + 1))
         h.replaceNode(el, subtree)
         h.replaceWithContents(subtree)
     else:
@@ -100,15 +97,13 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
 
 
 def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
-    if not el.get("path"):
+    if not (path := el.get("bs-path")):
         m.die(
             "Whoops, an include-code block didn't get parsed correctly, so I can't include anything.",
             el=el,
         )
         h.removeNode(el)
         return
-    path = el.get("path")
-    assert path is not None
     includedInputSource = doc.inputSource.relative(path)
     if includedInputSource is None:
         m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")
@@ -125,8 +120,8 @@ def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
         m.die(f"Couldn't find include-code file '{path}'. Error was:\n{err}", el=el)
         h.removeNode(el)
         return
-    if el.get("data-code-show"):
-        codeShow = el.get("data-code-show")
+    if el.get("bs-code-show"):
+        codeShow = el.get("bs-code-show")
         assert codeShow is not None
         showLines = parseRangeString(codeShow)
         if len(showLines) == 0:
@@ -140,22 +135,21 @@ def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
                 lines = lines[:end]
             if start:
                 lines = lines[start - 1 :]
-                if not el.get("line-start"):
+                if not el.get("bs-line-start"):
                     # If manually overridden, leave it alone,
                     # but otherwise DWIM.
-                    el.set("line-start", str(start))
+                    el.set("bs-line-start", str(start))
     h.appendChild(el, *lines, allowEmpty=True)
 
 
 def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
-    if not el.get("path"):
+    if not (path := el.get("bs-path")):
         m.die(
             "Whoops, an include-raw block didn't get parsed correctly, so I can't include anything.",
             el=el,
         )
         h.removeNode(el)
         return
-    path = el.get("path", "")
     includedInputSource = doc.inputSource.relative(path)
     if includedInputSource is None:
         m.die(f"Tried to include a file at '{path}', but the current input type can't resolve relative paths.")

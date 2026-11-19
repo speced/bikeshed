@@ -558,7 +558,7 @@ class Spec:
             return True
         if el.tag in self.md.opaqueElements:
             return True
-        if el.get("data-opaque") is not None or el.get("bs-opaque") is not None:
+        if el.get("bs-opaque") is not None:
             return True
         return False
 

@@ -182,7 +182,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                     ),
                 )
                 el.set(
-                    "data-alternate-id",
+                    "bs-alternate-id",
                     config.simplifyText(f"dom-{singleFor}-{primaryDfnText}"),
                 )
                 if primaryDfnText.startswith("[["):
@@ -190,8 +190,8 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
                     # so gotta dedup them some other way.
                     id += "-slot"
                     el.set(
-                        "data-alternate-id",
-                        "{}-slot".format(el.get("data-alternate-id")),
+                        "bs-alternate-id",
+                        "{}-slot".format(el.get("bs-alternate-id")),
                     )
             else:
                 if dfnFor:

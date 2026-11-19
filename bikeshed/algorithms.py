@@ -60,7 +60,7 @@ def checkVarHygiene(doc: t.SpecT) -> None:
     # Look for vars that only show up once. These are probably typos.
     varCounts: defaultdict[tuple[str, str | None], list[t.ElementT]] = defaultdict(list)
     atLeastOneAlgo = False
-    for el in h.findAll("var:not([data-var-ignore])", doc):
+    for el in h.findAll("var:not([bs-ignore])", doc):
         var = h.foldWhitespace(h.textContent(el)).strip()
         algo = algoName(el)
         varCounts[(var, algo)].append(el)

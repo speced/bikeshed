@@ -14,7 +14,7 @@ def processHeadings(doc: t.SpecT, scope: str = "doc") -> None:
     for el in allHeadings:
         if h.hasClass(doc, el, "settled"):
             continue
-        if scope == "doc" and h.treeAttr(el, "boilerplate"):
+        if scope == "doc" and h.treeAttr(el, "bs-boilerplate"):
             continue
         headings.append(el)
     resetHeadings(headings)

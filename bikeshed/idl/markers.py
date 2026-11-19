@@ -229,12 +229,12 @@ class IDLMarker(widlparser.protocols.Marker):
             typeName = str(memberType).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
-            return (startTag("a", {"data-link-type": "attribute", "data-link-for": typeName}), endTag("a"))
+            return (startTag("a", {"data-link-type": "attribute", "bs-link-for": typeName}), endTag("a"))
 
         # LegacyWindowAlias defines additional names for the construct,
         # so all the names should be forced <dfn>s, just like the interface name itself.
         if construct.idl_type == "extended-attribute" and construct.name == "LegacyWindowAlias":
-            return (startTag("idl", {"data-idl-type": "interface", "data-lt": text}), endTag("idl"))
+            return (startTag("idl", {"bs-idl-type": "interface", "bs-lt": text}), endTag("idl"))
 
         # The constructor name in [LegacyFactoryFunction], needs to actually be marked up
         # as the definition of the function.
@@ -246,7 +246,7 @@ class IDLMarker(widlparser.protocols.Marker):
             return (
                 startTag(
                     "idl",
-                    {"data-idl-type": "constructor", "data-idl-for": interfaceName, "data-lt": methodName},
+                    {"bs-idl-type": "constructor", "bs-idl-for": interfaceName, "bs-lt": methodName},
                 ),
                 endTag("idl"),
             )
@@ -264,7 +264,7 @@ class IDLMarker(widlparser.protocols.Marker):
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
                 return (
-                    startTag("a", {"data-link-type": "dfn", "for": parentName, "data-lt": "stringification behavior"}),
+                    startTag("a", {"data-link-type": "dfn", "for": parentName, "bs-lt": "stringification behavior"}),
                     endTag("a"),
                 )
             # Otherwise, you *can* point to/dfn stringification behavior if you want.
@@ -273,9 +273,9 @@ class IDLMarker(widlparser.protocols.Marker):
                     "idl",
                     {
                         "data-export": "",
-                        "data-idl-type": "dfn",
-                        "data-idl-for": parentName,
-                        "data-lt": "stringification behavior",
+                        "bs-idl-type": "dfn",
+                        "bs-idl-for": parentName,
+                        "bs-lt": "stringification behavior",
                         "id": f"{parentName}-stringification-behavior",
                     },
                 ),
@@ -294,9 +294,9 @@ class IDLMarker(widlparser.protocols.Marker):
                         "a",
                         {
                             "data-link-type": "method",
-                            "data-link-for": parentName,
-                            "data-lt": t.cast(str, construct.normal_name),
-                            "data-okay-to-fail": "",
+                            "bs-link-for": parentName,
+                            "bs-lt": t.cast(str, construct.normal_name),
+                            "bs-okay-to-fail": "",
                             "bs-unwrap-on-link-fail": "",
                         },
                     ),
@@ -317,7 +317,7 @@ class IDLMarker(widlparser.protocols.Marker):
         }
         if text in builtinTypes:
             return (
-                startTag("a", {"data-link-spec": "webidl", "data-link-type": builtinTypes[text]}),
+                startTag("a", {"bs-link-spec": "webidl", "data-link-type": builtinTypes[text]}),
                 endTag("a"),
             )
         return (None, None)
@@ -340,7 +340,7 @@ class IDLMarker(widlparser.protocols.Marker):
                 )
                 return (None, None)
             # Otherwise it's [LegacyNamedConstructor], which is allowed
-            return (startTag("a", {"data-link-type": "extended-attribute", "data-link-for": ""}), endTag("a"))
+            return (startTag("a", {"data-link-type": "extended-attribute", "bs-link-for": ""}), endTag("a"))
 
         if idlType == "argument" and construct.parent.idl_type == "constructor":
             # Don't mark up the arguments to [Constructor] either
@@ -370,18 +370,18 @@ class IDLMarker(widlparser.protocols.Marker):
                 self.errors.append(f"Can't figure out how to construct attribute-info from:\n  {construct}")
                 return (None, None)
             if rest.readonly is not None:
-                attrs["data-readonly"] = ""
-            attrs["data-type"] = str(rest.type.type) + str(rest.type.suffix or "")
+                attrs["bs-readonly"] = ""
+            attrs["bs-type"] = str(rest.type.type) + str(rest.type.suffix or "")
         elif idlType == "dict-member":
             assert isinstance(construct, widlparser.DictionaryMember)
-            attrs["data-type"] = str(construct.type.type) + str(construct.type.suffix or "")
+            attrs["bs-type"] = str(construct.type.type) + str(construct.type.suffix or "")
             if construct.default is not None:
                 value = str(construct.default).split("=", 1)[1].strip()
                 if value.startswith("["):
                     value = "[]"
                 elif value.startswith("}"):
                     value = "{}"
-                attrs["data-default"] = value
+                attrs["bs-default"] = value
         elif idlType in ["interface", "namespace", "dictionary"]:
             if construct.partial:  # type: ignore
                 refType = "link"
@@ -395,21 +395,24 @@ class IDLMarker(widlparser.protocols.Marker):
             if idlType == "argument" and construct.parent.idl_type == "method":
                 interfaceName = construct.parent.parent.name
                 methodNames = [f"{interfaceName}/{m}" for m in self.methodLinkingTexts(construct.parent)]  # type: ignore
-                attrs["data-idl-for"] = ", ".join(methodNames)
+                attrs["bs-idl-for"] = ", ".join(methodNames)
             else:
                 parentName = construct.parent.full_name
                 assert parentName is not None
-                attrs["data-idl-for"] = parentName
+                attrs["bs-idl-for"] = parentName
 
-        attrs["data-lt"] = idlTitle
-        attrs[f"data-{refType}-type"] = idlType
+        attrs["bs-lt"] = idlTitle
+        if refType == "link":
+            attrs["data-link-type"] = idlType
+        else:
+            attrs["bs-idl-type"] = idlType
         return (startTag(elementName, attrs), endTag(elementName))
 
     def markup_enum_value(self, text: str, construct: widlparser.Construct) -> MarkupReturnT:
         return (
             startTag(
                 "idl",
-                {"data-idl-type": "enum-value", "data-idl-for": t.cast(str, construct.name), "data-lt": text},
+                {"bs-idl-type": "enum-value", "bs-idl-for": t.cast(str, construct.name), "bs-lt": text},
             ),
             endTag("idl"),
         )
