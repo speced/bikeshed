@@ -1,6 +1,14 @@
+# Performance profiling and reporting for Bikeshed (`bikeshed profile`).
+# Runs spec builds, synthetic benchmark specs, test runs, or arbitrary CLI
+# commands under cProfile and PhaseTimer, then analyzes call stacks and
+# caller/callee relationships to produce terminal bottleneck reports, JSON
+# exports, interactive SVG flamegraphs, standalone HTML dashboards, and raw
+# pstats files.
+#
+# This file was Gemini-generated.
+
 from __future__ import annotations
 
-# This file was Gemini-generated.
 import contextlib
 import cProfile
 import dataclasses
@@ -12,44 +20,52 @@ import re
 import sys
 import time
 
+from . import InputSource, constants, metadata, synthetic, t, test
 from . import messages as m
-from . import metadata, t, test
-from .Spec import PhaseRecord, PhaseTimer, Spec
+from .Spec import PhaseRecord, PhaseTimer, Spec, defaultOutputFilename
 
 if t.TYPE_CHECKING:
     import argparse
 
 
 class FunctionKey(t.NamedTuple):
+    """Unique identifier for a profiled function (file path, line number, and function name)."""
+
     filename: str
     line: int
-    func_name: str
+    funcName: str
 
 
 @dataclasses.dataclass
 class CallerInfo:
+    """Aggregated call statistics for a single caller invoking a profiled function."""
+
     key: FunctionKey
     name: str
     location: str
     category: str
     ncalls: int
     cumtime: float
-    percent_of_callee: float
+    percentOfCallee: float
 
 
 @dataclasses.dataclass
 class CalleeInfo:
+    """Aggregated call statistics for a single callee invoked by a profiled function."""
+
     key: FunctionKey
     name: str
     location: str
     category: str
     ncalls: int
     cumtime: float
-    percent_of_caller: float
+    percentOfCaller: float
 
 
 @dataclasses.dataclass
 class FunctionStat:
+    """Timing metrics, call counts, classification, and call-graph edges for a profiled function."""
+
     key: FunctionKey
     name: str
     filename: str
@@ -60,16 +76,18 @@ class FunctionStat:
     pcalls: int  # primitive calls
     tottime: float
     cumtime: float
-    tottime_percent: float
-    cumtime_percent: float
-    percall_tot: float
-    percall_cum: float
+    tottimePercent: float
+    cumtimePercent: float
+    percallTot: float
+    percallCum: float
     callers: list[CallerInfo] = dataclasses.field(default_factory=list)
     callees: list[CalleeInfo] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
 class CallTreeNode:
+    """Node in a hierarchical call tree used for flamegraphs and JSON export."""
+
     name: str
     location: str
     category: str
@@ -79,7 +97,8 @@ class CallTreeNode:
     percent: float
     children: list[CallTreeNode] = dataclasses.field(default_factory=list)
 
-    def to_dict(self) -> dict[str, t.Any]:
+    def toDict(self) -> dict[str, t.Any]:
+        """Serialize this call tree node and its descendants into a JSON-compatible dictionary."""
         return {
             "name": self.name,
             "location": self.location,
@@ -88,41 +107,44 @@ class CallTreeNode:
             "tottime": self.tottime,
             "ncalls": self.ncalls,
             "percent": self.percent,
-            "children": [c.to_dict() for c in self.children],
+            "children": [c.toDict() for c in self.children],
         }
 
 
 @dataclasses.dataclass
 class ProfileAnalysis:
-    target_name: str
-    total_wall_time: float
-    total_cpu_time: float
-    total_calls: int
-    primitive_calls: int
+    """Complete analyzed results of a profiling run, including phases, function stats, and call tree."""
+
+    targetName: str
+    totalWallTime: float
+    totalCpuTime: float
+    totalCalls: int
+    primitiveCalls: int
     phases: list[PhaseRecord]
     functions: dict[FunctionKey, FunctionStat]
-    bikeshed_functions: list[FunctionStat]
-    top_overall_functions: list[FunctionStat]
+    bikeshedFunctions: list[FunctionStat]
+    topOverallFunctions: list[FunctionStat]
     stats: pstats.Stats
-    call_tree: CallTreeNode | None = None
+    callTree: CallTreeNode | None = None
 
 
-def get_bikeshed_root() -> str:
+def getBikeshedRoot() -> str:
+    """Return the absolute path to the Bikeshed package directory."""
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def categorize_function(filename: str, bikeshed_root: str) -> tuple[str, str]:
-    """Returns (category, display_location)."""
+def categorizeFunction(filename: str, bikeshedRoot: str) -> tuple[str, str]:
+    """Classify a source filename into (category, displayLocation)."""
     if filename.startswith("<") or filename == "~":
         return "built-in", filename
 
-    norm_path = os.path.normpath(filename)
-    if norm_path.startswith(bikeshed_root):
-        rel = os.path.relpath(norm_path, bikeshed_root)
+    normPath = os.path.normpath(filename)
+    if normPath.startswith(bikeshedRoot):
+        rel = os.path.relpath(normPath, bikeshedRoot)
         return "bikeshed", rel
 
-    if "site-packages" in norm_path or "dist-packages" in norm_path:
-        parts = norm_path.replace("\\", "/").split("/")
+    if "site-packages" in normPath or "dist-packages" in normPath:
+        parts = normPath.replace("\\", "/").split("/")
         if "site-packages" in parts:
             idx = parts.index("site-packages")
             rel = "/".join(parts[idx + 1 :])
@@ -131,19 +153,20 @@ def categorize_function(filename: str, bikeshed_root: str) -> tuple[str, str]:
             idx = parts.index("dist-packages")
             rel = "/".join(parts[idx + 1 :])
             return "dependency", rel
-        return "dependency", os.path.basename(norm_path)
+        return "dependency", os.path.basename(normPath)
 
     # Standard library or local python
-    if "/lib/python" in norm_path or "\\lib\\python" in norm_path:
-        parts = re.split(r"[/\\]lib[/\\]python\d+\.\d+[/\\]?", norm_path)
+    if "/lib/python" in normPath or "\\lib\\python" in normPath:
+        parts = re.split(r"[/\\]lib[/\\]python\d+\.\d+[/\\]?", normPath)
         if len(parts) > 1:
             return "stdlib", parts[-1]
-        return "stdlib", os.path.basename(norm_path)
+        return "stdlib", os.path.basename(normPath)
 
-    return "stdlib", os.path.basename(norm_path)
+    return "stdlib", os.path.basename(normPath)
 
 
-def format_duration(seconds: float) -> str:
+def formatDuration(seconds: float) -> str:
+    """Format a duration in seconds as a fixed-width string in s, ms, or µs."""
     if seconds >= 1.0:
         return f"{seconds:6.2f}s"
     if seconds >= 0.001:
@@ -151,181 +174,185 @@ def format_duration(seconds: float) -> str:
     return f"{seconds * 1000000:6.0f}µs"
 
 
-def format_bar(fraction: float, width: int = 12, ascii_only: bool = False) -> str:
+def formatBar(fraction: float, width: int = 12, asciiOnly: bool = False) -> str:
+    """Render a proportional horizontal progress bar using Unicode blocks or ASCII."""
     clamped = max(0.0, min(1.0, fraction))
-    if ascii_only:
-        bar_len = round(clamped * width)
-        return "[" + "=" * bar_len + " " * (width - bar_len) + "]"
+    if asciiOnly:
+        barLen = round(clamped * width)
+        return "[" + "=" * barLen + " " * (width - barLen) + "]"
     blocks = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
-    total_eighths = round(clamped * width * 8)
-    full_blocks = total_eighths // 8
-    remainder = total_eighths % 8
-    res = "█" * full_blocks
-    if full_blocks < width and remainder > 0:
+    totalEighths = round(clamped * width * 8)
+    fullBlocks = totalEighths // 8
+    remainder = totalEighths % 8
+    res = "█" * fullBlocks
+    if fullBlocks < width and remainder > 0:
         res += blocks[remainder]
-        full_blocks += 1
-    res += " " * (width - full_blocks)
+        fullBlocks += 1
+    res += " " * (width - fullBlocks)
     return res
 
 
-def analyze_profile(
+def analyzeProfile(
     pr: cProfile.Profile,
-    wall_time: float,
+    wallTime: float,
     phases: list[PhaseRecord],
-    target_name: str,
+    targetName: str,
     *,
-    root_filter: str | None = None,
-    leaf_filter: str | None = None,
+    rootFilter: str | None = None,
+    leafFilter: str | None = None,
 ) -> ProfileAnalysis:
+    """Convert raw cProfile stats and phase timings into a structured ProfileAnalysis."""
     ps = pstats.Stats(pr)
-    ps_any = t.cast("t.Any", ps)
-    bikeshed_root = get_bikeshed_root()
+    psAny = t.cast("t.Any", ps)
+    bikeshedRoot = getBikeshedRoot()
 
-    total_cpu_time = float(ps_any.total_tt)
-    total_calls = int(ps_any.total_calls)
-    primitive_calls = int(ps_any.prim_calls)
+    totalCpuTime = float(psAny.total_tt)
+    totalCalls = int(psAny.total_calls)
+    primitiveCalls = int(psAny.prim_calls)
 
-    effective_total_time = max(wall_time, total_cpu_time, 0.000001)
+    effectiveTotalTime = max(wallTime, totalCpuTime, 0.000001)
 
-    raw_stats = dict(ps_any.stats)
+    rawStats = dict(psAny.stats)
 
     # First pass: categorize and build initial FunctionStat objects
-    fn_stats: dict[FunctionKey, FunctionStat] = {}
-    for raw_key, (cc, nc, tt, ct, _) in raw_stats.items():
-        key = FunctionKey(*raw_key)
-        category, loc = categorize_function(key.filename, bikeshed_root)
-        display_loc = f"{loc}:{key.line}" if key.line > 0 else loc
-        tot_pct = (tt / effective_total_time) * 100.0
-        cum_pct = (ct / effective_total_time) * 100.0
-        percall_tot = tt / max(1, nc)
-        percall_cum = ct / max(1, nc)
-        fn_stats[key] = FunctionStat(
+    fnStats: dict[FunctionKey, FunctionStat] = {}
+    for rawKey, (cc, nc, tt, ct, _) in rawStats.items():
+        key = FunctionKey(*rawKey)
+        category, loc = categorizeFunction(key.filename, bikeshedRoot)
+        displayLoc = f"{loc}:{key.line}" if key.line > 0 else loc
+        totPct = (tt / effectiveTotalTime) * 100.0
+        cumPct = (ct / effectiveTotalTime) * 100.0
+        percallTot = tt / max(1, nc)
+        percallCum = ct / max(1, nc)
+        fnStats[key] = FunctionStat(
             key=key,
-            name=key.func_name,
+            name=key.funcName,
             filename=key.filename,
             line=key.line,
-            location=display_loc,
+            location=displayLoc,
             category=category,
             ncalls=cc,
             pcalls=nc,
             tottime=tt,
             cumtime=ct,
-            tottime_percent=tot_pct,
-            cumtime_percent=cum_pct,
-            percall_tot=percall_tot,
-            percall_cum=percall_cum,
+            tottimePercent=totPct,
+            cumtimePercent=cumPct,
+            percallTot=percallTot,
+            percallCum=percallCum,
         )
 
     # Second pass: compute callers and callees
-    for raw_callee_key, (_, _, _, callee_ct, callers_dict) in raw_stats.items():
-        callee_key = FunctionKey(*raw_callee_key)
-        callee_stat = fn_stats[callee_key]
-        for raw_caller_key, caller_info in callers_dict.items():
-            caller_key = FunctionKey(*raw_caller_key)
-            if caller_key not in fn_stats:
+    for rawCalleeKey, (_, _, _, calleeCt, callersDict) in rawStats.items():
+        calleeKey = FunctionKey(*rawCalleeKey)
+        calleeStat = fnStats[calleeKey]
+        for rawCallerKey, callerInfo in callersDict.items():
+            callerKey = FunctionKey(*rawCallerKey)
+            if callerKey not in fnStats:
                 continue
-            caller_stat = fn_stats[caller_key]
-            caller_cc, _, _, caller_cumtime = caller_info
-            pct_of_callee = (caller_cumtime / max(callee_ct, 0.000001)) * 100.0
-            pct_of_caller = (caller_cumtime / max(caller_stat.cumtime, 0.000001)) * 100.0
+            callerStat = fnStats[callerKey]
+            callerCc, _, _, callerCumtime = callerInfo
+            pctOfCallee = (callerCumtime / max(calleeCt, 0.000001)) * 100.0
+            pctOfCaller = (callerCumtime / max(callerStat.cumtime, 0.000001)) * 100.0
 
-            callee_stat.callers.append(
+            calleeStat.callers.append(
                 CallerInfo(
-                    key=caller_key,
-                    name=caller_stat.name,
-                    location=caller_stat.location,
-                    category=caller_stat.category,
-                    ncalls=caller_cc,
-                    cumtime=caller_cumtime,
-                    percent_of_callee=pct_of_callee,
+                    key=callerKey,
+                    name=callerStat.name,
+                    location=callerStat.location,
+                    category=callerStat.category,
+                    ncalls=callerCc,
+                    cumtime=callerCumtime,
+                    percentOfCallee=pctOfCallee,
                 ),
             )
 
-            caller_stat.callees.append(
+            callerStat.callees.append(
                 CalleeInfo(
-                    key=callee_key,
-                    name=callee_stat.name,
-                    location=callee_stat.location,
-                    category=callee_stat.category,
-                    ncalls=caller_cc,
-                    cumtime=caller_cumtime,
-                    percent_of_caller=pct_of_caller,
+                    key=calleeKey,
+                    name=calleeStat.name,
+                    location=calleeStat.location,
+                    category=calleeStat.category,
+                    ncalls=callerCc,
+                    cumtime=callerCumtime,
+                    percentOfCaller=pctOfCaller,
                 ),
             )
 
     # Sort callers and callees by cumtime descending
-    for stat in fn_stats.values():
+    for stat in fnStats.values():
         stat.callers.sort(key=lambda c: c.cumtime, reverse=True)
         stat.callees.sort(key=lambda c: c.cumtime, reverse=True)
 
     # Build sorted lists
-    bikeshed_list = [s for s in fn_stats.values() if s.category == "bikeshed"]
-    bikeshed_list.sort(key=lambda s: s.cumtime, reverse=True)
+    bikeshedList = [s for s in fnStats.values() if s.category == "bikeshed"]
+    bikeshedList.sort(key=lambda s: s.cumtime, reverse=True)
 
-    all_list = list(fn_stats.values())
-    all_list.sort(key=lambda s: s.cumtime, reverse=True)
+    allList = list(fnStats.values())
+    allList.sort(key=lambda s: s.cumtime, reverse=True)
 
     # Build Call Tree
-    call_tree = build_call_tree(
-        fn_stats=fn_stats,
-        total_time=effective_total_time,
-        root_filter=root_filter,
-        leaf_filter=leaf_filter,
+    callTree = buildCallTree(
+        fnStats=fnStats,
+        totalTime=effectiveTotalTime,
+        rootFilter=rootFilter,
+        leafFilter=leafFilter,
     )
 
     return ProfileAnalysis(
-        target_name=target_name,
-        total_wall_time=wall_time,
-        total_cpu_time=total_cpu_time,
-        total_calls=total_calls,
-        primitive_calls=primitive_calls,
+        targetName=targetName,
+        totalWallTime=wallTime,
+        totalCpuTime=totalCpuTime,
+        totalCalls=totalCalls,
+        primitiveCalls=primitiveCalls,
         phases=phases,
-        functions=fn_stats,
-        bikeshed_functions=bikeshed_list,
-        top_overall_functions=all_list,
+        functions=fnStats,
+        bikeshedFunctions=bikeshedList,
+        topOverallFunctions=allList,
         stats=ps,
-        call_tree=call_tree,
+        callTree=callTree,
     )
 
 
-def build_call_tree(
-    fn_stats: dict[FunctionKey, FunctionStat],
-    total_time: float,
-    root_filter: str | None = None,
-    leaf_filter: str | None = None,
+def buildCallTree(
+    fnStats: dict[FunctionKey, FunctionStat],
+    totalTime: float,
+    rootFilter: str | None = None,
+    leafFilter: str | None = None,
 ) -> CallTreeNode:
-    min_time_threshold = total_time * 0.002  # ignore branches < 0.2% of total
+    """Build a pruned hierarchical call tree from function statistics, optionally filtered by root or leaf."""
+    minTimeThreshold = totalTime * 0.002  # ignore branches < 0.2% of total
 
     # Find root candidates
     roots: list[FunctionKey] = []
-    if root_filter:
-        for k, stat in fn_stats.items():
-            if root_filter in stat.name or root_filter in stat.location:
+    if rootFilter:
+        for k, stat in fnStats.items():
+            if rootFilter in stat.name or rootFilter in stat.location:
                 roots.append(k)
     else:
-        # Candidate roots: functions with no callers or no callers in fn_stats
-        for k, stat in fn_stats.items():
-            if not stat.callers and stat.cumtime >= min_time_threshold:
+        # Candidate roots: functions with no callers or no callers in fnStats
+        for k, stat in fnStats.items():
+            if not stat.callers and stat.cumtime >= minTimeThreshold:
                 roots.append(k)
 
     if not roots:
         # Fallback to the top function by cumtime
-        top = max(fn_stats.values(), key=lambda s: s.cumtime)
+        top = max(fnStats.values(), key=lambda s: s.cumtime)
         roots = [top.key]
 
-    def expand_node(
+    def expandNode(
         key: FunctionKey,
-        current_cumtime: float,
+        currentCumtime: float,
         ancestors: frozenset[FunctionKey],
         depth: int,
     ) -> CallTreeNode:
-        stat = fn_stats[key]
-        pct = (current_cumtime / max(total_time, 0.000001)) * 100.0
+        """Recursively expand a function node and its significant callees while guarding against cycles."""
+        stat = fnStats[key]
+        pct = (currentCumtime / max(totalTime, 0.000001)) * 100.0
         node = CallTreeNode(
             name=stat.name,
             location=stat.location,
             category=stat.category,
-            cumtime=current_cumtime,
+            cumtime=currentCumtime,
             tottime=stat.tottime,
             ncalls=stat.ncalls,
             percent=pct,
@@ -334,220 +361,221 @@ def build_call_tree(
         if depth > 35:
             return node
 
-        new_ancestors = ancestors | {key}
+        newAncestors = ancestors | {key}
         for callee in stat.callees:
-            if callee.cumtime < min_time_threshold:
+            if callee.cumtime < minTimeThreshold:
                 continue
             if callee.key in ancestors:
                 # Cycle / recursion detected
-                callee_stat = fn_stats.get(callee.key)
-                if callee_stat:
+                calleeStat = fnStats.get(callee.key)
+                if calleeStat:
                     node.children.append(
                         CallTreeNode(
-                            name=f"{callee_stat.name} (recursive)",
-                            location=callee_stat.location,
-                            category=callee_stat.category,
+                            name=f"{calleeStat.name} (recursive)",
+                            location=calleeStat.location,
+                            category=calleeStat.category,
                             cumtime=callee.cumtime,
-                            tottime=callee_stat.tottime,
+                            tottime=calleeStat.tottime,
                             ncalls=callee.ncalls,
-                            percent=(callee.cumtime / max(total_time, 0.000001)) * 100.0,
+                            percent=(callee.cumtime / max(totalTime, 0.000001)) * 100.0,
                         ),
                     )
             else:
-                child_node = expand_node(callee.key, callee.cumtime, new_ancestors, depth + 1)
-                node.children.append(child_node)
+                childNode = expandNode(callee.key, callee.cumtime, newAncestors, depth + 1)
+                node.children.append(childNode)
 
         return node
 
-    root_children: list[CallTreeNode] = []
+    rootChildren: list[CallTreeNode] = []
     for r in roots:
-        stat = fn_stats[r]
-        root_children.append(expand_node(r, stat.cumtime, frozenset(), 0))
+        stat = fnStats[r]
+        rootChildren.append(expandNode(r, stat.cumtime, frozenset(), 0))
 
     # Apply leaf filter if requested
-    if leaf_filter:
+    if leafFilter:
 
-        def prune_leaves(n: CallTreeNode) -> CallTreeNode | None:
-            matches = leaf_filter in n.name or leaf_filter in n.location
-            new_children = []
+        def pruneLeaves(n: CallTreeNode) -> CallTreeNode | None:
+            """Keep only call tree branches leading to nodes matching leafFilter."""
+            matches = leafFilter in n.name or leafFilter in n.location
+            newChildren = []
             for c in n.children:
-                pruned = prune_leaves(c)
+                pruned = pruneLeaves(c)
                 if pruned:
-                    new_children.append(pruned)
-            if matches or new_children:
-                n.children = new_children
+                    newChildren.append(pruned)
+            if matches or newChildren:
+                n.children = newChildren
                 return n
             return None
 
-        filtered_children = []
-        for rc in root_children:
-            pruned = prune_leaves(rc)
+        filteredChildren = []
+        for rc in rootChildren:
+            pruned = pruneLeaves(rc)
             if pruned:
-                filtered_children.append(pruned)
-        root_children = filtered_children
+                filteredChildren.append(pruned)
+        rootChildren = filteredChildren
 
-    top_node = CallTreeNode(
+    topNode = CallTreeNode(
         name="total",
         location="bikeshed",
         category="bikeshed",
-        cumtime=total_time,
+        cumtime=totalTime,
         tottime=0.0,
         ncalls=1,
         percent=100.0,
-        children=root_children,
+        children=rootChildren,
     )
-    return top_node
+    return topNode
 
 
-def print_terminal_report(
+def printTerminalReport(
     analysis: ProfileAnalysis,
     *,
-    sort_by: str = "cumtime",
+    sortBy: str = "cumtime",
     limit: int = 20,
-    show_all: bool = False,
-    callers_func: str | None = None,
-    callees_func: str | None = None,
+    showAll: bool = False,
+    callersFunc: str | None = None,
+    calleesFunc: str | None = None,
 ) -> None:
-    ascii_only = m.state.asciiOnly
-    divider_char = "=" if ascii_only else "━"
-    sub_divider = "-" if ascii_only else "─"
+    """Print a formatted terminal summary of pipeline phases, bottleneck functions, and caller/callee details."""
+    asciiOnly = m.state.asciiOnly
+    dividerChar = "=" if asciiOnly else "━"
+    subDivider = "-" if asciiOnly else "─"
 
-    m.say(divider_char * 80)
-    m.say(f"  BIKESHED PERFORMANCE PROFILE: {analysis.target_name}")
-    dur_info = (
-        f"  Total Wall Time: {format_duration(analysis.total_wall_time)}  |  "
-        + f"CPU Time: {format_duration(analysis.total_cpu_time)}  |  "
-        + f"Total Calls: {analysis.total_calls:,}"
+    m.say(dividerChar * 80)
+    m.say(f"  BIKESHED PERFORMANCE PROFILE: {analysis.targetName}")
+    durInfo = (
+        f"  Total Wall Time: {formatDuration(analysis.totalWallTime)}  |  "
+        + f"CPU Time: {formatDuration(analysis.totalCpuTime)}  |  "
+        + f"Total Calls: {analysis.totalCalls:,}"
     )
-    m.say(dur_info)
-    m.say(divider_char * 80)
+    m.say(durInfo)
+    m.say(dividerChar * 80)
 
     # 1. Pipeline Phases
     if analysis.phases:
         m.say("")
         m.say(
             f"── Pipeline Phases ({len(analysis.phases)} recorded) "
-            + (sub_divider * (54 - len(str(len(analysis.phases))))),
+            + (subDivider * (54 - len(str(len(analysis.phases))))),
         )
         header = f"  {'Phase':<42} {'Duration':>10} {'% Total':>9}  {'Proportion':<12}"
         m.say(header)
-        m.say("  " + (sub_divider * 76))
+        m.say("  " + (subDivider * 76))
 
-        total_time = max(analysis.total_wall_time, sum(p.elapsed for p in analysis.phases), 0.000001)
+        totalTime = max(analysis.totalWallTime, sum(p.elapsed for p in analysis.phases), 0.000001)
         # Filter phases that took at least 0.5ms or 0.2%
-        visible_phases = [p for p in analysis.phases if p.elapsed >= 0.0005 or (p.elapsed / total_time) >= 0.002]
+        visiblePhases = [p for p in analysis.phases if p.elapsed >= 0.0005 or (p.elapsed / totalTime) >= 0.002]
         # Sort by duration descending
-        visible_phases.sort(key=lambda p: p.elapsed, reverse=True)
+        visiblePhases.sort(key=lambda p: p.elapsed, reverse=True)
 
-        for p in visible_phases:
-            pct = (p.elapsed / total_time) * 100.0
-            p_bar = format_bar(p.elapsed / total_time, width=12, ascii_only=ascii_only)
-            dur_str = format_duration(p.elapsed)
-            name_str = p.name if len(p.name) <= 42 else (p.name[:39] + "...")
-            m.say(f"  {name_str:<42} {dur_str:>10} {pct:>8.1f}%  {p_bar}")
+        for p in visiblePhases:
+            pct = (p.elapsed / totalTime) * 100.0
+            pBar = formatBar(p.elapsed / totalTime, width=12, asciiOnly=asciiOnly)
+            durStr = formatDuration(p.elapsed)
+            nameStr = p.name if len(p.name) <= 42 else (p.name[:39] + "...")
+            m.say(f"  {nameStr:<42} {durStr:>10} {pct:>8.1f}%  {pBar}")
 
     # 2. Top Functions
-    fn_list = analysis.top_overall_functions if show_all else analysis.bikeshed_functions
-    title_kind = "All Functions" if show_all else "Bikeshed Code"
+    fnList = analysis.topOverallFunctions if showAll else analysis.bikeshedFunctions
+    titleKind = "All Functions" if showAll else "Bikeshed Code"
 
-    if sort_by == "tottime":
-        sorted_fns = sorted(fn_list, key=lambda s: s.tottime, reverse=True)
-    elif sort_by == "calls":
-        sorted_fns = sorted(fn_list, key=lambda s: s.ncalls, reverse=True)
-    elif sort_by == "name":
-        sorted_fns = sorted(fn_list, key=lambda s: s.name.lower())
+    if sortBy == "tottime":
+        sortedFns = sorted(fnList, key=lambda s: s.tottime, reverse=True)
+    elif sortBy == "calls":
+        sortedFns = sorted(fnList, key=lambda s: s.ncalls, reverse=True)
+    elif sortBy == "name":
+        sortedFns = sorted(fnList, key=lambda s: s.name.lower())
     else:  # cumtime
-        sorted_fns = sorted(fn_list, key=lambda s: s.cumtime, reverse=True)
+        sortedFns = sorted(fnList, key=lambda s: s.cumtime, reverse=True)
 
     m.say("")
     m.say(
-        f"── Top {title_kind} Bottlenecks (Sorted by {sort_by}) "
-        + (sub_divider * (45 - len(title_kind) - len(sort_by))),
+        f"── Top {titleKind} Bottlenecks (Sorted by {sortBy}) " + (subDivider * (45 - len(titleKind) - len(sortBy))),
     )
     header = f"  {'Function':<28} {'Location':<24} {'Calls':>7} {'Self':>9} {'%Tot':>6} {'Cumul':>9} {'%Cum':>6} {'PerCall':>8}"
     m.say(header)
-    m.say("  " + (sub_divider * 98))
+    m.say("  " + (subDivider * 98))
 
-    for s in sorted_fns[:limit]:
+    for s in sortedFns[:limit]:
         fname = s.name if len(s.name) <= 28 else (s.name[:25] + "...")
         floc = s.location if len(s.location) <= 24 else ("..." + s.location[-21:])
-        calls_str = f"{s.ncalls:,}" if s.ncalls < 1000000 else f"{s.ncalls/1000000:.1f}M"
-        tot_str = format_duration(s.tottime)
-        cum_str = format_duration(s.cumtime)
-        per_call_str = format_duration(s.percall_cum)
+        callsStr = f"{s.ncalls:,}" if s.ncalls < 1000000 else f"{s.ncalls/1000000:.1f}M"
+        totStr = formatDuration(s.tottime)
+        cumStr = formatDuration(s.cumtime)
+        perCallStr = formatDuration(s.percallCum)
         row = (
-            f"  {fname:<28} {floc:<24} {calls_str:>7} {tot_str:>9} {s.tottime_percent:>5.1f}% "
-            + f"{cum_str:>9} {s.cumtime_percent:>5.1f}% {per_call_str:>8}"
+            f"  {fname:<28} {floc:<24} {callsStr:>7} {totStr:>9} {s.tottimePercent:>5.1f}% "
+            + f"{cumStr:>9} {s.cumtimePercent:>5.1f}% {perCallStr:>8}"
         )
         m.say(row)
 
-    # 3. If Bikeshed functions were shown, also show top 5 overall non-bikeshed bottlenecks if any
-    if not show_all:
-        non_bikeshed = [s for s in analysis.top_overall_functions if s.category != "bikeshed" and s.cumtime >= 0.005]
-        if non_bikeshed:
+    # 3. If Bikeshed functions were shown, also show top overall non-bikeshed bottlenecks if any
+    if not showAll:
+        nonBikeshed = [s for s in analysis.topOverallFunctions if s.category != "bikeshed" and s.cumtime >= 0.005]
+        if nonBikeshed:
             m.say("")
-            m.say("── Top External & Runtime Bottlenecks " + (sub_divider * 42))
+            m.say("── Top External & Runtime Bottlenecks " + (subDivider * 42))
             m.say(f"  {'Function':<28} {'Category':<12} {'Location':<20} {'Calls':>7} {'Cumul':>9} {'%Cum':>6}")
-            m.say("  " + (sub_divider * 86))
-            for s in non_bikeshed[:8]:
+            m.say("  " + (subDivider * 86))
+            for s in nonBikeshed[:8]:
                 fname = s.name if len(s.name) <= 28 else (s.name[:25] + "...")
                 floc = s.location if len(s.location) <= 20 else ("..." + s.location[-17:])
-                calls_str = f"{s.ncalls:,}" if s.ncalls < 1000000 else f"{s.ncalls/1000000:.1f}M"
-                cum_str = format_duration(s.cumtime)
+                callsStr = f"{s.ncalls:,}" if s.ncalls < 1000000 else f"{s.ncalls/1000000:.1f}M"
+                cumStr = formatDuration(s.cumtime)
                 m.say(
-                    f"  {fname:<28} {s.category:<12} {floc:<20} {calls_str:>7} {cum_str:>9} {s.cumtime_percent:>5.1f}%",
+                    f"  {fname:<28} {s.category:<12} {floc:<20} {callsStr:>7} {cumStr:>9} {s.cumtimePercent:>5.1f}%",
                 )
 
     # 4. Caller details for top bottlenecks or requested function
-    targets_for_callers: list[FunctionStat] = []
-    if callers_func is not None:
-        if callers_func == "":
-            targets_for_callers = sorted_fns[:5]
+    targetsForCallers: list[FunctionStat] = []
+    if callersFunc is not None:
+        if callersFunc == "":
+            targetsForCallers = sortedFns[:5]
         else:
-            targets_for_callers = [
+            targetsForCallers = [
                 s
                 for s in analysis.functions.values()
-                if callers_func.lower() in s.name.lower() or callers_func in s.location
+                if callersFunc.lower() in s.name.lower() or callersFunc in s.location
             ][:5]
     else:
         # Default: show callers for the top 3 slowest functions with callers
-        targets_for_callers = [s for s in sorted_fns if s.callers][:3]
+        targetsForCallers = [s for s in sortedFns if s.callers][:3]
 
-    if targets_for_callers:
+    if targetsForCallers:
         m.say("")
-        m.say("── Callers of Key Bottlenecks " + (sub_divider * 50))
-        for stat in targets_for_callers:
-            cum_str = format_duration(stat.cumtime)
-            m.say(f"  • {stat.location} ({stat.name}) [cumtime: {cum_str}, calls: {stat.ncalls:,}]")
+        m.say("── Callers of Key Bottlenecks " + (subDivider * 50))
+        for stat in targetsForCallers:
+            cumStr = formatDuration(stat.cumtime)
+            m.say(f"  • {stat.location} ({stat.name}) [cumtime: {cumStr}, calls: {stat.ncalls:,}]")
             for caller in stat.callers[:4]:
-                caller_cum = format_duration(caller.cumtime)
-                pct = caller.percent_of_callee
+                callerCum = formatDuration(caller.cumtime)
+                pct = caller.percentOfCallee
                 m.say(
-                    f"      ↳ {caller.ncalls:,} calls ({caller_cum}, {pct:4.1f}%) from {caller.location} ({caller.name})",
+                    f"      ↳ {caller.ncalls:,} calls ({callerCum}, {pct:4.1f}%) from {caller.location} ({caller.name})",
                 )
 
     # 5. Callees details if requested
-    if callees_func is not None:
-        targets_for_callees = (
-            sorted_fns[:3]
-            if callees_func == ""
+    if calleesFunc is not None:
+        targetsForCallees = (
+            sortedFns[:3]
+            if calleesFunc == ""
             else [
                 s
                 for s in analysis.functions.values()
-                if callees_func.lower() in s.name.lower() or callees_func in s.location
+                if calleesFunc.lower() in s.name.lower() or calleesFunc in s.location
             ][:5]
         )
-        if targets_for_callees:
+        if targetsForCallees:
             m.say("")
-            m.say("── Callees of Functions " + (sub_divider * 55))
-            for stat in targets_for_callees:
-                cum_str = format_duration(stat.cumtime)
-                m.say(f"  • {stat.location} ({stat.name}) [cumtime: {cum_str}] calls:")
+            m.say("── Callees of Functions " + (subDivider * 55))
+            for stat in targetsForCallees:
+                cumStr = formatDuration(stat.cumtime)
+                m.say(f"  • {stat.location} ({stat.name}) [cumtime: {cumStr}] calls:")
                 for callee in stat.callees[:6]:
-                    callee_cum = format_duration(callee.cumtime)
-                    pct = callee.percent_of_caller
+                    calleeCum = formatDuration(callee.cumtime)
+                    pct = callee.percentOfCaller
                     m.say(
-                        f"      ⮡ {callee.ncalls:,} calls ({callee_cum}, {pct:4.1f}%) to {callee.location} ({callee.name})",
+                        f"      ⮡ {callee.ncalls:,} calls ({calleeCum}, {pct:4.1f}%) to {callee.location} ({callee.name})",
                     )
 
     # Footer tips
@@ -557,22 +585,25 @@ def print_terminal_report(
     m.say("  • Generate interactive SVG flamegraph: bikeshed profile <spec> --svg flame.svg")
     m.say("  • Export machine-readable JSON:        bikeshed profile <spec> --json [report.json]")
     m.say("  • Inspect function callers/callees:   bikeshed profile <spec> --callers [func] / --callees [func]")
+    m.say("  • Profile a synthetic benchmark spec:  bikeshed profile --synthetic [size] [--save-synthetic [out.bs]]")
 
 
-def export_json(analysis: ProfileAnalysis) -> dict[str, t.Any]:
-    total_time = max(analysis.total_wall_time, 0.000001)
+def exportJson(analysis: ProfileAnalysis) -> dict[str, t.Any]:
+    """Convert a ProfileAnalysis into a JSON-serializable dictionary of phases, bottlenecks, and call tree."""
+    totalTime = max(analysis.totalWallTime, 0.000001)
 
-    phases_data = [
+    phasesData = [
         {
             "name": p.name,
             "group": p.group,
             "duration": p.elapsed,
-            "percent": round((p.elapsed / total_time) * 100.0, 2),
+            "percent": round((p.elapsed / totalTime) * 100.0, 2),
         }
         for p in analysis.phases
     ]
 
-    def serialize_fn(s: FunctionStat) -> dict[str, t.Any]:
+    def serializeFn(s: FunctionStat) -> dict[str, t.Any]:
+        """Serialize a FunctionStat and its top callers and callees into a dictionary."""
         return {
             "name": s.name,
             "location": s.location,
@@ -583,10 +614,10 @@ def export_json(analysis: ProfileAnalysis) -> dict[str, t.Any]:
             "primitive_calls": s.pcalls,
             "tottime": round(s.tottime, 6),
             "cumtime": round(s.cumtime, 6),
-            "tottime_percent": round(s.tottime_percent, 2),
-            "cumtime_percent": round(s.cumtime_percent, 2),
-            "percall_tot": round(s.percall_tot, 6),
-            "percall_cum": round(s.percall_cum, 6),
+            "tottime_percent": round(s.tottimePercent, 2),
+            "cumtime_percent": round(s.cumtimePercent, 2),
+            "percall_tot": round(s.percallTot, 6),
+            "percall_cum": round(s.percallCum, 6),
             "callers": [
                 {
                     "name": c.name,
@@ -594,7 +625,7 @@ def export_json(analysis: ProfileAnalysis) -> dict[str, t.Any]:
                     "category": c.category,
                     "calls": c.ncalls,
                     "cumtime": round(c.cumtime, 6),
-                    "percent_of_callee": round(c.percent_of_callee, 1),
+                    "percent_of_callee": round(c.percentOfCallee, 1),
                 }
                 for c in s.callers[:10]
             ],
@@ -605,32 +636,32 @@ def export_json(analysis: ProfileAnalysis) -> dict[str, t.Any]:
                     "category": c.category,
                     "calls": c.ncalls,
                     "cumtime": round(c.cumtime, 6),
-                    "percent_of_caller": round(c.percent_of_caller, 1),
+                    "percent_of_caller": round(c.percentOfCaller, 1),
                 }
                 for c in s.callees[:10]
             ],
         }
 
     return {
-        "target": analysis.target_name,
-        "total_wall_time": round(analysis.total_wall_time, 6),
-        "total_cpu_time": round(analysis.total_cpu_time, 6),
-        "total_calls": analysis.total_calls,
-        "primitive_calls": analysis.primitive_calls,
-        "phases": phases_data,
-        "bikeshed_bottlenecks": [serialize_fn(s) for s in analysis.bikeshed_functions[:50]],
-        "top_overall": [serialize_fn(s) for s in analysis.top_overall_functions[:50]],
-        "call_tree": analysis.call_tree.to_dict() if analysis.call_tree else None,
+        "target": analysis.targetName,
+        "total_wall_time": round(analysis.totalWallTime, 6),
+        "total_cpu_time": round(analysis.totalCpuTime, 6),
+        "total_calls": analysis.totalCalls,
+        "primitive_calls": analysis.primitiveCalls,
+        "phases": phasesData,
+        "bikeshed_bottlenecks": [serializeFn(s) for s in analysis.bikeshedFunctions[:50]],
+        "top_overall": [serializeFn(s) for s in analysis.topOverallFunctions[:50]],
+        "call_tree": analysis.callTree.toDict() if analysis.callTree else None,
     }
 
 
-def generate_svg_flamegraph(
+def generateSvgFlamegraph(
     analysis: ProfileAnalysis,
     width: int = 1200,
-    row_height: int = 20,
+    rowHeight: int = 20,
 ) -> str:
-    """Generates a self-contained, interactive SVG flamegraph."""
-    tree = analysis.call_tree
+    """Generate a self-contained, interactive SVG flamegraph from the analysis call tree."""
+    tree = analysis.callTree
     if not tree or not tree.children:
         # Generate minimal SVG indicating no data
         return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="100"><text x="20" y="50" font-family="sans-serif">No profiling frames recorded.</text></svg>'
@@ -643,85 +674,87 @@ def generate_svg_flamegraph(
     #   stdlib: slate / cyan (#0097a7, #0288d1, #455a64)
     #   built-in: neutral gray (#78909c)
 
-    # Flatten nodes with coordinates (depth, x_fraction, width_fraction)
-    nodes_layout: list[dict[str, t.Any]] = []
-    max_depth = 0
+    # Flatten nodes with coordinates (depth, xFrac, wFrac)
+    nodesLayout: list[dict[str, t.Any]] = []
+    maxDepth = 0
 
-    def layout_node(node: CallTreeNode, depth: int, x_frac: float, w_frac: float) -> None:
-        nonlocal max_depth
-        max_depth = max(max_depth, depth)
+    def layoutNode(node: CallTreeNode, depth: int, xFrac: float, wFrac: float) -> None:
+        """Compute normalized layout coordinates for a call tree node and its descendants."""
+        nonlocal maxDepth
+        maxDepth = max(maxDepth, depth)
 
-        nodes_layout.append(
+        nodesLayout.append(
             {
                 "node": node,
                 "depth": depth,
-                "x_frac": x_frac,
-                "w_frac": w_frac,
+                "xFrac": xFrac,
+                "wFrac": wFrac,
             },
         )
 
-        curr_x = x_frac
-        sum_child_time = sum(c.cumtime for c in node.children)
+        currX = xFrac
+        sumChildTime = sum(c.cumtime for c in node.children)
         for child in node.children:
             # allocate child width proportionally
-            child_w = (child.cumtime / max(node.cumtime, sum_child_time, 0.000001)) * w_frac
-            if child_w < 0.0005:  # skip subpixel frames
+            childW = (child.cumtime / max(node.cumtime, sumChildTime, 0.000001)) * wFrac
+            if childW < 0.0005:  # skip subpixel frames
                 continue
-            layout_node(child, depth + 1, curr_x, child_w)
-            curr_x += child_w
+            layoutNode(child, depth + 1, currX, childW)
+            currX += childW
 
-    layout_node(tree, 0, 0.0, 1.0)
+    layoutNode(tree, 0, 0.0, 1.0)
 
-    header_height = 60
-    chart_height = (max_depth + 2) * row_height
-    total_height = header_height + chart_height
+    headerHeight = 60
+    chartHeight = (maxDepth + 2) * rowHeight
+    totalHeight = headerHeight + chartHeight
 
-    def pick_color(category: str, name: str) -> str:
+    def pickColor(category: str, name: str) -> str:
+        """Pick a deterministic fill color for a flamegraph frame by category and name."""
         # Stable hash for variation
-        h_val = abs(hash(name)) % 5
+        hVal = abs(hash(name)) % 5
         if category == "bikeshed":
             colors = ["#e67e22", "#d35400", "#e74c3c", "#f39c12", "#c0392b"]
-            return colors[h_val]
+            return colors[hVal]
         if category == "dependency":
             colors = ["#8e44ad", "#9b59b6", "#5c6bc0", "#3f51b5", "#673ab7"]
-            return colors[h_val]
+            return colors[hVal]
         if category == "stdlib":
             colors = ["#0097a7", "#00838f", "#0288d1", "#0277bd", "#00695c"]
-            return colors[h_val]
+            return colors[hVal]
         # built-in
         colors = ["#78909c", "#607d8b", "#90a4ae", "#546e7a", "#b0bec5"]
-        return colors[h_val]
+        return colors[hVal]
 
     elements: list[str] = []
     # Build frames
-    for item in nodes_layout:
+    for item in nodesLayout:
         node: CallTreeNode = item["node"]
         depth: int = item["depth"]
-        x_frac: float = item["x_frac"]
-        w_frac: float = item["w_frac"]
+        xFrac: float = item["xFrac"]
+        wFrac: float = item["wFrac"]
 
-        y = total_height - ((depth + 1) * row_height) - 10
-        fill = pick_color(node.category, node.name)
-        dur_str = format_duration(node.cumtime)
-        tip = f"{node.name} | {node.location} | {dur_str} ({node.percent:.1f}%) | {node.ncalls:,} calls"
-        safe_name = html.escape(node.name)
-        safe_tip = html.escape(tip)
+        y = totalHeight - ((depth + 1) * rowHeight) - 10
+        fill = pickColor(node.category, node.name)
+        durStr = formatDuration(node.cumtime)
+        tip = f"{node.name} | {node.location} | {durStr} ({node.percent:.1f}%) | {node.ncalls:,} calls"
+        safeName = html.escape(node.name)
+        safeTip = html.escape(tip)
 
-        txt = safe_name if (w_frac * width) >= 40 else ""
+        txt = safeName if (wFrac * width) >= 40 else ""
         elem = (
-            f'<g class="frame" data-name="{safe_name}" data-tip="{safe_tip}" '
-            + f'data-xf="{x_frac:.6f}" data-wf="{w_frac:.6f}" data-depth="{depth}">'
-            + f'<rect x="{x_frac * width:.2f}" y="{y}" width="{max(0.5, w_frac * width):.2f}" '
-            + f'height="{row_height - 1}" fill="{fill}" rx="2" ry="2"/>'
-            + f'<text x="{x_frac * width + 4:.2f}" y="{y + row_height - 6}" font-size="11" '
+            f'<g class="frame" data-name="{safeName}" data-tip="{safeTip}" '
+            + f'data-xf="{xFrac:.6f}" data-wf="{wFrac:.6f}" data-depth="{depth}">'
+            + f'<rect x="{xFrac * width:.2f}" y="{y}" width="{max(0.5, wFrac * width):.2f}" '
+            + f'height="{rowHeight - 1}" fill="{fill}" rx="2" ry="2"/>'
+            + f'<text x="{xFrac * width + 4:.2f}" y="{y + rowHeight - 6}" font-size="11" '
             + 'font-family="monospace" fill="#ffffff" clip-path="url(#cp)">'
             + f"{txt}</text></g>"
         )
         elements.append(elem)
 
-    frames_xml = "\n".join(elements)
+    framesXml = "\n".join(elements)
 
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {total_height}" width="100%" height="100%" style="background:#1e1e1e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {totalHeight}" width="100%" height="100%" style="background:#1e1e1e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
   <style>
     .frame {{ cursor: pointer; transition: opacity 0.15s ease; }}
     .frame:hover rect {{ filter: brightness(1.25); stroke: #ffffff; stroke-width: 1; }}
@@ -733,11 +766,11 @@ def generate_svg_flamegraph(
     .btn-text {{ fill: #eee; font-size: 12px; user-select: none; }}
   </style>
 
-  <rect width="{width}" height="{total_height}" fill="#181824"/>
+  <rect width="{width}" height="{totalHeight}" fill="#181824"/>
 
   <!-- Header -->
-  <text x="20" y="30" font-size="16" font-weight="bold" fill="#ffffff">Bikeshed Flamegraph: {html.escape(analysis.target_name)}</text>
-  <text x="20" y="48" font-size="12" fill="#aaaaaa">Total: {format_duration(analysis.total_wall_time)} | CPU: {format_duration(analysis.total_cpu_time)} | Calls: {analysis.total_calls:,} (Click frame to zoom, click top to reset)</text>
+  <text x="20" y="30" font-size="16" font-weight="bold" fill="#ffffff">Bikeshed Flamegraph: {html.escape(analysis.targetName)}</text>
+  <text x="20" y="48" font-size="12" fill="#aaaaaa">Total: {formatDuration(analysis.totalWallTime)} | CPU: {formatDuration(analysis.totalCpuTime)} | Calls: {analysis.totalCalls:,} (Click frame to zoom, click top to reset)</text>
 
   <!-- Legend -->
   <g transform="translate({width - 420}, 20)">
@@ -759,18 +792,18 @@ def generate_svg_flamegraph(
 
   <!-- Frames -->
   <g id="frames-group">
-    {frames_xml}
+    {framesXml}
   </g>
 
   <!-- Status / Info text bar -->
-  <text id="status-bar" x="20" y="{total_height - 4}" font-size="11" fill="#888888">Hover over a box for details; click to zoom in; click Reset to zoom out.</text>
+  <text id="status-bar" x="20" y="{totalHeight - 4}" font-size="11" fill="#888888">Hover over a box for details; click to zoom in; click Reset to zoom out.</text>
 
   <script><![CDATA[
     (function() {{
       const svg = document.querySelector('svg');
       const width = {width};
-      const totalHeight = {total_height};
-      const rowHeight = {row_height};
+      const totalHeight = {totalHeight};
+      const rowHeight = {rowHeight};
       const frames = Array.from(document.querySelectorAll('.frame'));
       const statusBar = document.getElementById('status-bar');
       const resetBtn = document.getElementById('reset-btn');
@@ -834,38 +867,38 @@ def generate_svg_flamegraph(
     return svg
 
 
-def generate_html_report(
+def generateHtmlReport(
     analysis: ProfileAnalysis,
 ) -> str:
-    """Generates an all-in-one standalone HTML profile report."""
-    svg_flamegraph = generate_svg_flamegraph(analysis)
-    json_data = json.dumps(export_json(analysis))
+    """Generate a standalone interactive HTML dashboard with flamegraph, phases, and function explorer."""
+    svgFlamegraph = generateSvgFlamegraph(analysis)
+    jsonData = json.dumps(exportJson(analysis))
 
-    target_name = html.escape(analysis.target_name)
-    wall_time_str = format_duration(analysis.total_wall_time)
-    cpu_time_str = format_duration(analysis.total_cpu_time)
-    calls_str = f"{analysis.total_calls:,}"
+    targetName = html.escape(analysis.targetName)
+    wallTimeStr = formatDuration(analysis.totalWallTime)
+    cpuTimeStr = formatDuration(analysis.totalCpuTime)
+    callsStr = f"{analysis.totalCalls:,}"
 
     # Build phase items
-    total_time = max(analysis.total_wall_time, 0.000001)
-    phases_html = []
+    totalTime = max(analysis.totalWallTime, 0.000001)
+    phasesHtml = []
     for p in analysis.phases:
-        pct = (p.elapsed / total_time) * 100.0
-        dur_str = format_duration(p.elapsed)
+        pct = (p.elapsed / totalTime) * 100.0
+        durStr = formatDuration(p.elapsed)
         row = (
             f'<tr><td>{html.escape(p.name)}</td><td>{html.escape(p.group or "-")}</td>'
-            + f'<td style="text-align:right;">{dur_str}</td>'
+            + f'<td style="text-align:right;">{durStr}</td>'
             + f'<td style="text-align:right;">{pct:.1f}%</td>'
             + f'<td><div class="progress-bar"><div class="progress-fill" style="width:{pct:.1f}%;"></div></div></td></tr>'
         )
-        phases_html.append(row)
-    phases_rows = "\n".join(phases_html) if phases_html else "<tr><td colspan='5'>No phases recorded</td></tr>"
+        phasesHtml.append(row)
+    phasesRows = "\n".join(phasesHtml) if phasesHtml else "<tr><td colspan='5'>No phases recorded</td></tr>"
 
-    html_content = f"""<!DOCTYPE html>
+    htmlContent = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Bikeshed Profile: {target_name}</title>
+  <title>Bikeshed Profile: {targetName}</title>
   <style>
     :root {{
       --bg: #12121e;
@@ -999,7 +1032,7 @@ def generate_html_report(
   <header>
     <div>
       <h1>Bikeshed Performance Profile</h1>
-      <div class="subtitle">Target: <strong>{target_name}</strong></div>
+      <div class="subtitle">Target: <strong>{targetName}</strong></div>
     </div>
     <div>
       <button class="tab-btn" onclick="downloadJSON()">Export JSON</button>
@@ -1009,20 +1042,20 @@ def generate_html_report(
   <div class="stat-grid">
     <div class="stat-card">
       <div class="stat-title">Total Wall Time</div>
-      <div class="stat-value">{wall_time_str}</div>
+      <div class="stat-value">{wallTimeStr}</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">Total CPU Time</div>
-      <div class="stat-value">{cpu_time_str}</div>
+      <div class="stat-value">{cpuTimeStr}</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">Function Calls</div>
-      <div class="stat-value">{calls_str}</div>
+      <div class="stat-value">{callsStr}</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">Top Bikeshed Bottleneck</div>
       <div class="stat-value" style="font-size: 18px; color: #f39c12;">
-        {html.escape(analysis.bikeshed_functions[0].name if analysis.bikeshed_functions else "N/A")}
+        {html.escape(analysis.bikeshedFunctions[0].name if analysis.bikeshedFunctions else "N/A")}
       </div>
     </div>
   </div>
@@ -1034,7 +1067,7 @@ def generate_html_report(
       <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Click any rectangle to zoom into that call stack; click Reset in the SVG to zoom out.</span>
     </div>
     <div class="flamegraph-container">
-      {svg_flamegraph}
+      {svgFlamegraph}
     </div>
   </div>
 
@@ -1052,7 +1085,7 @@ def generate_html_report(
         </tr>
       </thead>
       <tbody>
-        {phases_rows}
+        {phasesRows}
       </tbody>
     </table>
   </div>
@@ -1091,7 +1124,7 @@ def generate_html_report(
   </div>
 
   <script>
-    const profileData = {json_data};
+    const profileData = {jsonData};
     let currentCategory = 'bikeshed';
     let sortColumn = 'cumtime';
     let sortAsc = false;
@@ -1248,23 +1281,29 @@ def generate_html_report(
   </script>
 </body>
 </html>"""
-    return html_content
+    return htmlContent
 
 
-def profile_spec(
+def profileSpec(
     options: argparse.Namespace,
     extras: list[str],
+    *,
+    inputSource: InputSource.InputSource | None = None,
+    targetName: str | None = None,
+    defaultOutfile: str | None = None,
+    saveOutput: bool = False,
 ) -> ProfileAnalysis:
-
+    """Profile compiling a Bikeshed specification from a file path or explicit InputSource."""
     infile = getattr(options, "infile", None)
     timer = PhaseTimer(enabled=True)
 
     pr = cProfile.Profile()
-    start_wall = time.perf_counter()
+    startWall = time.perf_counter()
 
     pr.enable()
     doc = Spec(
-        inputFilename=infile,
+        inputFilename=infile if inputSource is None else None,
+        inputSource=inputSource,
         debug=getattr(options, "debug", False),
         debugPrint=getattr(options, "debugPrint", None),
         token=getattr(options, "ghToken", None),
@@ -1277,8 +1316,8 @@ def profile_spec(
         sys.exit(1)
 
     doc.mdCommandLine = metadata.fromCommandLine(extras)
-    error_level = getattr(options, "errorLevel", None) or "nothing"
-    doc.mdCommandLine.addData("Die On", error_level)
+    errorLevel = getattr(options, "errorLevel", None) or "nothing"
+    doc.mdCommandLine.addData("Die On", errorLevel)
     if getattr(options, "errorTiming", None):
         doc.mdCommandLine.addData("Die When", options.errorTiming)
     if getattr(options, "byos", False):
@@ -1288,153 +1327,228 @@ def profile_spec(
 
     # Finish & serialize
     outfile = getattr(options, "outfile", None)
-    save_output = getattr(options, "saveOutput", False)
-    if outfile and not save_output:
-        save_output = True
+    shouldSaveOutput = saveOutput or getattr(options, "saveOutput", False) or bool(outfile)
 
-    if save_output:
-        doc.finish(outputFilename=outfile)
+    if shouldSaveOutput:
+        doc.finish(outputFilename=outfile or defaultOutfile)
     else:
         # Dry run finish: serialize without writing file
         doc.serialize()
 
     pr.disable()
-    elapsed_wall = time.perf_counter() - start_wall
+    elapsedWall = time.perf_counter() - startWall
 
-    target_name = infile or (doc.inputSource.sourceName if doc.inputSource else "index.bs")
+    resolvedTarget = targetName or infile or (doc.inputSource.sourceName if doc.inputSource else "index.bs")
 
-    analysis = analyze_profile(
+    analysis = analyzeProfile(
         pr=pr,
-        wall_time=elapsed_wall,
+        wallTime=elapsedWall,
         phases=timer.phases,
-        target_name=target_name,
-        root_filter=getattr(options, "root", None),
-        leaf_filter=getattr(options, "leaf", None),
+        targetName=resolvedTarget,
+        rootFilter=getattr(options, "root", None),
+        leafFilter=getattr(options, "leaf", None),
     )
     return analysis
 
 
-def profile_test(options: argparse.Namespace) -> ProfileAnalysis:
+def profileSynthetic(
+    sizeStr: str,
+    options: argparse.Namespace,
+    extras: list[str],
+) -> ProfileAnalysis:
+    """Generate a synthetic benchmark spec of sizeStr, optionally save it and its HTML, and profile it."""
+    try:
+        targetBytes = synthetic.parseSize(sizeStr)
+    except ValueError as e:
+        m.die(str(e))
+        sys.exit(1)
 
+    content = synthetic.generateSyntheticSpec(targetBytes)
+    actualBytes = len(content.encode("utf-8"))
+    lineCount = content.count("\n")
+
+    saveSynthetic = getattr(options, "saveSynthetic", None)
+    if saveSynthetic == "":
+        saveSynthetic = synthetic.defaultFilename(sizeStr)
+    if saveSynthetic is not None:
+        try:
+            with open(saveSynthetic, "w", encoding="utf-8") as fh:
+                fh.write(content)
+        except OSError as e:
+            m.die(f"Couldn't save synthetic spec to '{saveSynthetic}':\n{e}")
+            sys.exit(1)
+        if getattr(options, "jsonFile", None) != "-":
+            m.say(
+                f"Saved synthetic spec ({synthetic.formatSize(actualBytes)}, {lineCount:,} lines) to {saveSynthetic}",
+            )
+
+    source = InputSource.StringInputSource(content, sourceName=saveSynthetic or "<synthetic>")
+    targetName = f"synthetic ({synthetic.formatSize(actualBytes)}, {lineCount:,} lines)"
+    defaultOutfile: str | None = None
+    if saveSynthetic is not None:
+        defaultOutfile = defaultOutputFilename(saveSynthetic)
+    elif getattr(options, "saveOutput", False):
+        defaultOutfile = "synthetic.html"
+
+    analysis = profileSpec(
+        options,
+        extras,
+        inputSource=source,
+        targetName=targetName,
+        defaultOutfile=defaultOutfile,
+        saveOutput=saveSynthetic is not None,
+    )
+
+    resolvedOutfile = getattr(options, "outfile", None) or defaultOutfile
+    if (
+        saveSynthetic is not None
+        and resolvedOutfile is not None
+        and resolvedOutfile != "-"
+        and not constants.dryRun
+        and getattr(options, "jsonFile", None) != "-"
+    ):
+        m.say(f"Saved synthetic output HTML to {resolvedOutfile}")
+
+    return analysis
+
+
+def profileTest(options: argparse.Namespace) -> ProfileAnalysis:
+    """Profile running Bikeshed's test suite with the configured test filters."""
     filters = test.TestFilter.fromOptions(options)
     timer = PhaseTimer(enabled=True)
 
     pr = cProfile.Profile()
-    start_wall = time.perf_counter()
+    startWall = time.perf_counter()
 
     pr.enable()
     test.run(filters)
     pr.disable()
 
-    elapsed_wall = time.perf_counter() - start_wall
+    elapsedWall = time.perf_counter() - startWall
 
-    analysis = analyze_profile(
+    analysis = analyzeProfile(
         pr=pr,
-        wall_time=elapsed_wall,
+        wallTime=elapsedWall,
         phases=timer.phases,
-        target_name=f"test (filters={filters})",
-        root_filter=getattr(options, "root", None),
-        leaf_filter=getattr(options, "leaf", None),
+        targetName=f"test (filters={filters})",
+        rootFilter=getattr(options, "root", None),
+        leafFilter=getattr(options, "leaf", None),
     )
     return analysis
 
 
-def profile_command(command_str: str, options: argparse.Namespace, cliMain: t.Callable[[], None]) -> ProfileAnalysis:
-    """Runs an arbitrary bikeshed command string under the profiler."""
-
-    orig_argv = sys.argv[:]
+def profileCommand(commandStr: str, options: argparse.Namespace, cliMain: t.Callable[[], None]) -> ProfileAnalysis:
+    """Run an arbitrary Bikeshed CLI command string under the profiler."""
+    origArgv = sys.argv[:]
     timer = PhaseTimer(enabled=True)
     pr = cProfile.Profile()
-    start_wall = time.perf_counter()
+    startWall = time.perf_counter()
 
     try:
-        sys.argv = ["bikeshed", *command_str.split()]
+        sys.argv = ["bikeshed", *commandStr.split()]
         pr.enable()
         cliMain()
     except SystemExit:
         pass
     finally:
         pr.disable()
-        sys.argv = orig_argv
+        sys.argv = origArgv
 
-    elapsed_wall = time.perf_counter() - start_wall
+    elapsedWall = time.perf_counter() - startWall
 
-    analysis = analyze_profile(
+    analysis = analyzeProfile(
         pr=pr,
-        wall_time=elapsed_wall,
+        wallTime=elapsedWall,
         phases=timer.phases,
-        target_name=f"command: {command_str}",
-        root_filter=getattr(options, "root", None),
-        leaf_filter=getattr(options, "leaf", None),
+        targetName=f"command: {commandStr}",
+        rootFilter=getattr(options, "root", None),
+        leafFilter=getattr(options, "leaf", None),
     )
     return analysis
 
 
-def handle_profile_cli(options: argparse.Namespace, extras: list[str], cliMain: t.Callable[[], None]) -> None:
-    # Check if profiling tests or custom command
-    if getattr(options, "command", None):
-        analysis = profile_command(options.command, options, cliMain)
-    elif (
+def handleProfileCli(options: argparse.Namespace, extras: list[str], cliMain: t.Callable[[], None]) -> None:
+    """Dispatch `bikeshed profile` CLI options to run profiling and emit requested reports."""
+    syntheticSize = getattr(options, "syntheticSize", None)
+    saveSynthetic = getattr(options, "saveSynthetic", None)
+    isTestMode = bool(
         getattr(options, "profileTest", False)
         or getattr(options, "testFiles", None)
-        or getattr(options, "testFolders", None)
-    ):
+        or getattr(options, "testFolders", None),
+    )
+    isCommandMode = bool(getattr(options, "command", None))
+
+    if saveSynthetic is not None and syntheticSize is None:
+        m.die("--save-synthetic can only be used together with --synthetic.")
+        sys.exit(1)
+
+    if syntheticSize is not None:
+        if isCommandMode or isTestMode:
+            m.die("--synthetic cannot be combined with --test, --file, --folder, or --command.")
+            sys.exit(1)
+        if getattr(options, "infile", None):
+            m.die("Cannot specify an input file together with --synthetic.")
+            sys.exit(1)
+        analysis = profileSynthetic(syntheticSize, options, extras)
+    elif isCommandMode:
+        analysis = profileCommand(options.command, options, cliMain)
+    elif isTestMode:
         # Profiling tests
         # Adapt test options
         options.manualOnly = None
         options.folders = getattr(options, "testFolders", None)
         options.files = getattr(options, "testFiles", None)
         options.rebase = False
-        analysis = profile_test(options)
+        analysis = profileTest(options)
     else:
         # Default: profile spec
-        analysis = profile_spec(options, extras)
+        analysis = profileSpec(options, extras)
 
     # Save raw pstats if requested
-    pstats_file = getattr(options, "pstatsFile", None)
-    if pstats_file:
-        analysis.stats.dump_stats(pstats_file)
-        m.say(f"Saved raw pstats to {pstats_file}")
+    pstatsFile = getattr(options, "pstatsFile", None)
+    if pstatsFile:
+        analysis.stats.dump_stats(pstatsFile)
+        m.say(f"Saved raw pstats to {pstatsFile}")
 
     # Generate and save SVG flamegraph if requested
-    svg_file = getattr(options, "svgFile", None)
-    if svg_file:
-        svg_content = generate_svg_flamegraph(
+    svgFile = getattr(options, "svgFile", None)
+    if svgFile:
+        svgContent = generateSvgFlamegraph(
             analysis,
         )
-        with open(svg_file, "w", encoding="utf-8") as f:
-            f.write(svg_content)
-        m.say(f"Saved interactive SVG flamegraph to {svg_file}")
+        with open(svgFile, "w", encoding="utf-8") as f:
+            f.write(svgContent)
+        m.say(f"Saved interactive SVG flamegraph to {svgFile}")
 
     # Generate and save HTML report if requested
-    html_file = getattr(options, "htmlFile", None)
-    if html_file:
-        html_content = generate_html_report(analysis)
-        with open(html_file, "w", encoding="utf-8") as f:
-            f.write(html_content)
-        m.say(f"Saved interactive HTML profile report to {html_file}")
+    htmlFile = getattr(options, "htmlFile", None)
+    if htmlFile:
+        htmlContent = generateHtmlReport(analysis)
+        with open(htmlFile, "w", encoding="utf-8") as f:
+            f.write(htmlContent)
+        m.say(f"Saved interactive HTML profile report to {htmlFile}")
 
     # JSON export
-    json_file = getattr(options, "jsonFile", None)
-    if json_file:
-        json_obj = export_json(analysis)
-        json_str = json.dumps(json_obj, indent=2)
-        if json_file == "-":
+    jsonFile = getattr(options, "jsonFile", None)
+    if jsonFile:
+        jsonObj = exportJson(analysis)
+        jsonStr = json.dumps(jsonObj, indent=2)
+        if jsonFile == "-":
             with contextlib.suppress(BrokenPipeError):
-                print(json_str)  # noqa: T201
+                print(jsonStr)  # noqa: T201
             return
-        with open(json_file, "w", encoding="utf-8") as f:
-            f.write(json_str)
-        m.say(f"Saved profile JSON to {json_file}")
+        with open(jsonFile, "w", encoding="utf-8") as f:
+            f.write(jsonStr)
+        m.say(f"Saved profile JSON to {jsonFile}")
         return
 
     # Print terminal report
     if not m.state.silent and m.state.printOn != "nothing":
-        print_terminal_report(
+        printTerminalReport(
             analysis=analysis,
-            sort_by=getattr(options, "sortBy", "cumtime"),
+            sortBy=getattr(options, "sortBy", "cumtime"),
             limit=getattr(options, "limit", 20),
-            show_all=getattr(options, "showAll", False),
-            callers_func=getattr(options, "callersFunc", None),
-            callees_func=getattr(options, "calleesFunc", None),
+            showAll=getattr(options, "showAll", False),
+            callersFunc=getattr(options, "callersFunc", None),
+            calleesFunc=getattr(options, "calleesFunc", None),
         )

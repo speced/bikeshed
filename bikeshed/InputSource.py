@@ -147,6 +147,26 @@ class StdinInputSource(InputSource):
         return InputContent(sys.stdin.readlines(), None)
 
 
+class StringInputSource(InputSource):
+    def __init__(
+        self,
+        content: str,
+        sourceName: str = "<string>",
+        *,
+        date: datetime.date | None = None,
+    ) -> None:
+        self.type = "string"
+        self.sourceName = sourceName
+        self.content = content
+        self.date = date
+
+    def __str__(self) -> str:
+        return self.sourceName
+
+    def read(self) -> InputContent:
+        return InputContent(self.content.splitlines(keepends=True), self.date)
+
+
 class UrlInputSource(InputSource):
     def __init__(self, sourceName: str, **kwargs: t.Any) -> None:  # pylint: disable=unused-argument
         assert sourceName.startswith("https:")

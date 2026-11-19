@@ -87,6 +87,7 @@ class Spec:
         self,
         inputFilename: str | None = None,
         *,
+        inputSource: InputSource.InputSource | None = None,
         debug: bool = False,
         debugPrint: str | None = None,
         token: str | None = None,
@@ -96,20 +97,24 @@ class Spec:
         timer: PhaseTimer | None = None,
     ) -> None:
         self.timer: PhaseTimer = timer or PhaseTimer(enabled=False)
-        catchArgparseBug(inputFilename)
         self.valid: bool = False
         self.lineNumbers: bool = lineNumbers
         if lineNumbers:
             # line-numbers are too hacky, so force this to be a dry run
             constants.dryRun = True
-        if inputFilename is None:
-            inputFilename = findImplicitInputFile()
-        if inputFilename is None:  # still
-            m.die(
-                "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.",
-            )
-            return
-        self.inputSource: InputSource.InputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
+        self.inputSource: InputSource.InputSource
+        if inputSource is not None:
+            self.inputSource = inputSource
+        else:
+            catchArgparseBug(inputFilename)
+            if inputFilename is None:
+                inputFilename = findImplicitInputFile()
+            if inputFilename is None:  # still
+                m.die(
+                    "No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.",
+                )
+                return
+            self.inputSource = InputSource.inputFromName(inputFilename, chroot=constants.chroot)
         self.transitiveDependencies: set[InputSource.InputSource] = set()
         self.debug: bool = debug
         self.debugPrint: str | None = debugPrint
@@ -432,12 +437,8 @@ class Spec:
                 outputFilename = os.path.splitext(self.inputSource.sourceName)[0] + ".html"
             elif not isinstance(self.inputSource, InputSource.FileInputSource):
                 outputFilename = "-"
-            elif self.inputSource.sourceName.endswith(".bs"):
-                outputFilename = self.inputSource.sourceName[0:-3] + ".html"
-            elif self.inputSource.sourceName.endswith(".src.html"):
-                outputFilename = self.inputSource.sourceName[0:-9] + ".html"
             else:
-                outputFilename = "-"
+                outputFilename = defaultOutputFilename(self.inputSource.sourceName)
         return outputFilename
 
     def finish(self, outputFilename: str | None = None, newline: str | None = None) -> None:
@@ -575,6 +576,15 @@ def printDone() -> None:
         m.p(f"| {contents} |")
         m.p(f"\\{'-'*contentLen}/")
         m.p("")
+
+
+def defaultOutputFilename(inputFilename: str) -> str:
+    if inputFilename.endswith(".bs"):
+        return inputFilename[0:-3] + ".html"
+    elif inputFilename.endswith(".src.html"):
+        return inputFilename[0:-9] + ".html"
+    else:
+        return "-"
 
 
 def findImplicitInputFile() -> str | None:

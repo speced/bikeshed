@@ -562,6 +562,24 @@ def main() -> None:
         help="Profile another Bikeshed command string (e.g. 'test --file 001').",
     )
     profileParser.add_argument(
+        "--synthetic",
+        dest="syntheticSize",
+        nargs="?",
+        const="200kb",
+        default=None,
+        metavar="SIZE",
+        help="Generate and profile a synthetic Bikeshed spec of approximately SIZE (e.g. 500kb, 2MB, 100k; bare numbers are in KB; default: 200kb).",
+    )
+    profileParser.add_argument(
+        "--save-synthetic",
+        dest="saveSynthetic",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="PATH",
+        help="Save the generated synthetic .bs source document to PATH (default: synth-<size>.bs in the current directory) and its compiled HTML output (used with --synthetic).",
+    )
+    profileParser.add_argument(
         "--root",
         dest="root",
         default=None,
@@ -877,7 +895,7 @@ def handleTest(options: argparse.Namespace, extras: list[str]) -> None:
 def handleProfile(options: argparse.Namespace, extras: list[str]) -> None:
     from . import profiling
 
-    profiling.handle_profile_cli(options, extras, cliMain=main)
+    profiling.handleProfileCli(options, extras, cliMain=main)
 
 
 def handleTemplate(options: argparse.Namespace) -> None:
