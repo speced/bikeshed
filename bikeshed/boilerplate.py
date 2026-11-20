@@ -188,8 +188,8 @@ def addStatusSection(doc: t.SpecT) -> None:
     loadBoilerplate(doc, "status")
 
 
-# The cg-assets style sheets and scripts
-CG_ASSETS_BASE = "https://w3c.github.io/cg-assets/"
+# The CG assets style sheets and scripts
+CG_ASSETS_BASE = "https://incubation.w3.org/assets/specs-2026/"
 CG_ASSETS_STYLES = ("css/base.css", "css/cg-spec.css", "css/dark.css")
 CG_ASSETS_SCRIPTS = ("js/cg-fixup.js", "js/dark.js", "js/cg-metadata.js")
 
