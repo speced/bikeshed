@@ -15,6 +15,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/speced/bikeshed/",
+    license_expression="CC0-1.0",
+    license_files=["LICENSE", "bikeshed/highlight/LICENSE"],
     packages=find_namespace_packages(include=["bikeshed*"]),
     package_data={"bikeshed": ["py.typed"]},
     include_package_data=True,
@@ -22,7 +24,6 @@ setup(
     python_requires=">=3.12",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
-        "License :: Public Domain",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3.12",
         "Topic :: Software Development :: Documentation",
