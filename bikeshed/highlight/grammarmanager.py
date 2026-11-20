@@ -8,6 +8,7 @@ from .. import config, t
 from .. import messages as m
 
 LANGUAGE_ALIASES: dict[str, str] = {
+    "asm": "assembly",
     "docker": "dockerfile",
     "gql": "graphql",
     "idl": "webidl",
