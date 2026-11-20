@@ -215,7 +215,11 @@ class Script(JCResource):
                     jsonVal = val.__json__()
                 except:
                     jsonVal = val
-                text += f'"{key}": {json.dumps(jsonVal, sort_keys=True, separators=(",",":"))},\n'
+                jsonStr = scriptEscapeRe.sub(
+                    r"\\u003c",
+                    json.dumps(jsonVal, sort_keys=True, separators=(",", ":")),
+                )
+                text += f'"{key}": {jsonStr},\n'
             text += "};\n\n"
         with self.path.open("r", encoding="utf-8") as fh:
             text += fh.read()
@@ -255,6 +259,8 @@ class Style(JCResource):
             sheet += "\n"
         return h.E.style(f"/* Boilerplate: style-{self.name} */\n{sheet}")
 
+
+scriptEscapeRe = re.compile(r"<(?=!--|/?script)", re.IGNORECASE)
 
 darkModeRe = re.compile(
     r"""
