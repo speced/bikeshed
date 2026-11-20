@@ -9,12 +9,16 @@ from .. import messages as m
 
 LANGUAGE_ALIASES: dict[str, str] = {
     "asm": "assembly",
+    "bison": "yacc",
     "docker": "dockerfile",
+    "flex": "lex",
     "gql": "graphql",
+    "grm": "gold",
     "idl": "webidl",
     "js": "javascript",
     "jsx": "javascript",
     "md": "markdown",
+    "peggy": "pegjs",
     "py": "python",
     "rb": "ruby",
     "sass": "scss",
