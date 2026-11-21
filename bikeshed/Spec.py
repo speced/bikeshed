@@ -6,7 +6,6 @@ import dataclasses
 import glob
 import json
 import os
-import re
 import sys
 import time
 import urllib.parse
@@ -37,7 +36,6 @@ from . import (
     language,
     links,
     lint,
-    markdown,
     mdn,
     metadata,
     refs,
@@ -230,11 +228,16 @@ class Spec:
         self.md.validate(doc=self)
         m.retroactivelyCheckErrorLevel()
 
-    def earlyParse(self, inputContent: InputSource.InputContent) -> list[h.ParserNode]:
-        lines = inputContent.rawLines
-        if not self.md.markupShorthands.explicitFalse("markdown-blockquotes"):
-            lines = replaceMarkdownBlockquotes(inputContent.rawLines)
-        nodes = h.initialDocumentParse("".join(lines), h.ParseConfig.fromSpec(self))
+    def earlyParse(
+        self,
+        inputContent: InputSource.InputContent,
+        indentChecker: h.IndentChecker | None = None,
+    ) -> list[h.ParserNode]:
+        nodes = h.initialDocumentParse(
+            "".join(inputContent.rawLines),
+            h.ParseConfig.fromSpec(self),
+            indentChecker=indentChecker,
+        )
         if self.debugPrint == "early-parse":
             h.debugNodes(nodes)
         return nodes
@@ -256,13 +259,19 @@ class Spec:
             self.initMetadata(self.inputContent)
             self.recordDependencies(self.inputSource)
 
-        with self.timer.phase("assembleDocument: earlyParse"):
-            self.nodes = self.earlyParse(self.inputContent)
+        indentChecker: h.IndentChecker | None = None
+        if "mixed-indents" in self.md.complainAbout and self.md.indentInfo and self.md.indentInfo.char:
+            indentChecker = h.IndentChecker(
+                indentChar=self.md.indentInfo.char,
+                opaqueTags=h.DEFAULT_OPAQUE_ELEMENTS | frozenset(self.md.opaqueElements),
+            )
 
-        if "mixed-indents" in self.md.complainAbout:
-            if self.md.indentInfo and self.md.indentInfo.char:
-                with self.timer.phase("assembleDocument: mixedIndents"):
-                    checkForMixedIndents(self.nodes, self.md.indentInfo, self.md.opaqueElements)
+        with self.timer.phase("assembleDocument: earlyParse"):
+            self.nodes = self.earlyParse(self.inputContent, indentChecker=indentChecker)
+
+        if indentChecker is not None:
+            with self.timer.phase("assembleDocument: mixedIndents"):
+                indentChecker.emit()
 
         with self.timer.phase("assembleDocument: loadExtensions"):
             extensions.load(self)
@@ -273,15 +282,10 @@ class Spec:
         with self.timer.phase("assembleDocument: initializeBiblio"):
             self.refs.initializeBiblio(doc=self)
 
-        # Deal with markdown
         if self.debugPrint == "pre-md":
+            m.warn("--print=pre-md is no longer distinct from post-md; printing unified parse output.")
             print(h.strFromNodes(self.nodes))  # noqa: T201
-        if "markdown-block" in self.md.markupShorthands:
-            with self.timer.phase("assembleDocument: markdown"):
-                self.nodes = markdown.parse(self.nodes, markdown.MarkdownConfig.fromSpec(self))
-        elif self.nodes:
-            self.nodes.append(h.RawText(text="\n"))
-        if self.debugPrint == "post-md":
+        elif self.debugPrint == "post-md":
             print(h.strFromNodes(self.nodes))  # noqa: T201
 
         with self.timer.phase("assembleDocument: addHeaderFooter"):
@@ -647,96 +651,6 @@ def addDomintroStyles(doc: Spec) -> None:
         return
 
     doc.extraJC.addDomintro()
-
-
-def checkForMixedIndents(
-    nodes: t.Sequence[h.ParserNode],
-    info: metadata.IndentInfo,
-    opaqueElements: t.Iterable[str] = (),
-) -> None:
-    badIndentChar = " " if info.char == "\t" else "\t"
-    opaqueTags = h.DEFAULT_OPAQUE_ELEMENTS | frozenset(opaqueElements)
-    atLineStart = True
-    opaqueDepth = 0
-    for node in nodes:
-        if opaqueDepth > 0:
-            if isinstance(node, h.StartTag) and node.tag in opaqueTags:
-                opaqueDepth += 1
-            elif isinstance(node, h.EndTag) and node.tag in opaqueTags:
-                opaqueDepth -= 1
-            atLineStart = False
-            continue
-        if isinstance(node, h.RawText):
-            parts = node.text.split("\n")
-            for j, part in enumerate(parts):
-                if atLineStart and part:
-                    partLineNo = node.line + j
-                    lineNum: str | int = f"{partLineNo} of {node.context}" if node.context else partLineNo
-                    if part.startswith(badIndentChar):
-                        if info.char == " ":
-                            m.lint("Line starts with tabs, but document is space-indented", lineNum=lineNum)
-                        else:
-                            m.lint("Line starts with spaces, but document is tab-indented", lineNum=lineNum)
-                    if re.match(r"(\t+ +\t)|( +\t)", part):
-                        m.lint("Line's indent contains tabs after spaces.", lineNum=lineNum)
-                if j < len(parts) - 1:
-                    atLineStart = True
-                elif part or (j == 0 and node.start != node.end):
-                    atLineStart = False
-        else:
-            if isinstance(node, h.StartTag) and node.tag in opaqueTags:
-                opaqueDepth += 1
-            atLineStart = False
-
-
-def replaceMarkdownBlockquotes(lines: list[str]) -> list[str]:
-    # Does a slightly hacky fixup of Markdown blockquotes,
-    # so they'll pass thru the HTML parser more safely.
-
-    # * If `Markup Shorthands: markdown-blockquotes` is set off,
-    #   does nothing.
-    # * If it's *unset*, we warn you to set it one way or the other (but treat it as on).
-    # * If it's set to on, we make the replacements without a warning.
-
-    # If a line starts with any > characters (and whitespace), they're replaced by
-    # bqChar PUAs. These are then observed in a few spots in the HTML parser,
-    # and sometimes ignored (treated as whitespace).
-    # If they survive to the Markdown parser, they're treated equivalently to
-    # normal blockquote chars.
-
-    def startsBq(s: str) -> bool:
-        return bool(re.match(r"\s*>", s))
-
-    # Otherwise, it was explicitly set to on, so transform the lines.
-    i = 0
-    numLines = len(lines)
-    while True:
-        # Hit the end
-        if i >= numLines:
-            break
-        if not startsBq(lines[i]):
-            i += 1
-            continue
-        # If it's a *lone* blockquote line, leave it be.
-        # It might be the end of a tag, or a single > in an opaque element,
-        # which'll get caught safely by the HTML parser.
-        # If it is just one line of blockquote, it'll survive to the Markdown parser
-        # and get transformed there.
-        if (i + 1 < numLines and not startsBq(lines[i + 1])) or i + 1 == numLines:
-            i += 1
-            continue
-        # Otherwise there's at least two lines in a row, which is *very likely*
-        # to be a blockquote.
-        # Transform the > into bqChar, so the HTML parser can handle them more intelligently.
-        # If this happens to hit inside an opaque element, it'll be reversed back to >
-        # by the HTML parser.
-        while i < numLines and (match := re.match(r"([>\s]*)(.*)", lines[i], re.DOTALL)):
-            assert match is not None
-            prefix, rest = match.groups()
-            prefix = prefix.replace(">", constants.bqChar)
-            lines[i] = prefix + rest
-            i += 1
-    return lines
 
 
 def prepTR(doc: t.SpecT) -> None:

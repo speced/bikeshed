@@ -135,7 +135,14 @@ class RawText(Text):
                     self.text = "’" + self.text[1:]
                 elif isinstance(lastNode, RawText) and _APOS_WORD_CHAR_RE.match(lastNode.text[-1]):
                     self.text = "’" + self.text[1:]
-            elif isinstance(lastNode, EndTag) and lastNode.tag == "var" and _APOS_START_SPACE_RE.match(self.text):
+            elif (
+                isinstance(lastNode, EndTag)
+                and lastNode.tag == "var"
+                and (
+                    _APOS_START_SPACE_RE.match(self.text)
+                    or (self.text == "'" and self.s is not None and self.s[self.end] == "\n")
+                )
+            ):
                 self.text = "’" + self.text[1:]
         if "'" in self.text:
             self.text = _APOS_IN_WORD_RE.sub(r"\1’\2", self.text)
