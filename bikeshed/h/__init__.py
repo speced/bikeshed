@@ -106,6 +106,7 @@ from .parser import (
     Comment,
     Doctype,
     EndTag,
+    IndentChecker,
     ParseConfig,
     ParserNode,
     ParserNodeT,

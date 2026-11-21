@@ -31,10 +31,14 @@ class ParseConfig:
     idl: bool = False
     # Expand [MACRO] text macros inside autolink shorthands.
     macrosInAutolinks: bool = False
-    # Enable block-level Markdown (currently handled by bikeshed/markdown).
+    # Enable block-level Markdown (headings, lists, paragraphs, rules).
     markdownBlock: bool = False
-    # Enable `>` Markdown blockquotes (currently handled by bikeshed/markdown).
+    # Enable `>` Markdown blockquotes.
     markdownBlockquotes: bool = False
+    # Whether `markdown-blockquotes` was explicitly enabled (suppresses unset warning).
+    markdownBlockquotesExplicit: bool = False
+    # Enable `#` and Setext (`===`/`---`) Markdown headings.
+    markdownHeadings: bool = True
     # Enable inline Markdown (`code` spans and [text](url) links).
     markdownInline: bool = False
     # Enable backslash escapes for Markdown punctuation (\*, \[, etc.).
@@ -43,11 +47,15 @@ class ParseConfig:
     markup: bool = False
     # Enable <org/repo#123> and <#123> repository issue links.
     repositoryLinks: bool = False
+    # Number of spaces per indentation level for Markdown lists.
+    indent: int = 4
     # Map of lowercased [MACRO] names to their replacement text.
     macros: dict[str, str] = field(default_factory=dict)
     # Optional source description appended to Stream.loc() (e.g. for macros or includes).
     context: str | None = None
-    # Extra opaque tag names whose contents skip shorthands and curly apostrophes.
+    # Extra element tag names treated as block-level HTML (not inline) by Markdown.
+    blockElements: set[str] = field(default_factory=set)
+    # Extra opaque tag names whose contents skip shorthands, block Markdown, and curly apostrophes.
     opaqueElements: set[str] = field(default_factory=set)
     # Parse strictly as plain HTML: disables shorthands, macros, attr shortcuts,
     # curly apostrophes, em-dashes, TagStack errors, and synthetic bs-line-number attrs.
@@ -65,12 +73,17 @@ class ParseConfig:
             idl="idl" in doc.md.markupShorthands,
             macrosInAutolinks="macros-in-autolinks" in doc.md.markupShorthands,
             markdownBlock="markdown-block" in doc.md.markupShorthands,
+            markdownBlockquotes=not doc.md.markupShorthands.explicitFalse("markdown-blockquotes"),
+            markdownBlockquotesExplicit=doc.md.markupShorthands.explicitTrue("markdown-blockquotes"),
+            markdownHeadings=True,
             markdownInline="markdown-inline" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,
             repositoryLinks="repository-links" in doc.md.markupShorthands,
+            indent=doc.md.indent,
             macros=doc.macros,
             context=context,
+            blockElements=set(doc.md.blockElements) | set(doc.md.opaqueElements),
             opaqueElements=set(doc.md.opaqueElements),
         )
 
@@ -83,12 +96,22 @@ class Stream:
     chars: str
     length: int
     _lineBreaks: list[int]
+    _colOffsets: list[int] | None
     startLine: int
     config: ParseConfig
     depth: int = 1
     openEls: TagStack = field(default_factory=TagStack)
 
-    def __init__(self, chars: str, config: ParseConfig, startLine: int = 1, depth: int = 1) -> None:
+    def __init__(
+        self,
+        chars: str,
+        config: ParseConfig,
+        startLine: int = 1,
+        depth: int = 1,
+        *,
+        colOffsets: list[int] | None = None,
+        openEls: TagStack | None = None,
+    ) -> None:
         if depth > 10:
             msg = "HTML parsing recursed more than 10 levels deep; probably an infinite loop."
             raise RecursionError(msg)
@@ -100,14 +123,33 @@ class Stream:
             lineBreaks.append(idx)
             idx = chars.find("\n", idx + 1)
         self._lineBreaks = lineBreaks
+        if colOffsets is not None:
+            assert len(colOffsets) == len(lineBreaks) + 1
+        self._colOffsets = colOffsets
         self.startLine = startLine
         self.config = config
         self.depth = depth
-        self.openEls = TagStack(opaqueTags=config.opaqueElements)
+        self.openEls = openEls if openEls is not None else TagStack(opaqueTags=config.opaqueElements)
 
-    def subStream(self, context: str, chars: str, startLine: int = 1) -> Stream:
+    def subStream(
+        self,
+        context: str | None,
+        chars: str,
+        startLine: int = 1,
+        *,
+        colOffsets: list[int] | None = None,
+        openEls: TagStack | None = None,
+        depth: int | None = None,
+    ) -> Stream:
         newConfig = dataclasses.replace(self.config, context=context)
-        return Stream(chars, config=newConfig, startLine=startLine, depth=self.depth + 1)
+        return Stream(
+            chars,
+            config=newConfig,
+            startLine=startLine,
+            depth=self.depth + 1 if depth is None else depth,
+            colOffsets=colOffsets,
+            openEls=openEls,
+        )
 
     def __getitem__(self, key: int) -> str:
         if key < 0 or key >= self.length:
@@ -140,13 +182,22 @@ class Stream:
             lineIndex = self.lineIndex(index)
         return lineIndex + self.startLine
 
+    def colOffset(self, lineIndex: int) -> int:
+        if self._colOffsets is None:
+            return 0
+        return self._colOffsets[lineIndex]
+
     def col(self, index: int, lineIndex: int | None = None) -> int:
         if lineIndex is None:
             lineIndex = self.lineIndex(index)
         if lineIndex == 0:
-            return index + 1
-        startOfCol = self._lineBreaks[lineIndex - 1]
-        return index - startOfCol
+            col = index + 1
+        else:
+            startOfCol = self._lineBreaks[lineIndex - 1]
+            col = index - startOfCol
+        if self._colOffsets is not None:
+            col += self._colOffsets[lineIndex]
+        return col
 
     def loc(self, index: int) -> str:
         lineIndex = self.lineIndex(index)

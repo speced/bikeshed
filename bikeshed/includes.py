@@ -4,7 +4,7 @@ import hashlib
 import itertools
 import re
 
-from . import datablocks, h, markdown, t
+from . import datablocks, h, t
 from . import messages as m
 
 
@@ -77,8 +77,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             context=f"file '{path}' (included by a block on {h.approximateLineNumber(el)})",
         )
         parseConfig.macros = {**parseConfig.macros, **macros}
-        nodes = h.nodesFromHtml("".join(lines), parseConfig, context=el)
-        nodes = markdown.parse(nodes, markdown.MarkdownConfig.fromSpec(doc))
+        nodes = h.nodesFromHtml("".join(lines), parseConfig, context=el, blockMarkdown=True)
         subtree = h.E.div({}, *h.buildFragment(nodes))
         datablocks.transformDataBlocks(doc, subtree)
         for childInclude in h.findAll("pre.include", subtree):

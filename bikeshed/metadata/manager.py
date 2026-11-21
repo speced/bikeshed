@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 
 from isodate import Duration
 
-from .. import config, h, markdown, repository, t
+from .. import config, h, repository, t
 from .. import messages as m
 from ..translate import _t
 from . import keys, parsers
@@ -446,8 +446,12 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, context: str) -> str:
     if len(lines) == 0:
         return ""
     lines = [line.rstrip() + "\n" for line in lines]
-    nodes = h.nodesFromHtml("".join(lines), h.ParseConfig.fromSpec(doc, context=context), context=context)
-    nodes = markdown.parse(nodes, markdown.MarkdownConfig.fromSpec(doc))
+    nodes = h.nodesFromHtml(
+        "".join(lines),
+        h.ParseConfig.fromSpec(doc, context=context),
+        context=context,
+        blockMarkdown=True,
+    )
     return h.strFromNodes(nodes)
 
 

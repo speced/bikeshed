@@ -38,9 +38,9 @@ BRACKET_AUTOLINK_CHARS = "=$:[]^"
 # start of unconsumed text.
 # (Adding more just means parseAnything will break text into
 #  smaller chunks; it doesn't affect correctness.)
-POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS + constants.bqChar
+POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS
 POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(POSSIBLE_NODE_START_CHARS)}]")
-ACTUAL_NODE_START_SET = frozenset("&<>`'~[{|\\—-" + constants.bqChar)
+ACTUAL_NODE_START_SET = frozenset("&<>`'~[{|\\—-")
 _RAW_HTML_START_RE = re.compile(r"[&<]")
 
 
@@ -293,10 +293,6 @@ def parseNode(
                 return Ok(node, i)
         return Err(start)
 
-    if first1 == constants.bqChar:
-        node = RawText.fromStream(s, start, start + 1, ">")
-        return Ok(node, start + 1)
-
     if first1 == "&":
         ch, i, _ = parseCharRef(s, start, context=CharRefContext.NonAttr)
         if ch is not None:
@@ -323,13 +319,8 @@ def parseNode(
 
     el: ParserNode | None
     if first1 in ("`", "~"):
-        # This isn't quite correct to handle here,
-        # but it'll have to wait until I munge
-        # the markdown and HTML parsers together.
         el, i, _ = parseFencedCodeBlock(s, start)
         if el is not None:
-            if constants.bqChar in el.data:
-                el.data = el.data.replace(constants.bqChar, ">")
             if blockType := isDatablock(el.startTag, s.loc(i)):
                 el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             return Ok(el, i)
@@ -751,8 +742,6 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                     return Err(start)
                 if "bs-macros" in startTag.attrs:
                     text = replaceMacrosInText(text, s.config.macros, s, start, context="<pre> contents")
-                if constants.bqChar in text:
-                    text = text.replace(constants.bqChar, ">")
                 startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
                 el = SafeElement.fromStream(s, start, i, startTag, text)
                 return Ok(el, i)
@@ -764,8 +753,6 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<script> contents")
-            if constants.bqChar in text:
-                text = text.replace(constants.bqChar, ">")
             if blockType := isDatablock(startTag, s.loc(i)):
                 startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             el = RawElement.fromStream(s, start, i, startTag, text)
@@ -776,8 +763,6 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<style> contents")
-            if constants.bqChar in text:
-                text = text.replace(constants.bqChar, ">")
             if blockType := isDatablock(startTag, s.loc(i)):
                 startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             el = RawElement.fromStream(s, start, i, startTag, text)
@@ -790,8 +775,6 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
-            if constants.bqChar in text:
-                text = text.replace(constants.bqChar, ">")
             if blockType := isDatablock(startTag, s.loc(i)):
                 startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             el = SafeElement.fromStream(s, start, i, startTag, text)
@@ -916,12 +899,7 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     # If I can, guess at what the 'garbage' is so I can display it.
     # Only look at next 20 chars, tho, so I don't spam the console.
     next20 = s.slice(i, i + 20)
-    if bqCharPreviouslyOnLine(s, i):
-        m.die(
-            f"Failed to parse a <{tagname}> (starting on {s.loc(start)}) start tag that appears to be split across the lines of a markdown blockquote. You might need to reformat the tag, or switch to the <blockquote> element.\n  See <https://speced.github.io/bikeshed/#md-blockquote>",
-            lineNum=s.loc(i),
-        )
-    elif ">" in next20 or " " in next20:
+    if ">" in next20 or " " in next20:
         garbageEnd = min(config.safeIndex(next20, ">", 20), config.safeIndex(next20, " ", 20))
         m.die(
             f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff ({next20[:garbageEnd]}).",
@@ -930,14 +908,6 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
     else:
         m.die(f"While trying to parse a <{tagname}> start tag, ran into some unparseable stuff.", lineNum=s.loc(i))
     return Err(start)
-
-
-def bqCharPreviouslyOnLine(s: Stream, i: int) -> bool:
-    while i >= 0 and s[i] != "\n":
-        if s[i] == constants.bqChar:
-            return True
-        i -= 1
-    return False
 
 
 ATTR_SHORTCUTS = {
@@ -1072,8 +1042,6 @@ def canonicalizeShortcuts(el: StartTag | SelfClosedTag) -> StartTag | SelfClosed
 _ASCII_TAGNAME_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9._-]*")
 _ASCII_ATTRNAME_RE = re.compile(r"[a-zA-Z0-9._:-]+")
 _WHITESPACE_RE = re.compile(r"[\t\n\x0c ]+")
-_WHITESPACE_OR_BQ_RE = re.compile(r"[\t\n\x0c " + constants.bqChar + r"]+")
-_WHITESPACE_OR_BQ_CHARS = preds.WHITESPACE_CHARS | frozenset((constants.bqChar,))
 
 
 def parseTagName(s: Stream, start: int) -> ResultT[str]:
@@ -1087,7 +1055,7 @@ def parseTagName(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
-    _, i, _ = parseWhitespace(s, start) if s.config.rawHtml else parseWhitespaceOrBq(s, start)
+    _, i, _ = parseWhitespace(s, start)
     attr = None
     attrs: dict[str, str] = {}
     while True:
@@ -1134,7 +1102,7 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
         else:
             break
 
-        ws, i, _ = parseWhitespace(s, i) if s.config.rawHtml else parseWhitespaceOrBq(s, i)
+        ws, i, _ = parseWhitespace(s, i)
         if ws is None:
             # We're definitely done, just see if it should be an error nor not.
             if s.eof(i):
@@ -1377,14 +1345,6 @@ def parseWhitespace(s: Stream, start: int) -> ResultT[bool]:
     return Ok(True, match.end())
 
 
-def parseWhitespaceOrBq(s: Stream, start: int) -> ResultT[bool]:
-    if start >= s.length or s.chars[start] not in _WHITESPACE_OR_BQ_CHARS:
-        return Err(start)
-    match = _WHITESPACE_OR_BQ_RE.match(s.chars, start)
-    assert match is not None
-    return Ok(True, match.end())
-
-
 def parseEndTag(s: Stream, start: int) -> ResultT[EndTag]:
     if s.slice(start, start + 2) != "</":
         return Err(start)
@@ -1461,7 +1421,7 @@ def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
         end = len(s)
     else:
         end = endIndex + 1
-        if start != 0:
+        if start != 0 or s.startLine != 1 or s.colOffset(0) != 0:
             if _SVG_DOCTYPE_RE.match(s.slice(start + 9, endIndex)):
                 m.die(
                     "Inline SVG fragments must not include a doctype or processing instruction.",
@@ -2455,7 +2415,7 @@ def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[Par
     return Ok([startCode, startTag, middleText, endTag, endCode], nodeEnd)
 
 
-SHORTHAND_VARIABLE_RE = re.compile(r"\|(\w(?:[\w\s" + constants.bqChar + r"-]*\w)?)\|")
+SHORTHAND_VARIABLE_RE = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
 
 
 def parseShorthandVariable(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
@@ -2526,7 +2486,7 @@ class LinkData:
 
 
 _LINK_HTML_ESCAPE_RE = re.compile(r"&[\w\d#]+;")
-_LINK_WS_OR_BQ_RE = re.compile(r"[\s" + constants.bqChar + "]+")
+_LINK_WS_RE = re.compile(r"\s+")
 
 
 def parseLinkInfo(
@@ -2566,19 +2526,17 @@ def parseLinkInfo(
 
     linkFor = None
     linkType = None
-    # If you break an autolink across lines inside a markdown blockquote,
-    # the > (turned into a bqChar) is there but should be ignored as whitespace.
     if "/" in lt:
         linkFor, _, lt = lt.rpartition("/")
         if linkFor == "":
             linkFor = "/"
         linkFor = linkFor.strip()
-        linkFor = _LINK_WS_OR_BQ_RE.sub(" ", linkFor)
+        linkFor = _LINK_WS_RE.sub(" ", linkFor)
     if "!!" in lt:
         lt, _, linkType = lt.partition("!!")
         linkType = linkType.strip()
     lt = lt.strip()
-    lt = _LINK_WS_OR_BQ_RE.sub(" ", lt)
+    lt = _LINK_WS_RE.sub(" ", lt)
 
     # Even tho you no longer *need* to escape [[..]] in links
     # (used for WebIDL private slots), the parser still *allows*

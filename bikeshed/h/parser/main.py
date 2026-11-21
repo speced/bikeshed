@@ -8,11 +8,13 @@ import re
 
 from ... import messages as m
 from ... import t
+from .blocks import IndentChecker, parseBlockStream
 from .nodes import (
     Doctype,
     EndTag,
     ParserNode,
     RawElement,
+    RawText,
     SafeText,
     SelfClosedTag,
     StartTag,
@@ -28,29 +30,47 @@ def nodesFromHtml(
     startLine: int = 1,
     closeElements: bool = False,
     context: str | StartTag | t.ElementT | None = None,
+    *,
+    blockMarkdown: bool = False,
 ) -> t.Generator[ParserNode, None, None]:
     s = Stream(data, startLine=startLine, config=config)
-    yield from nodesFromStream(s, 0)
+    if blockMarkdown and config.markdownBlock:
+        yield from parseBlockStream(s)
+    else:
+        yield from nodesFromStream(s, 0)
     if closeElements:
         # FIXME: This start= value isn't accurate, but nodesFromStream
         # doesn't give stream offsets...
         yield from closeOpenElements(s, start=None, context=context)
+    if blockMarkdown and config.markdownBlock and data.endswith("\n"):
+        yield RawText(text="\n")
 
 
 def initialDocumentParse(
     text: str,
     config: ParseConfig,
     startLine: int = 1,
+    indentChecker: IndentChecker | None = None,
 ) -> list[ParserNode]:
-    # Just do a document parse.
+    # Does a full document parse in a single pass:
     # * adds `bs-line-number` and `bs-parse-context` attributes, for error messages
-    # * converts any inline Bikeshed-isms into HTML (autolinks, markdown, etc)
-    # * close any left-open elements, logging an error
-    # * check if there are any html/head/body elements and error
+    # * converts block-level Markdown (when enabled) and inline Bikeshed-isms into HTML
+    # * records mixed-indentation lints when `indentChecker` is provided
+    # * closes any left-open elements, logging an error
 
     s = Stream(text, startLine=startLine, config=config)
-    nodes = list(nodesFromStream(s, 0))
-    nodes.extend(closeOpenElements(s, start=None, context=None))
+    if config.markdownBlock:
+        nodes = parseBlockStream(s, indentChecker=indentChecker)
+        nodes.extend(closeOpenElements(s, start=None, context=None))
+        if text.endswith("\n"):
+            nodes.append(RawText(text="\n"))
+    else:
+        nodes = list(nodesFromStream(s, 0))
+        if indentChecker is not None:
+            indentChecker.checkNodes(nodes)
+        nodes.extend(closeOpenElements(s, start=None, context=None))
+        if nodes:
+            nodes.append(RawText(text="\n"))
     return nodes
 
 
