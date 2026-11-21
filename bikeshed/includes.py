@@ -77,10 +77,9 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             context=f"file '{path}' (included by a block on {h.approximateLineNumber(el)})",
         )
         parseConfig.macros = {**parseConfig.macros, **macros}
-        lines = h.parseLines(lines, parseConfig, context=el)
-        lines = markdown.parse(t.cast("list[str]", lines), markdown.MarkdownConfig.fromSpec(doc))
-        text = t.EarlyParsedHtmlStr("".join(lines))
-        subtree = h.parseInto(h.E.div(), text)
+        nodes = h.nodesFromHtml("".join(lines), parseConfig, context=el)
+        nodes = markdown.parse(nodes, markdown.MarkdownConfig.fromSpec(doc))
+        subtree = h.E.div({}, *h.buildFragment(nodes))
         datablocks.transformDataBlocks(doc, subtree)
         for childInclude in h.findAll("pre.include", subtree):
             childInclude.set("bs-hash", hash)
@@ -166,7 +165,9 @@ def handleRawInclude(el: t.ElementT, doc: t.SpecT) -> None:
         m.die(f"Couldn't find include-raw file '{path}'. Error was:\n{err}", el=el)
         h.removeNode(el)
         return
-    subtree = h.parseHTML(h.safeHtml(content))
+    elLine = h.approximateLineNumber(el)
+    rawContext = f"file '{path}' (included by an include-raw block on line {elLine})" if elLine else f"file '{path}'"
+    subtree = h.parseRawHTML(content, context=rawContext)
     h.replaceNode(el, *subtree)
 
 

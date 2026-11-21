@@ -289,7 +289,7 @@ def addTestMetadata(doc: t.SpecT) -> None:
     assert doc.mdCommandLine is not None
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
     doc.mdBaseline.addData("Repository", "test/test")
-    _, md = metadata.parse(lines=doc.lines)
+    md = metadata.parse(lines=doc.inputContent.lines)
     if "Date" not in md.manuallySetKeys:
         doc.mdCommandLine.addData("Date", "1970-01-01")
     if "Inline Github Issue" not in md.manuallySetKeys:

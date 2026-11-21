@@ -47,7 +47,6 @@ from . import (
     t,
     wpt,
 )
-from . import line as l
 from . import messages as m
 
 if t.TYPE_CHECKING:
@@ -126,7 +125,7 @@ class Spec:
         else:
             self.dataFile = fileRequester
 
-        self.lines: list[l.Line] = []
+        self.nodes: list[h.ParserNode] = []
         self.valid = self.initializeState()
 
     def initializeState(self) -> bool:
@@ -188,7 +187,7 @@ class Spec:
         #       I should do something about that
         # TODO: Pure textual hack, no way to, say, put a block
         #       in a markdown code span or an <xmp> to show off.
-        self.lines, self.mdDocument = metadata.parse(lines=inputContent.lines)
+        self.mdDocument = metadata.parse(lines=inputContent.lines)
 
         # Combine the data so far, and compute the doctype
         # (the other md sources need the doctype in order to be found)
@@ -231,16 +230,14 @@ class Spec:
         self.md.validate(doc=self)
         m.retroactivelyCheckErrorLevel()
 
-    def earlyParse(self, inputContent: InputSource.InputContent) -> list[l.Line]:
+    def earlyParse(self, inputContent: InputSource.InputContent) -> list[h.ParserNode]:
         lines = inputContent.rawLines
         if not self.md.markupShorthands.explicitFalse("markdown-blockquotes"):
             lines = replaceMarkdownBlockquotes(inputContent.rawLines)
         nodes = h.initialDocumentParse("".join(lines), h.ParseConfig.fromSpec(self))
         if self.debugPrint == "early-parse":
             h.debugNodes(nodes)
-        text = h.strFromNodes(nodes, withIlcc=True)
-        inputContent.rawLines = [x + "\n" for x in text.split("\n")]
-        return inputContent.lines
+        return nodes
 
     def checkValidity(self) -> bool:
         return True
@@ -260,12 +257,12 @@ class Spec:
             self.recordDependencies(self.inputSource)
 
         with self.timer.phase("assembleDocument: earlyParse"):
-            self.lines = self.earlyParse(self.inputContent)
+            self.nodes = self.earlyParse(self.inputContent)
 
         if "mixed-indents" in self.md.complainAbout:
             if self.md.indentInfo and self.md.indentInfo.char:
                 with self.timer.phase("assembleDocument: mixedIndents"):
-                    checkForMixedIndents(self.lines, self.md.indentInfo)
+                    checkForMixedIndents(self.nodes, self.md.indentInfo, self.md.opaqueElements)
 
         with self.timer.phase("assembleDocument: loadExtensions"):
             extensions.load(self)
@@ -278,21 +275,21 @@ class Spec:
 
         # Deal with markdown
         if self.debugPrint == "pre-md":
-            print("".join(x.text for x in self.lines))  # noqa: T201
+            print(h.strFromNodes(self.nodes))  # noqa: T201
         if "markdown-block" in self.md.markupShorthands:
             with self.timer.phase("assembleDocument: markdown"):
-                self.lines = markdown.parse(self.lines, markdown.MarkdownConfig.fromSpec(self))
+                self.nodes = markdown.parse(self.nodes, markdown.MarkdownConfig.fromSpec(self))
+        elif self.nodes:
+            self.nodes.append(h.RawText(text="\n"))
         if self.debugPrint == "post-md":
-            print("".join(x.text for x in self.lines))  # noqa: T201
+            print(h.strFromNodes(self.nodes))  # noqa: T201
 
-        # Convert to a single string of html now, for convenience.
-        self.html = "".join(x.text for x in self.lines)
         with self.timer.phase("assembleDocument: addHeaderFooter"):
             boilerplate.addHeaderFooter(self)
 
         # Build the document
-        with self.timer.phase("assembleDocument: parseDocument"):
-            self.document, self.head, self.body = h.parseDocument(self.html)
+        with self.timer.phase("assembleDocument: buildDocument"):
+            self.document, self.head, self.body = h.buildDocument(self.nodes)
         if self.debugPrint == "boilerplate":
             print(h.printNodeTree(self.document))  # noqa: T201
         with self.timer.phase("assembleDocument: transformDataBlocks"):
@@ -554,7 +551,7 @@ class Spec:
         m.say(unexportMsg)
 
     def isOpaqueElement(self, el: t.ElementT) -> bool:
-        if el.tag in ("pre", "xmp", "script", "style"):
+        if el.tag in h.DEFAULT_OPAQUE_ELEMENTS:
             return True
         if el.tag in self.md.opaqueElements:
             return True
@@ -652,26 +649,44 @@ def addDomintroStyles(doc: Spec) -> None:
     doc.extraJC.addDomintro()
 
 
-def checkForMixedIndents(lines: t.Sequence[l.Line], info: metadata.IndentInfo) -> None:
+def checkForMixedIndents(
+    nodes: t.Sequence[h.ParserNode],
+    info: metadata.IndentInfo,
+    opaqueElements: t.Iterable[str] = (),
+) -> None:
     badIndentChar = " " if info.char == "\t" else "\t"
-    inComment = False
-    for line in lines:
-        if not inComment and line.text.startswith("<!--"):
-            inComment = True
-        if inComment and "-->" in line.text:
-            inComment = False
+    opaqueTags = h.DEFAULT_OPAQUE_ELEMENTS | frozenset(opaqueElements)
+    atLineStart = True
+    opaqueDepth = 0
+    for node in nodes:
+        if opaqueDepth > 0:
+            if isinstance(node, h.StartTag) and node.tag in opaqueTags:
+                opaqueDepth += 1
+            elif isinstance(node, h.EndTag) and node.tag in opaqueTags:
+                opaqueDepth -= 1
+            atLineStart = False
             continue
-        if inComment:
-            continue
-        if not line.text:
-            continue
-        if line.text.startswith(badIndentChar):
-            if info.char == " ":
-                m.lint("Line starts with tabs, but document is space-indented", lineNum=line.i)
-            else:
-                m.lint("Line starts with spaces, but document is tab-indented", lineNum=line.i)
-        if re.match(r"(\t+ +\t)|( +\t)", line.text):
-            m.lint("Line's indent contains tabs after spaces.", lineNum=line.i)
+        if isinstance(node, h.RawText):
+            parts = node.text.split("\n")
+            for j, part in enumerate(parts):
+                if atLineStart and part:
+                    partLineNo = node.line + j
+                    lineNum: str | int = f"{partLineNo} of {node.context}" if node.context else partLineNo
+                    if part.startswith(badIndentChar):
+                        if info.char == " ":
+                            m.lint("Line starts with tabs, but document is space-indented", lineNum=lineNum)
+                        else:
+                            m.lint("Line starts with spaces, but document is tab-indented", lineNum=lineNum)
+                    if re.match(r"(\t+ +\t)|( +\t)", part):
+                        m.lint("Line's indent contains tabs after spaces.", lineNum=lineNum)
+                if j < len(parts) - 1:
+                    atLineStart = True
+                elif part or (j == 0 and node.start != node.end):
+                    atLineStart = False
+        else:
+            if isinstance(node, h.StartTag) and node.tag in opaqueTags:
+                opaqueDepth += 1
+            atLineStart = False
 
 
 def replaceMarkdownBlockquotes(lines: list[str]) -> list[str]:
@@ -714,7 +729,7 @@ def replaceMarkdownBlockquotes(lines: list[str]) -> list[str]:
         # to be a blockquote.
         # Transform the > into bqChar, so the HTML parser can handle them more intelligently.
         # If this happens to hit inside an opaque element, it'll be reversed back to >
-        # by smuggleDatablock().
+        # by the HTML parser.
         while i < numLines and (match := re.match(r"([>\s]*)(.*)", lines[i], re.DOTALL)):
             assert match is not None
             prefix, rest = match.groups()

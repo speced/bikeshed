@@ -19,10 +19,6 @@ from typing import (
 # Representing a string that has been escaped so it's safe to be emitted raw in an attr value.
 SafeAttrStr = NewType("SafeAttrStr", str)
 
-# Representing HTML that's guaranteed to be safe for the SimpleParser.
-# Being passed through EarlyParser is sufficient, but raw HTML from the outside world isn't.
-EarlyParsedHtmlStr = NewType("EarlyParsedHtmlStr", str)
-
 if TYPE_CHECKING:
     from types import ModuleType
     from typing import (
@@ -67,8 +63,6 @@ if TYPE_CHECKING:
 
     type SafeAttrDict = dict[str, SafeAttrStr | Literal[""]]
     type EmptyLiteralStr = Literal[""]
-
-    type SafeHtmlStr = LiteralString | EarlyParsedHtmlStr
 
     type JSONObject = dict[str, JSONContainer | JSONPrimitive]
     type JSONArray = list[JSONContainer | JSONPrimitive]

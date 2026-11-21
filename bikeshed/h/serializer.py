@@ -3,7 +3,7 @@ from __future__ import annotations
 from lxml import etree
 
 from .. import t
-from . import dom
+from . import dom, elements
 
 # Precomputed indentation strings to avoid repeated `" " * indent` allocations.
 _INDENTS: list[str] = [" " * i for i in range(128)]
@@ -18,6 +18,7 @@ _NL_INDENTS: list[str] = ["\n" + " " * i for i in range(128)]
 #    3: opaque element (pre, etc.) - whitespace preserved, children serialized inline
 #    4: raw CDATA element (xmp, script, style) - text not HTML-escaped
 #    5: <title> element - raw if `bs-title-contents` attr is present, else normal
+#    6: <math> element - inline by default (and when `display=inline`), block if `display=block`
 # `close_tag` is:
 #   ""         if the end tag is always omitted (or for wrapper elements)
 #   None       for <dt>/<dd>, whose end tag is omitted only before another <dt>/<dd> or end of parent
@@ -26,101 +27,21 @@ type TagInfoT = tuple[str, int, bool, str, str | None]
 
 _ODD_INFO: TagInfoT = ("", -1, False, "", "")
 
-_INLINE_ELS: frozenset[str] = frozenset(
-    [
-        "a",
-        "bs-inline",
-        "em",
-        "strong",
-        "small",
-        "s",
-        "cite",
-        "q",
-        "dfn",
-        "abbr",
-        "data",
-        "time",
-        "code",
-        "var",
-        "samp",
-        "kbd",
-        "sub",
-        "sup",
-        "i",
-        "b",
-        "u",
-        "mark",
-        "ruby",
-        "bdi",
-        "bdo",
-        "span",
-        "br",
-        "wbr",
-        "img",
-        "meter",
-        "progress",
-        "math",
-        "[]",
-    ],
-)
-_RAW_ELS: frozenset[str] = frozenset(["xmp", "script", "style"])
-_VOID_ELS: frozenset[str] = frozenset(
-    [
-        "area",
-        "base",
-        "br",
-        "col",
-        "command",
-        "embed",
-        "hr",
-        "img",
-        "input",
-        "keygen",
-        "link",
-        "meta",
-        "param",
-        "source",
-        "track",
-        "wbr",
-    ],
-)
-_OMIT_END_TAG_ELS: frozenset[str] = frozenset(
-    [
-        "td",
-        "th",
-        "tr",
-        "thead",
-        "tbody",
-        "tfoot",
-        "colgroup",
-        "col",
-        "li",
-        "dt",
-        "dd",
-        "html",
-        "head",
-        "body",
-    ],
-)
-_ALWAYS_OMIT_END_TAG_ELS: frozenset[str] = _OMIT_END_TAG_ELS - {"dt", "dd"}
-_DEFAULT_OPAQUE_ELS: frozenset[str] = frozenset(["pre", "xmp", "script", "style"])
-_DEFAULT_BLOCK_ELS: frozenset[str] = frozenset(["bs-block"])
-
 # Cache of tag metadata dicts keyed by `(opaqueEls, blockEls)` so repeated Serializer
 # runs (e.g. during tests) reuse already-computed tag entries without recreating or copying.
 _TAG_INFO_CACHE: dict[tuple[frozenset[str], frozenset[str]], dict[t.Any, TagInfoT]] = {}
 
 
 class Serializer:
-    inlineEls = _INLINE_ELS
-    rawEls = _RAW_ELS
-    voidEls = _VOID_ELS
-    omitEndTagEls = _OMIT_END_TAG_ELS
-    alwaysOmitEndTagEls = _ALWAYS_OMIT_END_TAG_ELS
+    inlineEls = elements.INLINE_ELEMENTS
+    rawEls = elements.RAW_ELEMENTS
+    voidEls = elements.VOID_ELEMENTS
+    omitEndTagEls = elements.OMIT_END_TAG_ELEMENTS
+    alwaysOmitEndTagEls = elements.ALWAYS_OMIT_END_TAG_ELEMENTS
 
     def __init__(self, opaqueElements: t.Iterable[str], blockElements: t.Iterable[str]) -> None:
-        self.opaqueEls = frozenset(opaqueElements) | _DEFAULT_OPAQUE_ELS
-        self.blockEls = frozenset(blockElements) | _DEFAULT_BLOCK_ELS
+        self.opaqueEls = frozenset(opaqueElements) | elements.DEFAULT_OPAQUE_ELEMENTS
+        self.blockEls = frozenset(blockElements) | elements.DEFAULT_BLOCK_ELEMENTS
 
     def serialize(self, root: t.ElementT) -> str:
         """
@@ -170,9 +91,9 @@ class Serializer:
                 tag = tag.partition("}")[2]
             if tag == "clippath":
                 tag = "clipPath"
-            if tag in _VOID_ELS:
+            if tag in elements.VOID_ELEMENTS:
                 kind = 1
-            elif tag in _RAW_ELS:
+            elif tag in elements.RAW_ELEMENTS:
                 kind = 4
             elif tag == "title":
                 kind = 5
@@ -180,11 +101,13 @@ class Serializer:
                 kind = 3
             elif tag in ("bs-inline", "bs-block"):
                 kind = 2
+            elif tag == "math":
+                kind = 6
             else:
                 kind = 0
-            isBlock = rawTag not in _INLINE_ELS and ("-" not in rawTag or rawTag in blockEls)
+            isBlock = (tag not in elements.INLINE_ELEMENTS and "-" not in tag) or tag in blockEls
             openTag = "" if kind == 2 else f"<{tag}>"
-            if kind == 2 or rawTag in _ALWAYS_OMIT_END_TAG_ELS:
+            if kind == 2 or rawTag in elements.ALWAYS_OMIT_END_TAG_ELEMENTS:
                 closeTag: str | None = ""
             elif rawTag in ("dt", "dd"):
                 closeTag = None
@@ -193,6 +116,10 @@ class Serializer:
             res = (tag, kind, isBlock, openTag, closeTag)
             tagInfo[rawTag] = res
             return res
+
+        def _isBlockMath(el: t.ElementT) -> bool:
+            """Returns whether a `<math>` element has `display=block` (ASCII case-insensitively)."""
+            return el.get("display", "inline") == "block"
 
         def _formatClass(v: str) -> str:
             """
@@ -374,7 +301,7 @@ class Serializer:
             """
             tag, kind, _, openTag, _ = info
 
-            if kind in (0, 3):
+            if kind in (0, 3, 6):
                 items = el.items()
                 start = _startTag(tag, openTag, items) if items else openTag
                 text = el.text
@@ -393,7 +320,7 @@ class Serializer:
                     except KeyError:
                         cinfo = _getTagInfo(ctag)
                     ckind = cinfo[1]
-                    if ckind == 0 and len(child) == 0:
+                    if ckind in (0, 6) and len(child) == 0:
                         citems = child.items()
                         cstart = _startTag(cinfo[0], cinfo[3], citems) if citems else cinfo[3]
                         cend = cinfo[4] or f"</{cinfo[0]}>"
@@ -562,8 +489,8 @@ class Serializer:
                         else:
                             pendingText = tail
                     continue
-                if not cinfo[2]:
-                    # Inline child (`cinfo[2]` is `isBlock == False`)
+                if not cinfo[2] and not (ckind == 6 and _isBlockMath(c)):
+                    # Inline child (`cinfo[2]` is `isBlock == False`, excluding `<math display=block>`)
                     if not inInlineRun:
                         if hasBlocks:
                             if childPendingClose:
@@ -590,7 +517,7 @@ class Serializer:
                                 write(pendingText)
                                 pendingText = None
                         inInlineRun = True
-                    if ckind == 0 and len(c) == 0:
+                    if ckind in (0, 6) and len(c) == 0:
                         citems = c.items()
                         cstart = _startTag(cinfo[0], cinfo[3], citems) if citems else cinfo[3]
                         cclose = cinfo[4]

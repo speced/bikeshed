@@ -6,6 +6,7 @@ from enum import Enum
 
 from ... import config, constants, t
 from ... import messages as m
+from .. import elements
 from . import preds
 from .nodes import (
     Comment,
@@ -18,9 +19,7 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
-    Text,
     escapeAttr,
-    escapeHTML,
     minimalEscapeAttr,
 )
 from .preds import charRefs, isControl, isDigit, isWhitespace
@@ -29,25 +28,6 @@ from .stream import Stream
 
 if t.TYPE_CHECKING:
     from .result import OkT, ResultT
-
-VOID_ELEMENTS = {
-    "area",
-    "base",
-    "br",
-    "col",
-    "command",
-    "embed",
-    "hr",
-    "img",
-    "input",
-    "keygen",
-    "link",
-    "meta",
-    "param",
-    "source",
-    "track",
-    "wbr",
-}
 
 # Characters used by the [...]-type autolinks, inside of the bracket.
 BRACKET_AUTOLINK_CHARS = "=$:[]^"
@@ -61,39 +41,58 @@ BRACKET_AUTOLINK_CHARS = "=$:[]^"
 POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS + constants.bqChar
 POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(POSSIBLE_NODE_START_CHARS)}]")
 ACTUAL_NODE_START_SET = frozenset("&<>`'~[{|\\—-" + constants.bqChar)
+_RAW_HTML_START_RE = re.compile(r"[&<]")
 
 
 def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
     # Consumes the stream until eof, yielding ParserNodes.
     # Massages the results slightly for final consumption,
     # adding curly quotes and combining adjacent RawText nodes.
+    #
+    # `lastNode` is always the previous node (for curlifyApostrophes context);
+    # when `heldLast` is True, it is an unyielded RawText buffered for merging.
     lastNode: ParserNode | None = None
     heldLast = False
+    heldCanMerge = False
     for node in generateNodes(s, start):
         if isinstance(node, SafeText):
+            # Escape SafeText into RawText so all text nodes follow one path and can merge.
             node = RawText.fromSafeText(node)
         if isinstance(node, RawText):
-            node.curlifyApostrophes(lastNode)
-            if node.needsLCCs():
+            if not s.config.rawHtml and not s.inOpaqueElement():
+                node.curlifyApostrophes(lastNode)
+            # Only merge RawText nodes that belong to this stream (not macro sub-streams)
+            # and whose emitted newlines match their source line span (not transforms like
+            # line-ending em-dashes that collapse newlines), so downstream line splitting
+            # (`node.line + j`) stays accurate.
+            nodeCanMerge = node.s is s and node.text.count("\n") == node.height
+            if (
+                heldLast
+                and heldCanMerge
+                and nodeCanMerge
+                and isinstance(lastNode, RawText)
+                and lastNode.end == node.start
+            ):
+                # Contiguous spans preserve `text.count("\n") == height`, so heldCanMerge stays True.
+                lastNode.text += node.text
+                lastNode.end = node.end
+            else:
                 if heldLast:
                     assert lastNode is not None
                     yield lastNode
-                yield node
-                lastNode = node
-                heldLast = False
-                continue
-            if heldLast and isinstance(lastNode, RawText):
-                lastNode.text += node.text
-            else:
                 lastNode = node
                 heldLast = True
+                heldCanMerge = nodeCanMerge
         else:
+            # Flush any buffered text, yield the non-text node, and retain it in
+            # `lastNode` so a following RawText can curlify leading apostrophes (e.g. `</var>'s`).
             if heldLast:
                 assert lastNode is not None
                 yield lastNode
             yield node
             lastNode = node
             heldLast = False
+            heldCanMerge = False
     if heldLast:
         assert lastNode is not None
         yield lastNode
@@ -167,7 +166,7 @@ def debugNode(node: ParserNode | list[ParserNode]) -> str:
         return f"</{node.tag} {node.loc}>"
     if isinstance(node, (RawText, SafeText)):
         return f"<{type(node).__name__} {node.loc} {node.text!r}>"
-    if isinstance(node, RawElement):
+    if isinstance(node, (RawElement, SafeElement)):
         return f"<{node.tag} {node.loc}>[omitted raw content]</>"
     if isinstance(node, SelfClosedTag):
         return f"<{node.tag} {node.loc} />"
@@ -222,6 +221,15 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
     """
     if s.eof(start):
         return Err(start)
+    if s.config.rawHtml:
+        if s.chars[start] in ("&", "<"):
+            res = parseNode(s, start)
+            if isOk(res):
+                return res
+        match = _RAW_HTML_START_RE.search(s.chars, start + 1)
+        i = match.start() if match else s.length
+        node = RawText.fromStream(s, start, i)
+        return Ok(node, i)
     if s.chars[start] in ACTUAL_NODE_START_SET:
         res = parseNode(s, start)
         if isOk(res):
@@ -250,10 +258,24 @@ def parseNode(
         return Err(start)
 
     first1 = s.chars[start]
-    if first1 not in ACTUAL_NODE_START_SET:
+    node: ParserNode | list[ParserNode] | None
+    if s.config.rawHtml:
+        if first1 == "&":
+            ch, i, _ = parseCharRef(s, start, context=CharRefContext.NonAttr)
+            if ch is not None:
+                if isinstance(ch, str):
+                    return Ok(RawText.fromStream(s, start, i, f"&#{ord(ch)};"), i)
+                return Ok(ch, i)
+            return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
+        if first1 == "<":
+            node, i, _ = parseAngleStart(s, start)
+            if node is not None:
+                return Ok(node, i)
+            return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
         return Err(start)
 
-    node: ParserNode | list[ParserNode] | None
+    if first1 not in ACTUAL_NODE_START_SET:
+        return Err(start)
 
     if first1 == "-":
         if s.slice(start, start + 3) == "--\n":
@@ -306,10 +328,10 @@ def parseNode(
         # the markdown and HTML parsers together.
         el, i, _ = parseFencedCodeBlock(s, start)
         if el is not None:
+            if constants.bqChar in el.data:
+                el.data = el.data.replace(constants.bqChar, ">")
             if blockType := isDatablock(el.startTag, s.loc(i)):
-                smuggleDatablock(el, el.data, blockType)
-            else:
-                smuggleDatablock(el, escapeHTML(el.data), "pre")
+                el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             return Ok(el, i)
     if s.config.markdownInline:
         if first2 == r"\`":
@@ -668,7 +690,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
     if s[i] == "/":
         endTag, i, _ = parseEndTag(s, start)
         if endTag is not None:
-            if endTag.tag == "l":
+            if not s.config.rawHtml and endTag.tag == "l":
                 # Should have been caught by parseLToEnd().
                 # Since it wasn't, that means there was a parse error.
                 endTag.tag = "span"
@@ -678,6 +700,23 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
     startTag, i, _ = parseStartTag(s, start)
     if startTag is not None:
         if isinstance(startTag, (SelfClosedTag, list)):
+            return Ok(startTag, i)
+        if s.config.rawHtml:
+            if startTag.tag == "script":
+                text, i, _ = parseScriptToEnd(s, i)
+                if text is None:
+                    return Err(start)
+                return Ok(RawElement.fromStream(s, start, i, startTag, text), i)
+            if startTag.tag == "style":
+                text, i, _ = parseStyleToEnd(s, i)
+                if text is None:
+                    return Err(start)
+                return Ok(RawElement.fromStream(s, start, i, startTag, text), i)
+            if startTag.tag == "xmp":
+                text, i, _ = parseXmpToEnd(s, i)
+                if text is None:
+                    return Err(start)
+                return Ok(RawElement.fromStream(s, start, i, startTag, text), i)
             return Ok(startTag, i)
         if startTag.tag == "l":
             nodes, i, _ = parseLToEnd(s, i, startTag)
@@ -712,31 +751,24 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                     return Err(start)
                 if "bs-macros" in startTag.attrs:
                     text = replaceMacrosInText(text, s.config.macros, s, start, context="<pre> contents")
-                el = RawElement.fromStream(s, start, i, startTag, "")
-                smuggleDatablock(el, text, blockType)
+                if constants.bqChar in text:
+                    text = text.replace(constants.bqChar, ">")
+                startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
+                el = SafeElement.fromStream(s, start, i, startTag, text)
                 return Ok(el, i)
             else:
-                # Just a normal pre
-                # Parse it as normal nodes, then re-serialize and smuggle it
-                text, i, _ = parseOpaqueToEnd(s, i, startTag, start)
-                if text is None:
-                    # Only hit when I never found the end tag, so just
-                    # call it a normal start tag.
-                    return Ok(startTag, i)
-                el = RawElement.fromStream(s, start, i, startTag, "")
-                smuggleDatablock(el, text, "pre")
-                return Ok(el, i)
+                return Ok(startTag, i)
         elif startTag.tag == "script":
             text, i, _ = parseScriptToEnd(s, i)
             if text is None:
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<script> contents")
+            if constants.bqChar in text:
+                text = text.replace(constants.bqChar, ">")
+            if blockType := isDatablock(startTag, s.loc(i)):
+                startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             el = RawElement.fromStream(s, start, i, startTag, text)
-            if blockType := isDatablock(el.startTag, s.loc(i)):
-                smuggleDatablock(el, text, blockType)
-            else:
-                smuggleDatablock(el, text, "raw")
             return Ok(el, i)
         elif startTag.tag == "style":
             text, i, _ = parseStyleToEnd(s, i)
@@ -744,11 +776,11 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<style> contents")
-            el = RawElement.fromStream(s, start, i, startTag, text)
+            if constants.bqChar in text:
+                text = text.replace(constants.bqChar, ">")
             if blockType := isDatablock(startTag, s.loc(i)):
-                smuggleDatablock(el, text, blockType)
-            else:
-                smuggleDatablock(el, text, "raw")
+                startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
+            el = RawElement.fromStream(s, start, i, startTag, text)
             return Ok(el, i)
         elif startTag.tag == "xmp":
             startTag.tag = "pre"
@@ -758,20 +790,11 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Err(start)
             if "bs-macros" in startTag.attrs:
                 text = replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
-            el = RawElement.fromStream(s, start, i, startTag, "")
+            if constants.bqChar in text:
+                text = text.replace(constants.bqChar, ">")
             if blockType := isDatablock(startTag, s.loc(i)):
-                smuggleDatablock(el, text, blockType)
-            else:
-                smuggleDatablock(el, escapeHTML(text), "pre")
-            return Ok(el, i)
-        elif startTag.tag in s.config.opaqueElements:
-            text, i, _ = parseOpaqueToEnd(s, i, startTag, start)
-            if text is None:
-                # Only hit when I never found the end tag, so just
-                # call it a normal start tag.
-                return Ok(startTag, i)
-            el = RawElement.fromStream(s, start, i, startTag, "")
-            smuggleDatablock(el, text, "opaque")
+                startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
+            el = SafeElement.fromStream(s, start, i, startTag, text)
             return Ok(el, i)
         else:
             return Ok(startTag, i)
@@ -827,36 +850,6 @@ def isDatablockClass(text: str) -> bool:
     return text in _DATABLOCK_CLASSES
 
 
-def smuggleDatablock(el: RawElement | SafeElement, text: str, blockType: str) -> None:
-    # Prepare a datablock, which might have content that'll confuse the markdown parser,
-    # by instead shoving the contents into an attribute, after linebreaks are removed.
-
-    # If this is from text that's been re-parsed, don't overwrite an already-smuggled value.
-    if "bs-datablock-data" in el.startTag.attrs:
-        if text == "":
-            return
-        else:
-            m.die(
-                "PROGRAMMING ERROR: An already-smuggled datablock tried to smuggle a new non-empty value.",
-                lineNum=el.loc,
-            )
-            return
-
-    # Make the element single-line,
-    el.data = ""
-    singleLineText = text.replace("\n", constants.virtualLineBreak)
-    if constants.bqChar in singleLineText:
-        # These elements won't see the markdown parser, so any bqChar
-        # would pass thru to the final doc, which is definitely wrong.
-        # Return them to > chars.
-        singleLineText = singleLineText.replace(constants.bqChar, ">")
-    el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
-    el.startTag.attrs["bs-datablock-data"] = escapeAttr(singleLineText)
-    # Note, because el remembers its original start/end line number,
-    # it automatically uses ilcc characters to ensure the line counts continue to work
-    # even though it's now a single-line element.
-
-
 def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | list[ParserNode]]:
     if s[start] != "<":
         return Err(start)
@@ -890,13 +883,14 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
 
     el: SelfClosedTag | StartTag
     if s[i] == "/":
-        if s[i + 1] == ">" and tagname in ("br", "link", "meta"):
+        if s[i + 1] == ">" and (
+            tagname in ("br", "link", "meta")
+            or preds.isXMLishTagname(tagname)
+            or (s.config.rawHtml and tagname in elements.VOID_ELEMENTS)
+        ):
             el = SelfClosedTag.fromStream(s, start, i + 2, tagname, safeAttrs)
-            return Ok(canonicalizeShortcuts(el), i + 2)
-        elif s[i + 1] == ">" and preds.isXMLishTagname(tagname):
-            el = SelfClosedTag.fromStream(s, start, i + 2, tagname, safeAttrs)
-            return Ok(canonicalizeShortcuts(el), i + 2)
-        elif tagname in VOID_ELEMENTS:
+            return Ok(el if s.config.rawHtml else canonicalizeShortcuts(el), i + 2)
+        elif tagname in elements.VOID_ELEMENTS:
             m.die(f"Void element (<{tagname}>) with a spurious trailing /.", lineNum=s.loc(start))
             i += 1
             # Skip past and handle it normally
@@ -909,11 +903,11 @@ def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | l
             # Again, just skip it and keep going.
 
     if s[i] == ">":
-        if tagname in VOID_ELEMENTS:
+        if tagname in elements.VOID_ELEMENTS:
             el = SelfClosedTag.fromStream(s, start, i + 1, tagname, safeAttrs)
         else:
             el = StartTag.fromStream(s, start, i + 1, tagname, safeAttrs)
-        return Ok(canonicalizeShortcuts(el), i + 1)
+        return Ok(el if s.config.rawHtml else canonicalizeShortcuts(el), i + 1)
 
     if s.eof(i):
         m.die(f"Tag <{tagname}> wasn't closed at end of file.", lineNum=s.loc(start))
@@ -1093,7 +1087,7 @@ def parseTagName(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
-    _, i, _ = parseWhitespaceOrBq(s, start)
+    _, i, _ = parseWhitespace(s, start) if s.config.rawHtml else parseWhitespaceOrBq(s, start)
     attr = None
     attrs: dict[str, str] = {}
     while True:
@@ -1102,7 +1096,7 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
         startAttr = i
 
         # Macros are allowed in attr list context, *if* they expand to an attribute list.
-        if s[i] == "[":
+        if not s.config.rawHtml and s[i] == "[":
             macroAttrs, i, _ = parseMacroToAttrs(s, i)
             if macroAttrs is None:
                 break
@@ -1121,9 +1115,14 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
                 break
             attrName, attrValue = attr
             if attrName in attrs:
+                if s.config.rawHtml:
+                    ws, i, _ = parseWhitespace(s, i)
+                    if ws is None:
+                        break
+                    continue
                 m.die(f"Attribute '{attrName}' appears twice in the tag.", lineNum=s.loc(startAttr))
                 return Err(start)
-            if "[" in attrValue:
+            if not s.config.rawHtml and "[" in attrValue:
                 attrValue = replaceMacrosInText(
                     text=attrValue,
                     macros=s.config.macros,
@@ -1135,7 +1134,7 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
         else:
             break
 
-        ws, i, _ = parseWhitespaceOrBq(s, i)
+        ws, i, _ = parseWhitespace(s, i) if s.config.rawHtml else parseWhitespaceOrBq(s, i)
         if ws is None:
             # We're definitely done, just see if it should be an error nor not.
             if s.eof(i):
@@ -1403,12 +1402,14 @@ def parseEndTag(s: Stream, start: int) -> ResultT[EndTag]:
     if tagname is None:
         m.die("Garbage in an end tag.", lineNum=s.loc(start))
         return Err(start)
-    if tagname in VOID_ELEMENTS:
+    if tagname in elements.VOID_ELEMENTS:
         m.die(f"Saw an end tag </{tagname}> for a void element.", lineNum=s.loc(start))
         return Err(start)
     if s.eof(i):
         m.die(f"Hit EOF in the middle of an end tag </{tagname}>.", lineNum=s.loc(start))
         return Err(start)
+    if s.config.rawHtml:
+        _, i, _ = parseWhitespace(s, i)
     if s[i] != ">":
         m.die(f"Garbage after the tagname in </{tagname}>.", lineNum=s.loc(start))
         return Err(start)
@@ -1446,15 +1447,30 @@ def parseComment(s: Stream, start: int) -> ResultT[Comment]:
         i += 1
 
 
+_SVG_DOCTYPE_RE = re.compile(r"\s+svg(?![\w-])", re.I)
+
+
 def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
     if s.slice(start, start + 2) != "<!":
         return Err(start)
     if s.slice(start + 2, start + 9).lower() != "doctype":
         return Err(start)
-    if s.slice(start + 9, start + 15).lower() != " html>":
-        m.die("Unnecessarily complex doctype - use <!doctype html>.", lineNum=s.loc(start))
-    node = Doctype.fromStream(s, start, start + 15, s.slice(start, start + 15))
-    return Ok(node, start + 15)
+    endIndex = s.chars.find(">", start + 9)
+    if endIndex == -1:
+        m.die("Hit EOF in the middle of a doctype.", lineNum=s.loc(start))
+        end = len(s)
+    else:
+        end = endIndex + 1
+        if start != 0:
+            if _SVG_DOCTYPE_RE.match(s.slice(start + 9, endIndex)):
+                m.die(
+                    "Inline SVG fragments must not include a doctype or processing instruction.",
+                    lineNum=s.loc(start),
+                )
+            else:
+                m.die("Bikeshed markup does not use a doctype.", lineNum=s.loc(start))
+    node = Doctype.fromStream(s, start, end, s.slice(start, end))
+    return Ok(node, end)
 
 
 def parseScriptToEnd(s: Stream, start: int) -> OkT[str]:
@@ -1549,61 +1565,6 @@ def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
             continue
         val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
         startSeg = i
-
-
-def parseOpaqueToEnd(s: Stream, dataStart: int, startTag: StartTag, start: int) -> ResultT[str]:
-    # Does *normal* parsing on a <pre> until it sees the end tag,
-    # but then serializes all the contents back to a string,
-    # so it can be handled/smuggled like a datablock.
-    nodes = []
-    endTag = None
-    tagName = startTag.tag
-    s.observeNode(startTag)
-    for values, i, _ in generateResults(s, dataStart):
-        if not isinstance(values, list):
-            values = [values]
-        for vi, value in enumerate(values):
-            if isinstance(value, EndTag) and value.tag == tagName:
-                endTag = value
-                if vi < len(values) - 1:
-                    # Leftover nodes after the end tag...
-                    remainingNodes = "\n".join(repr(x) for x in values[vi:])
-                    m.die(
-                        f"PROGRAMMING ERROR: Leftover nodes after the </{tagName}>:{remainingNodes}",
-                        lineNum=s.loc(i),
-                    )
-                break
-            elif isinstance(value, Comment):
-                # Drop comments eagerly
-                pass
-            else:
-                nodes.append(value)
-        if endTag:
-            break
-    else:
-        # I hit EOF without finding the end tag
-        m.die(f"Tried to parse a <{tagName}>, but can't find the </{tagName}>.", lineNum=s.loc(start))
-        s.openEls.undo(startTag)
-        return Err(dataStart)
-
-    # If the element is a <pre> and first node is a <code>, remove and stash it separately,
-    # as it'll mess up the indent finding otherwise.
-    if tagName == "pre" and nodes and isinstance(nodes[0], StartTag) and nodes[0].tag == "code":
-        startTag.attrs["bs-code-start-tag"] = escapeAttr(str(nodes[0]))
-        nodes = nodes[1:]
-        # Similarly, if there's a </code> at the end, kill it
-        # (plus any preceding whitespace, just for ease).
-        # The datablock handling will put it back
-        while nodes:
-            if isinstance(nodes[-1], Text) and nodes[-1].text.strip() == "":
-                nodes.pop()
-            elif isinstance(nodes[-1], EndTag) and nodes[-1].tag == "code":
-                endTag = nodes.pop()
-                startTag.attrs["bs-code-end-tag"] = escapeAttr(str(endTag))
-            else:
-                break
-
-    return Ok("".join(str(x) for x in nodes), i)
 
 
 PROD_PROPDESC_RE = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")

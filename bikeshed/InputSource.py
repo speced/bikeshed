@@ -13,7 +13,7 @@ import attr
 import requests
 import tenacity
 
-from . import config, constants, line, t
+from . import config, line, t
 from . import messages as m
 
 
@@ -24,35 +24,7 @@ class InputContent:
 
     @property
     def lines(self) -> list[line.Line]:
-        ret = []
-        offset = 0
-        for i, text in enumerate(self.rawLines, 1):
-            lineNo = i + offset
-            # The early HTML parser can change how nodes print,
-            # so they occupy a different number of lines than they
-            # had in the source. Markdown parser needs to know
-            # the correct source lines, tho, so when this happens,
-            # the nodes will insert special PUA chars to indicate that.
-            # I can remove them here and properly adjust the line number.
-            # Current known causes of this:
-            # * line-ending -- turned into em dashes
-            # * multi-line start tags
-            # * multi-line markdown code spans;
-            #     - the text loses its newlines
-            #     - the original text goes into an attribute on the start
-            #       tag now
-            ilcc = constants.incrementLineCountChar
-            dlcc = constants.decrementLineCountChar
-            if ilcc in text:
-                offset += text.count(ilcc)
-                text = text.replace(ilcc, "")
-            if dlcc in text:
-                offset -= text.count(dlcc)
-                text = text.replace(dlcc, "")
-
-            ret.append(line.Line(lineNo, text))
-
-        return ret
+        return [line.Line(i, text) for i, text in enumerate(self.rawLines, 1)]
 
     @property
     def content(self) -> str:

@@ -6,8 +6,9 @@ from abc import ABCMeta, abstractmethod
 from collections import Counter
 from dataclasses import InitVar, dataclass, field
 
-from ... import constants, t
 from ... import messages as m
+from ... import t
+from .. import elements
 
 if t.TYPE_CHECKING:
     from .stream import Stream  # pylint: disable=cyclic-import
@@ -15,28 +16,8 @@ if t.TYPE_CHECKING:
 ParserNodeT: t.TypeAlias = (
     "Comment | Doctype | EndTag | RawElement | RawText | SafeElement | SafeText | SelfClosedTag | StartTag"
 )
+TagNodeT: t.TypeAlias = "StartTag | EndTag | SelfClosedTag | RawElement | SafeElement"
 
-
-_VOID_ELEMENTS = frozenset(
-    (
-        "area",
-        "base",
-        "br",
-        "col",
-        "command",
-        "embed",
-        "hr",
-        "img",
-        "input",
-        "keygen",
-        "link",
-        "meta",
-        "param",
-        "source",
-        "track",
-        "wbr",
-    ),
-)
 
 _APOS_START_WORD_RE = re.compile(r"'\w")
 _APOS_WORD_CHAR_RE = re.compile(r"\w")
@@ -46,14 +27,8 @@ _APOS_START_SPACE_RE = re.compile(r"'\s")
 
 def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
     s = f"<{tagName}"
-    lineBreakAttrs = []
     for k, v in sortAttrs(attrs):
-        if "\n" in v:
-            lineBreakAttrs.append(k)
-            v = v.replace("\n", constants.virtualLineBreak)
         s += f' {k}="{v}"'
-    if lineBreakAttrs:
-        s += f' bs-line-break-attrs="{" ".join(lineBreakAttrs)}"'
     s += ">"
     return s
 
@@ -75,7 +50,7 @@ def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
 
 
 def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
-    if "bs-line-number" not in node.attrs:
+    if "bs-line-number" not in node.attrs and node.loc:
         node.attrs["bs-line-number"] = escapeAttr(node.loc)
     if "bs-parse-context" not in node.attrs and node.context:
         node.attrs["bs-parse-context"] = escapeAttr(node.context)
@@ -86,35 +61,35 @@ def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
 
 @dataclass
 class ParserNode(metaclass=ABCMeta):
-    s: Stream = field(repr=False)
-    start: int = field(repr=False)
-    end: int = field(repr=False)
+    s: Stream | None = field(default=None, repr=False, kw_only=True)
+    start: int = field(default=0, repr=False, kw_only=True)
+    end: int = field(default=0, repr=False, kw_only=True)
 
     @property
     def line(self) -> int:
-        return self.s.line(self.start)
+        return self.s.line(self.start) if self.s is not None else 1
 
     @property
     def endLine(self) -> int:
-        return self.line + self.height
+        return self.s.line(self.end) if self.s is not None else 1
 
     @property
     def loc(self) -> str:
-        return self.s.loc(self.start)
+        return self.s.loc(self.start) if self.s is not None else ""
 
     @property
     def endLoc(self) -> str:
-        return self.s.loc(self.end)
+        return self.s.loc(self.end) if self.s is not None else ""
 
     @property
     def context(self) -> str | None:
-        return self.s.context
+        return self.s.context if self.s is not None else None
 
     @property
     def height(self) -> int:
-        if self.start == self.end:
+        if self.start == self.end or self.s is None:
             return 0
-        return self.s.chars.count("\n", self.start, self.end)
+        return self.s.line(self.end) - self.s.line(self.start)
 
     @abstractmethod
     def __str__(self) -> str:
@@ -124,7 +99,6 @@ class ParserNode(metaclass=ABCMeta):
 @dataclass
 class Text(ParserNode, metaclass=ABCMeta):
     text: str
-    hasLCCs: bool = field(default=False, repr=False)
 
 
 @dataclass
@@ -134,34 +108,13 @@ class RawText(Text):
     def __str__(self) -> str:
         return self.text
 
-    @property
-    def height(self) -> int:
-        if not self.hasLCCs:
-            return self.text.count("\n")
-        if self.start == self.end:
-            return 0
-        return self.s.chars.count("\n", self.start, self.end)
-
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
-        if text is None:
-            return cls(
-                s=s,
-                start=start,
-                end=end,
-                text=s.chars[start:end],
-                hasLCCs=False,
-            )
-        if start == end and "\n" not in text:
-            hasLCCs = False
-        else:
-            hasLCCs = text.count("\n") != s.chars.count("\n", start, end)
         return cls(
             s=s,
             start=start,
             end=end,
-            text=text,
-            hasLCCs=hasLCCs,
+            text=s.chars[start:end] if text is None else text,
         )
 
     @classmethod
@@ -171,7 +124,6 @@ class RawText(Text):
             start=node.start,
             end=node.end,
             text=str(node),
-            hasLCCs=node.hasLCCs,
         )
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
@@ -179,7 +131,7 @@ class RawText(Text):
             return self
         if self.text[0] == "'":
             if _APOS_START_WORD_RE.match(self.text):
-                if isinstance(lastNode, (EndTag, RawElement, SelfClosedTag)):
+                if isinstance(lastNode, (EndTag, RawElement, SafeElement, SelfClosedTag)):
                     self.text = "’" + self.text[1:]
                 elif isinstance(lastNode, RawText) and _APOS_WORD_CHAR_RE.match(lastNode.text[-1]):
                     self.text = "’" + self.text[1:]
@@ -188,13 +140,6 @@ class RawText(Text):
         if "'" in self.text:
             self.text = _APOS_IN_WORD_RE.sub(r"\1’\2", self.text)
         return self
-
-    def needsLCCs(self) -> bool:
-        """
-        Whether or not the node will eventally insert an ILCC or DLCC
-        to fix the line count when serializing to a string.
-        """
-        return self.hasLCCs
 
 
 @dataclass
@@ -206,24 +151,11 @@ class SafeText(Text):
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
-        if text is None:
-            return cls(
-                s=s,
-                start=start,
-                end=end,
-                text=s.chars[start:end],
-                hasLCCs=False,
-            )
-        if start == end and "\n" not in text:
-            hasLCCs = False
-        else:
-            hasLCCs = text.count("\n") != s.chars.count("\n", start, end)
         return cls(
             s=s,
             start=start,
             end=end,
-            text=text,
-            hasLCCs=hasLCCs,
+            text=s.chars[start:end] if text is None else text,
         )
 
 
@@ -324,7 +256,7 @@ class SelfClosedTag(ParserNode):
 
     def __str__(self) -> str:
         s = startTagStrFromNode(self)
-        if self.tag in _VOID_ELEMENTS:
+        if self.tag in elements.VOID_ELEMENTS:
             return s
         return s + f"</{self.tag}>"
 
@@ -377,10 +309,9 @@ class Comment(ParserNode):
         return f"<!--{escapeHTML(self.data)}-->"
 
 
-# RawElement is for things like <script> or <style>
-# which have special parsing rules that just look
-# for the ending tag and treat the entire rest of
-# the contents as raw text, without escaping.
+# RawElement is for HTML raw-text elements (like <script>, <style>, or <xmp>)
+# which have special parsing rules that just look for the ending tag and treat
+# the rest of the contents as raw text, serialized without HTML-escaping.
 @dataclass
 class RawElement(ParserNode):
     tag: str
@@ -402,10 +333,9 @@ class RawElement(ParserNode):
         return f"{self.startTag}{self.data}</{self.tag}>"
 
 
-# SafeElement is for elements like <xmp>, which are
-# basically RawElements, but might not be understood
-# by random HTML parsers, and so need their contents
-# escaped instead.
+# SafeElement is for normal HTML elements (like <pre> produced from <xmp>,
+# fenced code blocks, or datablocks) whose source contents were read literally
+# as raw text, and therefore must be HTML-escaped when serialized as HTML.
 @dataclass
 class SafeElement(ParserNode):
     tag: str
@@ -427,6 +357,10 @@ class SafeElement(ParserNode):
         return f"{self.startTag}{escapeHTML(self.data)}</{self.tag}>"
 
 
+def isTag(node: ParserNode) -> t.TypeIs[TagNodeT]:
+    return isinstance(node, (StartTag, EndTag, SelfClosedTag, RawElement, SafeElement))
+
+
 def escapeHTML(text: str) -> str:
     # Escape HTML
     return text.replace("&", "&#38;").replace("<", "&#60;")
@@ -443,103 +377,6 @@ def minimalEscapeAttr(text: str) -> t.SafeAttrStr:
 def unescapeAttr(text: t.SafeAttrStr | t.EmptyLiteralStr) -> str:
     return str(text.replace("&#34;", '"').replace("&#38;", "&"))
 
-
-_HEADING_TAGS = frozenset(("h1", "h2", "h3", "h4", "h5", "h6"))
-
-_AUTO_CLOSE_P_START_TAGS = frozenset(
-    (
-        "address",
-        "article",
-        "aside",
-        "blockquote",
-        "center",
-        "details",
-        "dialog",
-        "dir",
-        "div",
-        "dl",
-        "fieldset",
-        "figcaption",
-        "figure",
-        "footer",
-        "header",
-        "hgroup",
-        "main",
-        "menu",
-        "nav",
-        "ol",
-        "p",
-        "search",
-        "section",
-        "summary",
-        "ul",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "pre",
-        "listing",
-        "form",
-        "plaintext",
-        "table",
-        "hr",
-        "xmp",
-    ),
-)
-
-_AUTO_CLOSE_P_END_TAGS = frozenset(
-    (
-        "address",
-        "article",
-        "aside",
-        "blockquote",
-        "body",
-        "center",
-        "details",
-        "dialog",
-        "dir",
-        "div",
-        "dl",
-        "fieldset",
-        "figcaption",
-        "figure",
-        "footer",
-        "header",
-        "hgroup",
-        "html",
-        "main",
-        "menu",
-        "nav",
-        "ol",
-        "search",
-        "section",
-        "summary",
-        "ul",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "pre",
-        "listing",
-        "form",
-        "plaintext",
-        "table",
-        "caption",
-        "thead",
-        "tbody",
-        "tfoot",
-        "tr",
-        "td",
-        "th",
-        "li",
-        "dt",
-        "dd",
-    ),
-)
 
 _TAG_CONTEXT_REQS: dict[str, tuple[str, ...]] = {
     "td": ("tr", "table"),
@@ -562,7 +399,7 @@ _TAG_CONTEXT_REQS: dict[str, tuple[str, ...]] = {
 @dataclass
 class TagStack:
     tags: list[TagStackEntry] = field(default_factory=list)
-    opaqueTags: set[str] = field(default_factory=lambda: {"pre", "xmp", "script", "style"})
+    opaqueTags: set[str] = field(default_factory=lambda: set(elements.DEFAULT_OPAQUE_ELEMENTS))
     _opaqueCount: int = 0
     _tagCounts: Counter[str] = field(default_factory=Counter)
 
@@ -640,13 +477,13 @@ class TagStack:
                     # but they're not actually open,
                     # that's fine
                     return
-                if node.tag in _HEADING_TAGS:
+                if node.tag in elements.HEADING_ELEMENTS:
                     # People put the wrong closing tag on headings all the time.
                     # Auto-close the nearest heading, whatever it is,
                     # and report it as an error.
                     headingStart = self.nearestHeading()
                     if headingStart and headingStart.startTag.tag != node.tag:
-                        self.virtualCloseUntil(["h1", "h2", "h3", "h4", "h5", "h6"], node)
+                        self.virtualCloseUntil(elements.HEADING_ELEMENTS, node)
                         m.die(
                             f"Saw a heading end tag {node}, but the current open heading is <{headingStart.startTag.tag}> (at {headingStart.startTag.loc}).",
                             lineNum=node.loc,
@@ -721,7 +558,7 @@ class TagStack:
         # (Only valid HTML; real parsers do a lot more work.)
         if not self.tags:
             return
-        if tag in _AUTO_CLOSE_P_START_TAGS:
+        if tag in elements.AUTO_CLOSE_P_START_ELEMENTS:
             self.virtualClose(node, ["p"])
         if tag == "li":
             self.virtualClose(node, ["p"], ["ol", "ul"])
@@ -769,7 +606,7 @@ class TagStack:
         # (Only valid HTML; real parsers do a lot more work.)
         if not self.tags:
             return
-        if tag in _AUTO_CLOSE_P_END_TAGS:
+        if tag in elements.AUTO_CLOSE_P_END_ELEMENTS:
             self.virtualClose(node, ["p"])
         if tag in ("ol", "ul"):
             self.virtualClose(node, ["li"], ["ol", "ul"])
@@ -820,7 +657,7 @@ class TagStack:
                     )
                     # yield from self.virtualCloseUntil([tag], node)
 
-    def virtualCloseUntil(self, tags: list[str], node: ParserNode, realEndTag: bool = False) -> None:
+    def virtualCloseUntil(self, tags: t.Collection[str], node: ParserNode, realEndTag: bool = False) -> None:
         # Now that the lxml parser doesn't run HTML's auto-closing rules,
         # I need to auto-close things myself when they're misordered.
         # Don't go past a shorthand, tho, as those are definitively scoped.
@@ -865,7 +702,7 @@ class TagStack:
 
     def nearestHeading(self) -> TagStackEntry | None:
         for entry in reversed(self.tags):
-            if entry.startTag.tag in _HEADING_TAGS:
+            if entry.startTag.tag in elements.HEADING_ELEMENTS:
                 return entry
         return None
 
@@ -898,7 +735,7 @@ class TagStackEntry:
     def __post_init__(self, opaqueTags: set[str]) -> None:
         if (
             self.startTag.tag in opaqueTags
-            or self.startTag.tag in ("pre", "xmp", "script", "style")
+            or self.startTag.tag in elements.DEFAULT_OPAQUE_ELEMENTS
             or "bs-opaque" in self.startTag.attrs
         ):
             self.isOpaque = True

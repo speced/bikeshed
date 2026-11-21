@@ -183,13 +183,15 @@ def inlineRemoteIssues(doc: t.SpecT) -> None:
             )
             h.addClass(doc, el, "no-marker")
         else:
+            elLine = h.approximateLineNumber(el)
+            issueContext = f"GitHub issue {key}" + (f" (referenced on line {elLine})" if elLine else "")
             h.appendChild(
                 el,
                 h.E.a(
                     {"href": href, "class": "marker"},
                     _t("Issue #{number} on GitHub: “{title}”").format(number=data["number"], title=data["title"]),
                 ),
-                *h.parseHTML(data["body_html"]),
+                *h.parseRawHTML(data["body_html"], context=issueContext),
             )
             h.addClass(doc, el, "no-marker")
         if el.tag == "p":
@@ -216,8 +218,12 @@ def addNoteHeaders(doc: t.SpecT) -> None:
         else:
             preText = ""
         lineNum = lineNumberFromBsLineNumber(el.get("bs-line-number"))
-        parseConfig = h.ParseConfig.fromSpec(doc=doc, context="heading='' attribute")
-        parsedHeading = h.parseHTML(h.parseText(el.get("bs-heading", ""), parseConfig, startLine=lineNum, context=el))
+        parsedHeading = h.parseBikeshedHTML(
+            doc,
+            el.get("bs-heading", ""),
+            context="heading='' attribute",
+            startLine=lineNum,
+        )
         h.prependChild(el, h.E.div({"class": "marker"}, preText, *parsedHeading))
 
 
