@@ -234,7 +234,7 @@ def classifyDfns(doc: t.SpecT, dfns: list[t.ElementT]) -> None:
             child = h.hasOnlyChild(el)
             if child is not None and child.tag == "code":
                 continue
-            if el.tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            if el.tag in h.HEADING_ELEMENTS:
                 # Don't wrap headings, it looks bad.
                 continue
             h.wrapContents(el, h.E.code({"bs-nohighlight": ""}))

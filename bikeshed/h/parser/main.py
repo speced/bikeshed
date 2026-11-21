@@ -6,15 +6,13 @@ import io
 import os
 import re
 
-from ... import constants, t
 from ... import messages as m
+from ... import t
 from .nodes import (
-    Comment,
     Doctype,
     EndTag,
     ParserNode,
     RawElement,
-    RawText,
     SafeText,
     SelfClosedTag,
     StartTag,
@@ -47,7 +45,6 @@ def initialDocumentParse(
     # Just do a document parse.
     # * adds `bs-line-number` and `bs-parse-context` attributes, for error messages
     # * converts any inline Bikeshed-isms into HTML (autolinks, markdown, etc)
-    # * blank out comments so they can't interfere with other passes
     # * close any left-open elements, logging an error
     # * check if there are any html/head/body elements and error
 
@@ -57,41 +54,12 @@ def initialDocumentParse(
     return nodes
 
 
-def strFromNodes(nodes: t.Iterable[ParserNode], withIlcc: bool = False) -> t.EarlyParsedHtmlStr:
-    strs = []
-    ilcc = constants.incrementLineCountChar
-    dlcc = constants.decrementLineCountChar
-    for node in nodes:
-        if isinstance(node, Comment):
-            # Serialize comments as a standardized, recognizable sequence
-            # so Markdown processing can ignore them better.
-            strs.append(constants.bsComment)
-            if withIlcc:
-                strs.append(ilcc * node.data.count("\n"))
-            continue
-        if isinstance(node, RawText):
-            s = node.text
-            if withIlcc and node.hasLCCs:
-                diff = node.height - s.count("\n")
-                if diff > 0:
-                    s += ilcc * diff
-                elif diff < 0:
-                    s += dlcc * -diff
-            strs.append(s)
-            continue
-        s = str(node)
-        if withIlcc:
-            diff = node.height - s.count("\n")
-            if diff > 0:
-                s += ilcc * diff
-            elif diff < 0:
-                s += dlcc * -diff
-        strs.append(s)
-    return t.EarlyParsedHtmlStr("".join(strs))
+def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
+    return "".join(str(node) for node in nodes)
 
 
-def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[t.EarlyParsedHtmlStr]:
-    return t.cast("list[t.EarlyParsedHtmlStr]", strFromNodes(nodes).split("\n"))
+def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
+    return strFromNodes(nodes).split("\n")
 
 
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
@@ -108,12 +76,12 @@ def parseLines(
     context: str | StartTag | t.ElementT | None,
     startLine: int = 1,
     closeElements: bool = False,
-) -> list[t.EarlyParsedHtmlStr]:
+) -> list[str]:
     # Runs a list of lines thru the parser,
     # returning another list of lines.
 
     if len(textLines) == 0:
-        return t.cast("list[t.EarlyParsedHtmlStr]", textLines)
+        return textLines
     endingWithNewline = textLines[0].endswith("\n")
     if endingWithNewline:
         text = "".join(textLines)
@@ -122,7 +90,7 @@ def parseLines(
     parsedNodes = list(nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context))
     parsedLines = linesFromNodes(parsedNodes)
     if endingWithNewline:
-        parsedLines = [t.EarlyParsedHtmlStr(x + "\n") for x in parsedLines]
+        parsedLines = [x + "\n" for x in parsedLines]
 
     return parsedLines
 
@@ -133,7 +101,7 @@ def parseText(
     context: str | StartTag | t.ElementT | None,
     startLine: int = 1,
     closeElements: bool = False,
-) -> t.EarlyParsedHtmlStr:
+) -> str:
     # Just runs the text thru the parser.
     return strFromNodes(
         nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context),
@@ -145,7 +113,7 @@ def parseTitle(
     config: ParseConfig,
     context: str | StartTag | t.ElementT | None = None,
     startLine: int = 1,
-) -> t.EarlyParsedHtmlStr:
+) -> str:
     # Parses the text, but removes any tags from the content,
     # as they'll just show up as literal text in <title>.
     nodes = nodesFromHtml(text, config, startLine=startLine, context=context)

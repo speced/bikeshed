@@ -446,18 +446,16 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, context: str) -> str:
     if len(lines) == 0:
         return ""
     lines = [line.rstrip() + "\n" for line in lines]
-    lines = t.cast("list[str]", h.parseLines(lines, h.ParseConfig.fromSpec(doc, context=context), context=context))
-    lines = markdown.parse(lines, markdown.MarkdownConfig.fromSpec(doc))
-    return "".join(lines)
+    nodes = h.nodesFromHtml("".join(lines), h.ParseConfig.fromSpec(doc, context=context), context=context)
+    nodes = markdown.parse(nodes, markdown.MarkdownConfig.fromSpec(doc))
+    return h.strFromNodes(nodes)
 
 
-def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
+def parse(lines: t.Sequence[Line]) -> MetadataManager:
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
-    # Returns the text lines, with the metadata-related lines removed,
-    # and a filled MetadataManager object
+    # Returns a filled MetadataManager object
 
-    newlines = []
     inMetadata = False
     lastKey = None
     multilineVal = False
@@ -508,14 +506,11 @@ def parse(lines: t.Sequence[Line]) -> tuple[list[Line], MetadataManager]:
             if match:
                 title = match[1]
                 md.addData("Title", title, lineNum=line.i)
-            newlines.append(line)
-        else:
-            newlines.append(line)
-    indentInfo = inferIndent(newlines)
+    indentInfo = inferIndent(lines)
     md.indentInfo = indentInfo
     if "Indent" not in md.manuallySetKeys and indentInfo.size:
         md.indent = indentInfo.size
-    return newlines, md
+    return md
 
 
 @dataclasses.dataclass

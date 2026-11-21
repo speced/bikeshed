@@ -11,15 +11,14 @@ import lxml.html
 from lxml import etree
 from lxml.cssselect import CSSSelector
 
-from .. import constants, t
+from .. import t
 from ..messages import die, warn
 from ..unset import UNSET
-from . import parser
+from . import elements, parser
 
 if t.TYPE_CHECKING:
     type ElementPredT = t.Callable[[t.ElementT], bool]
     type FlattenListT = t.Iterable[t.NodeT | FlattenListT]
-    from .parser import StartTag
 
 
 def unescape(string: str) -> str:
@@ -274,87 +273,29 @@ def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
     return sorted(el, key=lambda x: (x.get("bs-line-number", ""), textContent(x)))
 
 
-def safeHtml(
+def parseRawHTML(text: str, *, context: str, startLine: int = 1) -> list[t.NodeT]:
+    config = parser.ParseConfig(rawHtml=True, context=context)
+    container = parser.buildFragment(parser.nodesFromHtml(text, config, startLine=startLine, context=context))
+    return childNodes(container, clear=True)
+
+
+def parseBikeshedHTML(doc: t.SpecT, text: str, *, context: str, startLine: int = 1) -> list[t.NodeT]:
+    config = parser.ParseConfig.fromSpec(doc, context=context)
+    container = parser.buildFragment(parser.nodesFromHtml(text, config, startLine=startLine, context=context))
+    return childNodes(container, clear=True)
+
+
+def parseInto(
+    container: t.ElementT,
     text: str,
-    startLine: int = 1,  # pylint: disable=unused-argument
-    context: str | parser.StartTag | t.ElementT | None = None,  # pylint: disable=unused-argument
-) -> t.SafeHtmlStr:
-    if constants.virtualLineBreak in text:
-        return text.replace(constants.virtualLineBreak, "\n")
-    return text
-    # return parser.parseText(text, h.DEFAULT_PARSE_CONFIG, context, startLine)
-
-
-def safeBikeshedHtml(
-    text: str,
-    config: parser.ParseConfig,  # pylint: disable=unused-argument
-    startLine: int = 1,  # pylint: disable=unused-argument
-    context: str | parser.StartTag | t.ElementT | None = None,  # pylint: disable=unused-argument
-) -> t.SafeHtmlStr:
-    return parser.parseText(text, config, context, startLine)
-
-
-def parseHTML(text: t.SafeHtmlStr) -> list[t.NodeT]:
-    # container = parser.parseFragment(text)
-    container = lxml.html.fragment_fromstring(text, create_parent="div")
-    return list(childNodes(container, clear=True))
-
-
-def parseElements(text: t.SafeHtmlStr) -> list[t.ElementT]:
-    # container = parser.parseFragment(text)
-    container = lxml.html.fragment_fromstring(text, create_parent="div")
-    return [x for x in childNodes(container, clear=True) if isElement(x)]
-
-
-def parseInto(container: t.ElementT, text: t.SafeHtmlStr, allowEmpty: bool = False) -> t.ElementT:
+    *,
+    context: str,
+    startLine: int = 1,
+    allowEmpty: bool = False,
+) -> t.ElementT:
     clearContents(container)
-    appendChild(container, *parseHTML(text), allowEmpty=allowEmpty)
+    appendChild(container, *parseRawHTML(text, context=context, startLine=startLine), allowEmpty=allowEmpty)
     return container
-
-
-def parseDocument(
-    text: str,
-    structuralNodes: list[StartTag] | None = None,
-) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
-    # Parse an html string into a complete document, using lxml's parser.
-    # The lxml parser is unreliable, so I have to ensure I get a <head> and <body>.
-    # Then, since the lxml parser doesn't merge html/head/body elements together
-    # like HTML5 requires, do that manually with the extracted tags from the
-    # document parse.
-    htmlEl = lxml.html.document_fromstring(text)
-    assert htmlEl.tag == "html", "parseDocument() always produces an <html> element"
-    headEl: t.ElementT | None = None
-    bodyEl: t.ElementT | None = None
-    for child in htmlEl:
-        if child.tag == "head":
-            if headEl is not None:
-                die("Your boilerplate contains multiple <head> elements.", el=child)
-            headEl = child
-        elif child.tag == "body":
-            if bodyEl is not None:
-                die("Your boilerplate contains multiple <body> elements.", el=child)
-            bodyEl = child
-    if headEl is None:
-        headEl = E.head()
-        prependChild(htmlEl, headEl)
-    if bodyEl is None:
-        bodyEl = E.body()
-        appendChild(htmlEl, bodyEl)
-    assert len(htmlEl) == 2, "parseDocument() always produces one <head> and one <body> element"
-    if structuralNodes:
-        for startTag in structuralNodes:
-            if startTag.tag == "html":
-                el = htmlEl
-            elif startTag.tag == "head":
-                el = headEl
-            else:
-                el = bodyEl
-            for key, val in startTag.attrs.items():
-                if key == "class" and hasAttr(el, "class"):
-                    el.set("class", el.get("class", "") + " " + val)
-                else:
-                    el.set(key, val)
-    return htmlEl, headEl, bodyEl
 
 
 def escapeHTML(text: str) -> str:
@@ -602,7 +543,7 @@ def collectLinksWithSectionNames(
         if tagName(child) == "a":
             links[child] = name
             continue
-        if tagName(child) in ("h1", "h2", "h3", "h4", "h5", "h6"):
+        if tagName(child) in elements.HEADING_ELEMENTS:
             if hasClass(doc, child, "no-ref"):
                 name = None
             else:

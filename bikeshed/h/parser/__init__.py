@@ -22,17 +22,19 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
+    TagNodeT,
     Text,
+    isTag,
 )
 from .parser import (
     closeOpenElements,
-)
-from .simpleparser import (
-    parseDocument,
-    parseFragment,
 )
 from .stream import (
     DEFAULT_PARSE_CONFIG,
     ParseConfig,
     Stream,
+)
+from .treebuilder import (
+    buildDocument,
+    buildFragment,
 )

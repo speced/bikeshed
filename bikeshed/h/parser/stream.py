@@ -15,23 +15,43 @@ if t.TYPE_CHECKING:
 
 @dataclass
 class ParseConfig:
+    # Enable |var| algorithm variable shorthands.
     algorithm: bool = False
+    # Enable [[SPEC]] and [[SPEC#section]] bibliography/section autolinks.
     biblio: bool = False
+    # Enable {^foo^} CDDL autolinks.
     cddl: bool = False
+    # Enable 'prop', ''value'', and <<type>> CSS autolinks.
     css: bool = False
+    # Enable [=dfn=] and [$abstract op$] autolinks.
     dfn: bool = False
+    # Enable [:Header:] HTTP header autolinks.
     header: bool = False
+    # Enable {{Interface}} WebIDL autolinks.
     idl: bool = False
+    # Expand [MACRO] text macros inside autolink shorthands.
     macrosInAutolinks: bool = False
+    # Enable block-level Markdown (currently handled by bikeshed/markdown).
     markdownBlock: bool = False
+    # Enable `>` Markdown blockquotes (currently handled by bikeshed/markdown).
     markdownBlockquotes: bool = False
+    # Enable inline Markdown (`code` spans and [text](url) links).
     markdownInline: bool = False
+    # Enable backslash escapes for Markdown punctuation (\*, \[, etc.).
     markdownEscapes: bool = False
+    # Enable <{element}> and <{element/attr}> markup autolinks.
     markup: bool = False
+    # Enable <org/repo#123> and <#123> repository issue links.
     repositoryLinks: bool = False
+    # Map of lowercased [MACRO] names to their replacement text.
     macros: dict[str, str] = field(default_factory=dict)
+    # Optional source description appended to Stream.loc() (e.g. for macros or includes).
     context: str | None = None
+    # Extra opaque tag names whose contents skip shorthands and curly apostrophes.
     opaqueElements: set[str] = field(default_factory=set)
+    # Parse strictly as plain HTML: disables shorthands, macros, attr shortcuts,
+    # curly apostrophes, em-dashes, TagStack errors, and synthetic bs-line-number attrs.
+    rawHtml: bool = False
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:

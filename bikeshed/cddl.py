@@ -201,7 +201,10 @@ def markupCDDL(doc: t.SpecT) -> None:
             text = h.textContent(el)
             try:
                 ast = cddlparser.parse(text)
-                h.parseInto(el, h.safeHtml(ast.serialize(marker)))
+                lineNum = (h.parseLineNumber(el) or 1) + int(el.get("bs-line-number-content-adjustment", "0"))
+                parseContext = el.get("bs-parse-context")
+                cddlContext = f"CDDL block in {parseContext}" if parseContext else "CDDL block"
+                h.parseInto(el, ast.serialize(marker), startLine=lineNum, context=cddlContext)
             except Exception as err:
                 m.die(
                     f"{err}\nInvalid CDDL block (first 100 characters):\n{text[0:100]}{'...' if len(text) > 100 else ''}",
