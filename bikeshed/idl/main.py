@@ -37,7 +37,9 @@ def markupIDL(doc: t.SpecT) -> None:
             if isinstance(marker, IDLMarker) and marker.errors:
                 for error in marker.errors:
                     m.die(error, el=el)
-            parsed = list(h.parseHTML(h.safeHtml(markedUp, startLine=lineNum)))
+            parseContext = el.get("bs-parse-context")
+            idlContext = f"IDL block in {parseContext}" if parseContext else "IDL block"
+            parsed = list(h.parseRawHTML(markedUp, startLine=lineNum, context=idlContext))
             merged = mergeMarkup(el, parsed)
             h.replaceContents(el, merged)
             # Parse a second time with the global one, which collects all data in the doc.

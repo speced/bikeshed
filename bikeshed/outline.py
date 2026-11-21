@@ -61,7 +61,7 @@ def collectHeadings(
     if root is None:
         root = doc.body
     for child in h.childElements(root):
-        if h.tagName(child) in ("h1", "h2", "h3", "h4", "h5", "h6"):
+        if h.tagName(child) in h.HEADING_ELEMENTS:
             headings.append(child)
         collectHeadings(doc, child, headings)
     return headings

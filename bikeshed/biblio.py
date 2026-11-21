@@ -160,7 +160,7 @@ class StringBiblioEntry(BiblioEntry):
     data: str
 
     def __init__(self, linkText: str, data: str, order: int = 0) -> None:
-        doc = h.E.div({}, *h.parseHTML(data))
+        doc = h.E.div({}, *h.parseRawHTML(data, context=f"biblio entry '{linkText}'"))
         titleEl = h.find("cite", doc)
         if titleEl is not None:
             title = h.textContent(titleEl)
@@ -177,7 +177,7 @@ class StringBiblioEntry(BiblioEntry):
         return True
 
     def toHTML(self) -> t.ElementT:
-        return h.E.inline({}, *h.parseHTML(self.data.strip()))
+        return h.E.inline({}, *h.parseRawHTML(self.data.strip(), context=f"biblio entry '{self.linkText}'"))
 
 
 class AliasBiblioEntry(BiblioEntry):

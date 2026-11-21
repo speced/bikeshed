@@ -18,12 +18,7 @@ if t.TYPE_CHECKING:
 
 
 def boilerplateFromHtml(doc: t.SpecT, htmlString: str, context: str) -> list[t.NodeT]:
-    htmlString = h.parseText(htmlString, h.ParseConfig.fromSpec(doc, context=context), context=context)
-    # FIXME: Here I'm having to pass a value that's already an EarlyParsedHtmlStr
-    # (and thus should be safe for parsing into a doc) back thru h.safeHtml(),
-    # because h.parseHTML() is still using the lxml parser, not my SimpleParser,
-    # so the virtualLinebreak chars don't get handled unless I do it myself.
-    bp = h.E.div({}, *h.parseHTML(h.safeHtml(htmlString)))
+    bp = h.E.div({}, *h.parseBikeshedHTML(doc, htmlString, context=context))
     conditional.processConditionals(doc, bp)
     return h.childNodes(bp, clear=True)
 
@@ -124,13 +119,15 @@ def addHeaderFooter(doc: t.SpecT) -> None:
     header = retrieve.retrieveBoilerplateFile(doc, "header") if "header" in doc.md.boilerplate else ""
     footer = retrieve.retrieveBoilerplateFile(doc, "footer") if "footer" in doc.md.boilerplate else ""
 
-    doc.html = "\n".join(
-        [
-            h.parseText(header, h.ParseConfig.fromSpec(doc, context="header.include"), context=None),
-            doc.html,
-            h.parseText(footer, h.ParseConfig.fromSpec(doc, context="footer.include"), context=None),
-        ],
-    )
+    headerNodes = list(h.nodesFromHtml(header, h.ParseConfig.fromSpec(doc, context="header.include"), context=None))
+    footerNodes = list(h.nodesFromHtml(footer, h.ParseConfig.fromSpec(doc, context="footer.include"), context=None))
+    doc.nodes = [
+        *headerNodes,
+        h.RawText(text="\n"),
+        *doc.nodes,
+        h.RawText(text="\n"),
+        *footerNodes,
+    ]
 
 
 def fillWith(tag: str, newElements: t.Sequence[t.NodeT], doc: t.SpecT) -> None:
@@ -260,13 +257,7 @@ def addAtRisk(doc: t.SpecT) -> None:
     ul = h.E.ul()
     html.append(ul)
     for feature in doc.md.atRisk:
-        li = h.E.li()
-        normFeature = h.safeBikeshedHtml(
-            feature,
-            h.ParseConfig.fromSpec(doc, context="At Risk metadata"),
-            context="At Risk metadata",
-        )
-        h.parseInto(li, normFeature)
+        li = h.E.li({}, *h.parseBikeshedHTML(doc, feature, context="At Risk metadata"))
         h.appendChild(ul, li)
     html.append(
         h.E.p(
@@ -1143,12 +1134,7 @@ def addSpecMetadataSection(doc: t.SpecT) -> None:
             if isinstance(v, str):
                 if v == "":
                     continue
-                htmlText = h.parseText(
-                    v,
-                    h.ParseConfig.fromSpec(doc, context=f"!{k} metadata"),
-                    context=f"!{k} metadata",
-                )
-                parsed.append(h.E.inline({}, *h.parseHTML(htmlText)))
+                parsed.append(h.E.inline({}, *h.parseBikeshedHTML(doc, v, context=f"!{k} metadata")))
             else:
                 parsed.append(v)
         if k in md:

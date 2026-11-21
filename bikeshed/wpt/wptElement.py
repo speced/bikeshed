@@ -1,10 +1,43 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass
 
 from .. import h, t
 from .. import messages as m
 from ..translate import _t
+
+
+@dataclass(slots=True)
+class WptTitle:
+    text: str
+    lang: str | None
+    dir: str | None
+    sourceEl: t.ElementT
+
+    @classmethod
+    def fromEl(cls, el: t.ElementT) -> WptTitle | None:
+        title = el.get("title")
+        if not title:
+            return None
+        return cls(
+            text=title,
+            lang=el.get("lang"),
+            dir=el.get("dir"),
+            sourceEl=el,
+        )
+
+    def toElement(self, doc: t.SpecT) -> t.ElementT:
+        lineNum = h.parseLineNumber(self.sourceEl) or 1
+        parseContext = self.sourceEl.get("bs-parse-context")
+        titleContext = f"<wpt title> in {parseContext}" if parseContext else "<wpt title>"
+        return h.E.p(
+            {
+                "lang": self.lang,
+                "dir": self.dir,
+            },
+            *h.parseBikeshedHTML(doc, self.text, context=titleContext, startLine=lineNum),
+        )
 
 
 def processWptElements(doc: t.SpecT) -> None:
@@ -40,17 +73,14 @@ def processWptElements(doc: t.SpecT) -> None:
         if isHidden or doc.md.wptDisplay == "none":
             h.removeNode(el)
         else:
-            title = el.get("title")
-            titleLang = el.get("lang")
-            titleDir = el.get("dir")
+            title = WptTitle.fromEl(el)
             if prevEl is not None and prevEl.getnext() is el and (prevEl.tail is None or prevEl.tail.strip() == ""):
                 appendTestList(
+                    doc,
                     prevEl,
                     testNames=validTestNames,
                     testData=testData,
                     title=title,
-                    titleLang=titleLang,
-                    titleDir=titleDir,
                 )
                 h.removeNode(el)
             else:
@@ -60,8 +90,6 @@ def processWptElements(doc: t.SpecT) -> None:
                     testNames=validTestNames,
                     testData=testData,
                     title=title,
-                    titleLang=titleLang,
-                    titleDir=titleDir,
                 )
                 prevEl = el
 
@@ -131,9 +159,7 @@ def createHTML(
     *,
     testNames: list[str],
     testData: WptData,
-    title: str | None = None,
-    titleLang: str | None = None,
-    titleDir: str | None = None,
+    title: WptTitle | None = None,
 ) -> None:
     if doc.md.wptDisplay == "none":
         h.removeNode(blockEl)
@@ -148,35 +174,26 @@ def createHTML(
         h.clearContents(blockEl)
         h.appendChild(blockEl, h.E.summary(_t("Tests")))
         appendTestList(
+            doc,
             blockEl,
             testNames=testNames,
             testData=testData,
             title=title,
-            titleLang=titleLang,
-            titleDir=titleDir,
         )
     else:
         m.die("Programming error, uncaught WPT Display value in createHTML.")
 
 
 def appendTestList(
+    doc: t.SpecT,
     blockEl: t.ElementT,
     *,
     testNames: list[str],
     testData: WptData,
-    title: str | None = None,
-    titleLang: str | None = None,
-    titleDir: str | None = None,
+    title: WptTitle | None = None,
 ) -> None:
-    if title:
-        titleEl = h.E.p(
-            {
-                "lang": titleLang,
-                "dir": titleDir,
-            },
-            *h.parseHTML(h.safeHtml(title, context="<wpt title>")),
-        )
-        h.appendChild(blockEl, titleEl)
+    if title is not None:
+        h.appendChild(blockEl, title.toElement(doc))
     testListEl = h.E.ul({"class": "wpt-tests-list"})
     h.appendChild(blockEl, testListEl)
     if testNames:
