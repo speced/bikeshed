@@ -813,6 +813,58 @@ def parseParagraph(
     return [*prefixNodes, *contentNodes, *endTags, RawText(text="\n")], i, pending
 
 
+def matchFenceAt(s: Stream, contentStart: int, lineEnd: int) -> tuple[int, str, bool, bool] | None:
+    """If `contentStart` (after stripping nested `>` markers) starts with a code fence, returns `(gtDepth, fence, isOpener, isCloser)`."""
+    chars = s.chars
+    pos = skipHws(chars, contentStart, lineEnd)
+    gtDepth = 0
+    while pos < lineEnd and chars[pos] == ">":
+        gtDepth += 1
+        pos = skipHws(chars, pos + 1, lineEnd)
+    if pos >= lineEnd or chars[pos] not in ("`", "~"):
+        return None
+    match = fencedStartRe.match(chars, pos, lineEnd)
+    if match is None:
+        return None
+    isOpener = "`" not in chars[match.end() : lineEnd]
+    isCloser = skipHws(chars, match.end(), lineEnd) == lineEnd
+    return gtDepth, match.group(0), isOpener, isCloser
+
+
+def bqLineAllowsLazyContinuation(
+    s: Stream,
+    contentStart: int,
+    lineEnd: int,
+    blockElements: set[str],
+) -> bool | None:
+    """Returns whether a blockquote line's stripped content leaves a paragraph open for lazy continuation.
+
+    Returns `None` for single-line standalone comments/doctypes (which are transparent).
+    """
+    chars = s.chars
+    pos = skipHws(chars, contentStart, lineEnd)
+    while pos < lineEnd and chars[pos] == ">":
+        pos = skipHws(chars, pos + 1, lineEnd)
+    if pos >= lineEnd:
+        return False
+    afterComment = trySkipCommentOrDoctypeLine(s, pos, peekOnly=True)
+    if afterComment is not None:
+        lineNext = lineEnd + 1 if lineEnd < s.length else s.length
+        if afterComment == lineNext:
+            return None
+    if isFencedCodeStart(s, pos, lineEnd):
+        return False
+    if isBlockHtmlStart(s, pos, lineEnd, blockElements):
+        return False
+    rawKind, rawMatch = matchRawBlockStart(s, pos, lineEnd, s.config)
+    if rawKind is None:
+        return True
+    if rawKind in ("bulleted", "numbered", "dt", "dd"):
+        assert rawMatch is not None
+        return bqLineAllowsLazyContinuation(s, rawMatch.end(), lineEnd, blockElements)
+    return False
+
+
 def parseBlockquote(
     s: Stream,
     lineStart: int,
@@ -836,12 +888,38 @@ def parseBlockquote(
             f"Line {lineNum} looks like the start of a markdown blockquote.\nIf this is intended, please set `Markup Shorthands: markdown-blockquotes yes`; if not, set it to `no`.\nSee https://speced.github.io/bikeshed/#md-blockquote for details.",
         )
 
+    openFence: tuple[int, str, int] | None = None
+    canLazyContinue = False
+
+    def observeBqContent(contentStart: int, contentEnd: int) -> None:
+        nonlocal openFence, canLazyContinue
+        fence = matchFenceAt(s, contentStart, contentEnd)
+        if openFence is not None:
+            if (
+                fence is not None
+                and fence[0] == openFence[0]
+                and fence[1][0] == openFence[1]
+                and len(fence[1]) >= openFence[2]
+                and fence[3]
+            ):
+                openFence = None
+            canLazyContinue = False
+            return
+        if fence is not None and fence[2]:
+            openFence = (fence[0], fence[1][0], len(fence[1]))
+            canLazyContinue = False
+            return
+        allows = bqLineAllowsLazyContinuation(s, contentStart, contentEnd, state.blockElements)
+        if allows is not None:
+            canLazyContinue = allows
+
     afterGt = cStart + 1
     if afterGt < lineEnd and chars[afterGt] in (" ", "\t"):
         afterGt += 1
     physLineStart = s.currentLineStart(cStart)
     subLines: list[str] = [chars[afterGt:lineEnd]]
     colOffsets: list[int] = [(afterGt - physLineStart) + s.colOffset(s.lineIndex(cStart))]
+    observeBqContent(afterGt, lineEnd)
 
     i = lineEnd + 1 if lineEnd < length else length
     while i < length:
@@ -872,7 +950,7 @@ def parseBlockquote(
                     if pAbsIndent >= bqAbsIndent and not shouldStopForList(s, peekI, pEnd, pAbsIndent, stopAt):
                         if chars[pCStart] == ">":
                             continues = True
-                        else:
+                        elif canLazyContinue:
                             pKind, _ = matchRawBlockStart(s, pCStart, pEnd, s.config)
                             if (
                                 pKind is None
@@ -914,10 +992,14 @@ def parseBlockquote(
                 afterGt += 1
             subLines.append(chars[afterGt:curLineEnd])
             colOffsets.append((afterGt - curLineStart) + s.colOffset(s.lineIndex(curLineStart)))
+            observeBqContent(afterGt, curLineEnd)
             i = curLineEnd + 1 if curLineEnd < length else length
             continue
 
-        # Potential lazy continuation line: only allowed if it's a plain text line.
+        # Potential lazy continuation line: only allowed after an open paragraph
+        # (CommonMark §5.1) and only if it's a plain text line.
+        if not canLazyContinue:
+            break
         rawKind, _ = matchRawBlockStart(s, curCStart, curLineEnd, s.config)
         if rawKind is not None:
             break
