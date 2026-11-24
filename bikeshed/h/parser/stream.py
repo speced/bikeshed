@@ -15,6 +15,8 @@ if t.TYPE_CHECKING:
 
 @dataclass
 class ParseConfig:
+    """Configuration flags and metadata controlling HTML, shorthand, macro, and Markdown parsing."""
+
     # Enable |var| algorithm variable shorthands.
     algorithm: bool = False
     # Enable [[SPEC]] and [[SPEC#section]] bibliography/section autolinks.
@@ -63,6 +65,7 @@ class ParseConfig:
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
+        """Build a `ParseConfig` from a specification's metadata and macro table."""
         return ParseConfig(
             algorithm="algorithm" in doc.md.markupShorthands,
             biblio="biblio" in doc.md.markupShorthands,
@@ -93,9 +96,13 @@ DEFAULT_PARSE_CONFIG = ParseConfig()
 
 @dataclass
 class Stream:
+    """Character buffer with line/column mapping, parse configuration, and open-element tracking."""
+
     chars: str
     length: int
+    # Indices of every "\n" in `chars`, used with bisect_left for O(log N) line/col lookup.
     _lineBreaks: list[int]
+    # Optional per-line column shift (e.g. stripped blockquote prefixes) added to reported columns.
     _colOffsets: list[int] | None
     startLine: int
     config: ParseConfig
@@ -112,6 +119,7 @@ class Stream:
         colOffsets: list[int] | None = None,
         openEls: TagStack | None = None,
     ) -> None:
+        """Initialize a stream over `chars`, pre-indexing newline positions for line/column lookups."""
         if depth > 10:
             msg = "HTML parsing recursed more than 10 levels deep; probably an infinite loop."
             raise RecursionError(msg)
@@ -141,6 +149,7 @@ class Stream:
         openEls: TagStack | None = None,
         depth: int | None = None,
     ) -> Stream:
+        """Create a child stream inheriting this stream's config (with an updated `context` and incremented depth)."""
         newConfig = dataclasses.replace(self.config, context=context)
         return Stream(
             chars,
@@ -152,11 +161,13 @@ class Stream:
         )
 
     def __getitem__(self, key: int) -> str:
+        """Return the character at `key`, or `""` if `key` is out of bounds."""
         if key < 0 or key >= self.length:
             return ""
         return self.chars[key]
 
     def slice(self, start: int | None, stop: int | None) -> str:
+        """Return `chars[start:stop]`, clamping negative endpoints to 0 instead of indexing from the end."""
         if start is not None and start < 0:
             start = 0
         if stop is not None and stop < 0:
@@ -164,30 +175,37 @@ class Stream:
         return self.chars[start:stop]
 
     def eof(self, index: int) -> bool:
+        """Return True if `index` is at or past the end of the stream."""
         return index >= self.length
 
     def __len__(self) -> int:
+        """Return the number of characters in the stream."""
         return self.length
 
     @property
     def context(self) -> str | None:
+        """Return the optional source context label from this stream's config."""
         return self.config.context
 
     def lineIndex(self, index: int) -> int:
-        # Zero-based line index
+        """Return the zero-based line number containing `index` (newlines belong to the line they end)."""
+        # bisect_left places a "\n" index on the line it terminates, while the char after "\n" starts the next line.
         return bisect.bisect_left(self._lineBreaks, index)
 
     def line(self, index: int, lineIndex: int | None = None) -> int:
+        """Return the 1-based source line number for `index`."""
         if lineIndex is None:
             lineIndex = self.lineIndex(index)
         return lineIndex + self.startLine
 
     def colOffset(self, lineIndex: int) -> int:
+        """Return any stripped-prefix column offset for zero-based `lineIndex`."""
         if self._colOffsets is None:
             return 0
         return self._colOffsets[lineIndex]
 
     def col(self, index: int, lineIndex: int | None = None) -> int:
+        """Return the 1-based source column number for `index`, including any per-line column offset."""
         if lineIndex is None:
             lineIndex = self.lineIndex(index)
         if lineIndex == 0:
@@ -200,6 +218,7 @@ class Stream:
         return col
 
     def loc(self, index: int) -> str:
+        """Format `index` as a human-readable `line:col` location (with context if set)."""
         lineIndex = self.lineIndex(index)
         rc = f"{self.line(index, lineIndex)}:{self.col(index, lineIndex)}"
         if self.config.context is None:
@@ -207,16 +226,14 @@ class Stream:
         return f"{rc} of {self.config.context}"
 
     def skipTo(self, start: int, text: str) -> ResultT[str]:
-        # Skip forward until encountering `text`.
-        # Produces the text encountered before this point.
+        """Advance to the next occurrence of `text`, returning the intervening substring or `Err`."""
         i = self.chars.find(text, start)
         if i != -1:
             return Ok(self.chars[start:i], i)
         return Err(start)
 
     def skipToSameLine(self, start: int, text: str) -> ResultT[str]:
-        # Skips forward, but no further than the end of the current line.
-        # Produces the text encountered before this point.
+        """Advance to `text` on the current line (before `\\n`), returning the intervening substring or `Err`."""
         lineEnd = self.chars.find("\n", start)
         i = self.chars.find(text, start) if lineEnd == -1 else self.chars.find(text, start, lineEnd)
         if i != -1:
@@ -224,6 +241,7 @@ class Stream:
         return Err(start)
 
     def matchRe(self, start: int, pattern: t.Pattern) -> ResultT[t.Match]:
+        """Match compiled `pattern` anchored at `start`, returning the match object or `Err`."""
         match = pattern.match(self.chars, start)
         if match:
             return Ok(match, match.end())
@@ -231,6 +249,7 @@ class Stream:
             return Err(start)
 
     def searchRe(self, start: int, pattern: t.Pattern) -> ResultT[t.Match]:
+        """Search for compiled `pattern` at or after `start`, returning the match object or `Err`."""
         match = pattern.search(self.chars, start)
         if match:
             return Ok(match, match.end())
@@ -238,24 +257,22 @@ class Stream:
             return Err(start)
 
     def skipToNextLine(self, start: int) -> OkT[str]:
-        # Skips to the next line.
-        # Produces the leftover text on the current line.
+        """Advance to the start of the next line, returning the remaining text on the current line."""
         textAfter = self.remainingTextOnLine(start)
         return Ok(textAfter, start + len(textAfter))
 
     def precedingLinebreakIndex(self, start: int) -> int:
-        # Index in self._lineBreaks of the linebreak preceding `start`.
+        """Return the index in `_lineBreaks` of the newline before `start` (or `-1` on line 0)."""
         lineIndex = bisect.bisect_left(self._lineBreaks, start)
         return lineIndex - 1
 
     def followingLinebreakIndex(self, start: int) -> int:
-        # Same but the linebreak after.
-        # Note that a newline char is at the end of its line;
-        # the actual break in the line is *after* it.
+        """Return the index in `_lineBreaks` of the newline ending `start`'s line."""
+        # A newline char terminates its line; the break to the next line occurs after it.
         return bisect.bisect_left(self._lineBreaks, start)
 
     def currentLineStart(self, start: int) -> int:
-        # The index of the first character on the current line.
+        """Return the stream index of the first character on `start`'s line."""
         lineIndex = self.precedingLinebreakIndex(start)
         if lineIndex == -1:
             return 0
@@ -263,8 +280,7 @@ class Stream:
             return self._lineBreaks[lineIndex] + 1
 
     def nextLineStart(self, start: int) -> int:
-        # The index of the first character on the next line.
-        # Returns an OOB index if on the last line.
+        """Return the stream index of the first character on the line after `start` (or `length` on the last line)."""
         lineIndex = self.followingLinebreakIndex(start)
         if lineIndex >= len(self._lineBreaks):
             return self.length
@@ -272,15 +288,15 @@ class Stream:
             return self._lineBreaks[lineIndex] + 1
 
     def precedingTextOnLine(self, start: int) -> str:
-        # The text on the current line before the start point.
+        """Return the substring on the current line preceding `start`."""
         return self.slice(self.currentLineStart(start), start)
 
     def remainingTextOnLine(self, start: int) -> str:
-        # The text on the current line from the start point on.
-        # Includes the newline, if present.
+        """Return the substring from `start` through the end of the current line (including `\\n` if present)."""
         return self.slice(start, self.nextLineStart(start))
 
     def observeResult(self, res: ResultT[ParserNode | list[ParserNode]]) -> None:
+        """Update `openEls` if `res` is an `Ok` result containing a node or list of nodes."""
         if isOk(res):
             val, _, _ = res
             if isinstance(val, list):
@@ -289,23 +305,30 @@ class Stream:
                 self.observeNode(val)
 
     def observeNode(self, node: ParserNode) -> None:
+        """Record a parsed `node` on the open-elements stack."""
         self.openEls.update(node)
 
     def observeNodes(self, nodes: list[ParserNode]) -> None:
+        """Record each parsed node in `nodes` on the open-elements stack."""
         for node in nodes:
             self.openEls.update(node)
 
     def observeShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        """Push an open shorthand wrapper onto `openEls`."""
         self.openEls.updateShorthandOpen(startTag, sigils)
 
     def observeShorthandClose(self, s: Stream, i: int, startTag: StartTag, sigils: tuple[str, str]) -> list[ParserNode]:
+        """Close a shorthand wrapper on `openEls`, returning any auto-closed inner `EndTag`s."""
         return list(self.openEls.updateShorthandClose(s, i, startTag, sigils))
 
     def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        """Roll back an unclosed shorthand opener from `openEls` after a failed parse."""
         self.openEls.cancelShorthandOpen(startTag, sigils)
 
     def inOpaqueElement(self) -> bool:
+        """Return True if the parser is currently inside an opaque element (e.g. `pre`, `script`, `bs-opaque`)."""
         return self.openEls.inOpaqueElement()
 
     def inTagContext(self, tagName: str) -> bool:
+        """Return True if an open `<tagName>` element is currently on the stack."""
         return self.openEls.inTagContext(tagName)

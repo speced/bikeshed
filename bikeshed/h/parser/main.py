@@ -33,6 +33,7 @@ def nodesFromHtml(
     *,
     blockMarkdown: bool = False,
 ) -> t.Generator[ParserNode, None, None]:
+    """Parse `data` into a stream of `ParserNode`s, optionally running block Markdown and closing open elements."""
     s = Stream(data, startLine=startLine, config=config)
     if blockMarkdown and config.markdownBlock:
         yield from parseBlockStream(s)
@@ -43,6 +44,7 @@ def nodesFromHtml(
         # doesn't give stream offsets...
         yield from closeOpenElements(s, start=None, context=context)
     if blockMarkdown and config.markdownBlock and data.endswith("\n"):
+        # parseBlockStream joins blocks with "\n" without a trailing newline; preserve one if the input ended with one.
         yield RawText(text="\n")
 
 
@@ -52,11 +54,11 @@ def initialDocumentParse(
     startLine: int = 1,
     indentChecker: IndentChecker | None = None,
 ) -> list[ParserNode]:
-    # Does a full document parse in a single pass:
-    # * adds `bs-line-number` and `bs-parse-context` attributes, for error messages
-    # * converts block-level Markdown (when enabled) and inline Bikeshed-isms into HTML
-    # * records mixed-indentation lints when `indentChecker` is provided
-    # * closes any left-open elements, logging an error
+    """Run the full single-pass document parse, expanding block/inline syntax, checking indentation, and closing tags."""
+    # Adds `bs-line-number` / `bs-parse-context` via the emitted StartTags,
+    # converts block Markdown (when enabled) and inline Bikeshed-isms into HTML,
+    # records mixed-indentation lints when `indentChecker` is provided,
+    # and logs errors for any elements left open at EOF.
 
     s = Stream(text, startLine=startLine, config=config)
     if config.markdownBlock:
@@ -75,14 +77,17 @@ def initialDocumentParse(
 
 
 def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
+    """Serialize an iterable of `ParserNode`s back into an HTML string."""
     return "".join(str(node) for node in nodes)
 
 
 def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
+    """Serialize an iterable of `ParserNode`s and split the result on newlines."""
     return strFromNodes(nodes).split("\n")
 
 
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
+    """Print a debug representation of each node and return the materialized list."""
     nodes = list(nodes)
     print("=" * 50)  # noqa: T201
     for node in nodes:
@@ -97,9 +102,7 @@ def parseLines(
     startLine: int = 1,
     closeElements: bool = False,
 ) -> list[str]:
-    # Runs a list of lines thru the parser,
-    # returning another list of lines.
-
+    """Parse a list of source lines into HTML, preserving whether lines end with `\\n`."""
     if len(textLines) == 0:
         return textLines
     endingWithNewline = textLines[0].endswith("\n")
@@ -122,7 +125,7 @@ def parseText(
     startLine: int = 1,
     closeElements: bool = False,
 ) -> str:
-    # Just runs the text thru the parser.
+    """Parse `text` through the inline HTML/Bikeshed parser and return the serialized HTML string."""
     return strFromNodes(
         nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context),
     )
@@ -134,7 +137,6 @@ def parseTitle(
     context: str | StartTag | t.ElementT | None = None,
     startLine: int = 1,
 ) -> str:
-    # Parses the text, but removes any tags from the content,
-    # as they'll just show up as literal text in <title>.
+    """Parse `text` for a `<title>` element, stripping all tag nodes so only text remains."""
     nodes = nodesFromHtml(text, config, startLine=startLine, context=context)
     return strFromNodes(n for n in nodes if isinstance(n, Text))

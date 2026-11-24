@@ -12,7 +12,6 @@ from .nodes import (
     EndTag,
     ParserNode,
     RawText,
-    SafeText,
     SelfClosedTag,
     StartTag,
     TagNodeT,
@@ -20,17 +19,12 @@ from .nodes import (
     isTag,
 )
 from .parser import (
-    ACTUAL_NODE_START_SET,
-    POSSIBLE_NODE_START_CHARS,
-    POSSIBLE_NODE_START_RE,
     fencedStartRe,
     parseDoctype,
-    parseNode,
+    parseInlineNodes,
 )
-from .result import isOk
 from .stream import ParseConfig, Stream
 
-_INLINE_LINE_STOP_RE = re.compile(f"[\n{re.escape(POSSIBLE_NODE_START_CHARS)}]")
 _EQUALS_LINE_RE = re.compile(r"={3,}[ \t]*$")
 _DASH_LINE_RE = re.compile(r"-{3,}[ \t]*$")
 _HEADING_START_RE = re.compile(r"(#{1,5})[ \t]+(?=\S)")
@@ -65,6 +59,7 @@ class IndentChecker:
     _lastCheckedStart: int = -1
 
     def _checkPart(self, part: str, lineNum: str | int) -> None:
+        """Record any wrong-indent-character or tab-after-space lint issues on a line slice."""
         badIndentChar = " " if self.indentChar == "\t" else "\t"
         if part[0] == badIndentChar:
             if self.indentChar == " ":
@@ -75,8 +70,10 @@ class IndentChecker:
             self.issues.append((lineNum, "Line's indent contains tabs after spaces."))
 
     def checkLine(self, s: Stream, lineStart: int) -> None:
+        """Check indentation on the physical line at `lineStart`, skipping lines already checked."""
         if lineStart >= s.length:
             return
+        # Deduplicate lines inspected by both parseParagraph() and parseBlocks() (e.g. after a break).
         if s is self._lastCheckedStream and lineStart <= self._lastCheckedStart:
             return
         self._lastCheckedStream = s
@@ -93,6 +90,7 @@ class IndentChecker:
         self._checkPart(part, lineNum)
 
     def checkNodes(self, nodes: t.Sequence[ParserNode], *, atLineStart: bool = True) -> None:
+        """Walk parsed `nodes` and check indentation on non-opaque lines (used for macros and non-block mode)."""
         opaqueDepth = 0
         for node in nodes:
             if opaqueDepth > 0:
@@ -118,13 +116,20 @@ class IndentChecker:
                     opaqueDepth += 1
                 atLineStart = False
 
+    def checkMacroNodes(self, nodes: t.Sequence[ParserNode], atLineStart: bool) -> None:
+        """Callback to lint indentation inside macro-expanded nodes."""
+        self.checkNodes(nodes, atLineStart=atLineStart)
+
     def emit(self) -> None:
+        """Emit all recorded indentation lint messages."""
         for lineNum, msg in self.issues:
             m.lint(msg, lineNum=lineNum)
 
 
 @dataclass(slots=True)
 class ListStop:
+    """Linked frame describing an enclosing Markdown list so nested blocks know when to exit."""
+
     baseIndent: int
     itemTypes: tuple[str, ...]
     parent: ListStop | None = None
@@ -132,6 +137,8 @@ class ListStop:
 
 @dataclass(slots=True)
 class PendingLine:
+    """Pre-parsed non-paragraph line handed back from `parseParagraph()` to `parseBlocks()` to avoid re-parsing."""
+
     kind: str  # "htmlblock" | "blank"
     lineNodes: list[ParserNode]
     nextI: int
@@ -139,33 +146,41 @@ class PendingLine:
 
 @dataclass(slots=True)
 class BlockState:
+    """Mutable parsing state threaded across recursive block Markdown calls."""
+
     blockElements: set[str]
     blockquoteWarned: bool = False
     indentChecker: IndentChecker | None = None
+    onMacroNodes: t.Callable[[list[ParserNode], bool], None] | None = None
 
 
 def parseBlockStream(s: Stream, *, indentChecker: IndentChecker | None = None) -> list[ParserNode]:
     """Parses block-level Markdown and inline HTML/Bikeshed markup from `s` in one pass."""
+    assert not s.config.rawHtml
     state = BlockState(
         blockElements={*s.config.blockElements, "if-wrapper"},
         indentChecker=indentChecker,
+        onMacroNodes=indentChecker.checkMacroNodes if indentChecker is not None else None,
     )
     nodes, _ = parseBlocks(s, 0, state, checkIndents=indentChecker is not None)
     return nodes
 
 
 def skipHws(chars: str, pos: int, end: int) -> int:
+    """Advance `pos` past ASCII spaces and tabs up to `end`."""
     while pos < end and chars[pos] in (" ", "\t"):
         pos += 1
     return pos
 
 
 def findLineEnd(s: Stream, pos: int) -> int:
+    """Return the index of the next `\\n` at or after `pos` (or `s.length` at EOF)."""
     lineEnd = s.chars.find("\n", pos)
     return s.length if lineEnd == -1 else lineEnd
 
 
 def prefixCountAt(s: Stream, lineStart: int, indent: int) -> int:
+    """Count whole indentation levels (each a tab or `indent` spaces) starting at `lineStart`."""
     chars = s.chars
     length = s.length
     if lineStart >= length or chars[lineStart] not in (" ", "\t"):
@@ -186,6 +201,7 @@ def prefixCountAt(s: Stream, lineStart: int, indent: int) -> int:
 
 
 def consumeIndentAt(s: Stream, lineStart: int, indent: int, numIndents: int) -> int | None:
+    """Advance `lineStart` past `numIndents` indentation levels, or return `None` if fewer are present."""
     if numIndents == 0:
         return lineStart
     i = lineStart
@@ -203,9 +219,13 @@ def consumeIndentAt(s: Stream, lineStart: int, indent: int, numIndents: int) -> 
 
 
 def stripWsNodes(nodes: list[ParserNode]) -> list[ParserNode]:
-    """Returns a copy of `nodes` with leading and trailing whitespace stripped from outer RawText nodes."""
+    """Returns `nodes` with leading and trailing whitespace stripped from outer RawText nodes."""
     if not nodes:
         return []
+    first = nodes[0]
+    last = nodes[-1]
+    if not isinstance(first, RawText) and not isinstance(last, RawText):
+        return nodes
     res = list(nodes)
     while res and isinstance(res[0], RawText):
         trimmed = res[0].text.lstrip()
@@ -286,19 +306,15 @@ def makeStartTag(tagName: str, lineNumber: int, attrs: dict[str, str] | None = N
     return StartTag(tag=tagName, attrs=safeAttrs)
 
 
-def trySkipCommentOrDoctypeLine(
+def trySkipCommentOrDoctypeAt(
     s: Stream,
-    lineStart: int,
+    cStart: int,
     *,
     peekOnly: bool = False,
 ) -> int | None:
-    """If `lineStart` is a standalone single Comment or Doctype line (possibly multi-line), returns the index after its trailing newline."""
+    """If `cStart` (already past leading whitespace) starts a standalone Comment or Doctype line, returns the index after its trailing newline."""
     chars = s.chars
     length = s.length
-    lineEnd = findLineEnd(s, lineStart)
-    cStart = skipHws(chars, lineStart, lineEnd)
-    if cStart >= lineEnd or chars[cStart] != "<":
-        return None
     if chars.startswith("<!--", cStart):
         idx = cStart + 4
         while True:
@@ -325,6 +341,21 @@ def trySkipCommentOrDoctypeLine(
                 parseDoctype(s, cStart)
             return afterLineEnd + 1 if afterLineEnd < length else length
     return None
+
+
+def trySkipCommentOrDoctypeLine(
+    s: Stream,
+    lineStart: int,
+    *,
+    peekOnly: bool = False,
+) -> int | None:
+    """If `lineStart` is a standalone single Comment or Doctype line (possibly multi-line), returns the index after its trailing newline."""
+    chars = s.chars
+    lineEnd = findLineEnd(s, lineStart)
+    cStart = skipHws(chars, lineStart, lineEnd)
+    if cStart + 1 >= lineEnd or chars[cStart] != "<" or chars[cStart + 1] != "!":
+        return None
+    return trySkipCommentOrDoctypeAt(s, cStart, peekOnly=peekOnly)
 
 
 def matchRawBlockStart(
@@ -368,6 +399,7 @@ def matchLineItemType(s: Stream, lineStart: int, lineEnd: int, config: ParseConf
 
 
 def isFencedCodeStart(s: Stream, cStart: int, lineEnd: int) -> bool:
+    """Return True if `cStart` starts a valid fenced code block opener (no backticks in info string)."""
     chars = s.chars
     if cStart >= lineEnd or chars[cStart] not in ("`", "~"):
         return False
@@ -423,6 +455,7 @@ def isBlockHtmlStart(s: Stream, cStart: int, lineEnd: int, blockElements: set[st
 
 
 def shouldStopForList(s: Stream, lineStart: int, lineEnd: int, absIndent: int, stopAt: ListStop | None) -> bool:
+    """Return True if a line at `absIndent` exits any active enclosing list frame in `stopAt`."""
     stop = stopAt
     while stop is not None:
         if absIndent < stop.baseIndent:
@@ -495,124 +528,6 @@ def peekSetextUnderline(
     return None
 
 
-def stripIndentAfterNewlines(text: str, indent: int, numIndents: int) -> str:
-    """Strips up to `numIndents` indentation levels after each `\\n` in multi-line inline text."""
-    spaces = " " * indent
-    parts = text.split("\n")
-    for idx in range(1, len(parts)):
-        part = parts[idx]
-        offset = 0
-        for _ in range(numIndents):
-            if offset < len(part) and part[offset] == "\t":
-                offset += 1
-            elif part.startswith(spaces, offset):
-                offset += indent
-            else:
-                break
-        if offset:
-            parts[idx] = part[offset:]
-    return "\n".join(parts)
-
-
-def parseInlineLine(
-    s: Stream,
-    start: int,
-    state: BlockState,
-    *,
-    minIndent: int = 0,
-) -> tuple[list[ParserNode], int]:
-    """Parses one logical line of HTML/inline Bikeshed markup starting at `start`.
-
-    Stops at (and consumes) the first `\\n` encountered outside any multi-line
-    construct (tags, comments, autolinks, code spans, fenced blocks, em-dashes)
-    and outside any open opaque element (`s.inOpaqueElement()`).
-    """
-    nodes: list[ParserNode] = []
-    lastNode: ParserNode | None = None
-    heldLast = False
-    heldCanMerge = False
-
-    def emitOne(node: ParserNode) -> None:
-        nonlocal lastNode, heldLast, heldCanMerge
-        if isinstance(node, SafeText):
-            node = RawText.fromSafeText(node)
-        if isinstance(node, RawText):
-            if minIndent > 0 and "\n" in node.text and node.s is s and not s.inOpaqueElement():
-                node.text = stripIndentAfterNewlines(node.text, s.config.indent, minIndent)
-            if not s.config.rawHtml and not s.inOpaqueElement():
-                node.curlifyApostrophes(lastNode)
-            nodeCanMerge = node.s is s and node.text.count("\n") == node.height
-            if (
-                heldLast
-                and heldCanMerge
-                and nodeCanMerge
-                and isinstance(lastNode, RawText)
-                and lastNode.end == node.start
-            ):
-                lastNode.text += node.text
-                lastNode.end = node.end
-            else:
-                if heldLast:
-                    assert lastNode is not None
-                    nodes.append(lastNode)
-                lastNode = node
-                heldLast = True
-                heldCanMerge = nodeCanMerge
-        else:
-            if heldLast:
-                assert lastNode is not None
-                nodes.append(lastNode)
-            nodes.append(node)
-            lastNode = node
-            heldLast = False
-            heldCanMerge = False
-
-    i = start
-    end = s.length
-    chars = s.chars
-    while i < end:
-        ch = chars[i]
-        if ch == "\n" and not s.inOpaqueElement():
-            i += 1
-            break
-        if ch in ACTUAL_NODE_START_SET:
-            res = parseNode(s, i)
-            if isOk(res):
-                val, nextI, _ = res
-                wasOpaque = s.inOpaqueElement()
-                s.observeResult(res)
-                if isinstance(val, list):
-                    if (
-                        state.indentChecker is not None
-                        and not wasOpaque
-                        and val
-                        and val[0].s is not None
-                        and val[0].s is not s
-                    ):
-                        state.indentChecker.checkNodes(
-                            val,
-                            atLineStart=(s.col(i) == 1),
-                        )
-                    for subNode in val:
-                        emitOne(subNode)
-                else:
-                    emitOne(val)
-                i = nextI
-                continue
-        if s.inOpaqueElement():
-            match = POSSIBLE_NODE_START_RE.search(chars, i + 1)
-        else:
-            match = _INLINE_LINE_STOP_RE.search(chars, i + 1)
-        nextI = match.start() if match else end
-        emitOne(RawText.fromStream(s, i, nextI))
-        i = nextI
-
-    if heldLast:
-        assert lastNode is not None
-        nodes.append(lastNode)
-    return nodes, i
-
-
 def extractSingleLineHeadingId(nodes: list[ParserNode], hashes: str) -> str | None:
     """Extracts a trailing `{#id}` from `nodes`, stripping closing `#`s and `{#id}` in-place when matched."""
     if not nodes or not isinstance(nodes[-1], RawText):
@@ -646,6 +561,7 @@ def buildSingleLineHeading(
     hashes: str,
     contentNodes: list[ParserNode],
 ) -> list[ParserNode]:
+    """Wrap ATX heading content in `<h2>`-`<h6>` (level = `len(hashes) + 1`), extracting any trailing `{#id}`."""
     headingNodes = stripWsNodes(contentNodes)
     headingId = extractSingleLineHeadingId(headingNodes, hashes)
     headingNodes = stripWsNodes(headingNodes)
@@ -666,6 +582,7 @@ def buildMultiLineHeading(
     tagName: str,
     strippedNodes: list[ParserNode],
 ) -> list[ParserNode]:
+    """Wrap Setext heading content in `<h2>`/`<h3>`, extracting and stripping any trailing `{#id}`."""
     attrs: dict[str, str] = {}
     headingNodes = list(strippedNodes)
     if headingNodes and isinstance(headingNodes[-1], RawText):
@@ -757,12 +674,14 @@ def parseParagraph(
     while i < length:
         if checkIndents and state.indentChecker is not None and not s.inOpaqueElement():
             state.indentChecker.checkLine(s, i)
-        if (nextAfterComment := trySkipCommentOrDoctypeLine(s, i)) is not None:
-            i = nextAfterComment
-            continue
         lineEnd = findLineEnd(s, i)
-        if skipHws(chars, i, lineEnd) == lineEnd:
+        lineCStart = skipHws(chars, i, lineEnd)
+        if lineCStart == lineEnd:
             break
+        if chars[lineCStart] == "<" and lineCStart + 1 < lineEnd and chars[lineCStart + 1] == "!":
+            if (nextAfterComment := trySkipCommentOrDoctypeAt(s, lineCStart)) is not None:
+                i = nextAfterComment
+                continue
         absIndent = prefixCountAt(s, i, indent)
         if shouldStopForList(s, i, lineEnd, absIndent, stopAt):
             break
@@ -772,7 +691,7 @@ def parseParagraph(
             # initialRelIndent == 0 and it's a plain text line (otherwise let parseBlocks handle it).
             if initialRelIndent > 0:
                 break
-            cStart = skipHws(chars, i, lineEnd)
+            cStart = lineCStart
             rawKind, _ = matchRawBlockStart(s, cStart, lineEnd, s.config)
             if rawKind is not None:
                 break
@@ -782,15 +701,25 @@ def parseParagraph(
             relIndent = absIndent - minIndent
             if relIndent < initialRelIndent:
                 break
-            consumed = consumeIndentAt(s, i, indent, minIndent)
-            assert consumed is not None
-            bodyStart = consumed
-            cStart = skipHws(chars, bodyStart, lineEnd)
+            if minIndent == 0:
+                bodyStart = i
+                cStart = lineCStart
+            else:
+                consumed = consumeIndentAt(s, i, indent, minIndent)
+                assert consumed is not None
+                bodyStart = consumed
+                cStart = skipHws(chars, bodyStart, lineEnd)
             rawKind, _ = matchRawBlockStart(s, cStart, lineEnd, s.config)
             if rawKind is not None:
                 break
 
-        lineNodes, nextI = parseInlineLine(s, bodyStart, state, minIndent=minIndent)
+        lineNodes, nextI = parseInlineNodes(
+            s,
+            bodyStart,
+            stopAtNewline=True,
+            minIndent=minIndent,
+            onMacroNodes=state.onMacroNodes,
+        )
         stripped = stripWsNodes(lineNodes)
         if not stripped:
             pending = PendingLine(kind="blank", lineNodes=lineNodes, nextI=nextI)
@@ -888,10 +817,13 @@ def parseBlockquote(
             f"Line {lineNum} looks like the start of a markdown blockquote.\nIf this is intended, please set `Markup Shorthands: markdown-blockquotes yes`; if not, set it to `no`.\nSee https://speced.github.io/bikeshed/#md-blockquote for details.",
         )
 
+    # Tracks an open fenced code block as (nested `>` depth, fence char, fence length)
+    # so lazy continuation is disabled until a matching closer at the same depth appears.
     openFence: tuple[int, str, int] | None = None
     canLazyContinue = False
 
     def observeBqContent(contentStart: int, contentEnd: int) -> None:
+        """Update open-fence and lazy-continuation eligibility after consuming a blockquote line."""
         nonlocal openFence, canLazyContinue
         fence = matchFenceAt(s, contentStart, contentEnd)
         if openFence is not None:
@@ -918,6 +850,7 @@ def parseBlockquote(
         afterGt += 1
     physLineStart = s.currentLineStart(cStart)
     subLines: list[str] = [chars[afterGt:lineEnd]]
+    # Track stripped prefix widths per line so errors inside the child stream report accurate columns.
     colOffsets: list[int] = [(afterGt - physLineStart) + s.colOffset(s.lineIndex(cStart))]
     observeBqContent(afterGt, lineEnd)
 
@@ -1014,6 +947,8 @@ def parseBlockquote(
         colOffsets.append((curCStart - curLineStart) + s.colOffset(s.lineIndex(curLineStart)))
         i = curLineEnd + 1 if curLineEnd < length else length
 
+    # Preserve a trailing newline so inline constructs that inspect `s[self.end] == "\n"`
+    # (like trailing possessive `|var|'`) behave identically inside blockquotes.
     hadTrailingNewline = i > lineStart and chars[i - 1] == "\n"
     subChars = "\n".join(subLines)
     if hadTrailingNewline:
@@ -1149,7 +1084,13 @@ def parseBlocks(
             # trigger Markdown block constructs until its closing tag is encountered.
             if firstLineTrimmed:
                 firstLineTrimmed = False
-            lineNodes, nextI = parseInlineLine(s, i, state, minIndent=minIndent)
+            lineNodes, nextI = parseInlineNodes(
+                s,
+                i,
+                stopAtNewline=True,
+                minIndent=minIndent,
+                onMacroNodes=state.onMacroNodes,
+            )
             nodes.extend(lineNodes)
             if not s.inOpaqueElement():
                 nodes.append(RawText(text="\n"))
@@ -1159,6 +1100,8 @@ def parseBlocks(
 
         underIndented = False
         if firstLineTrimmed:
+            # First line of a list item: the list marker (and its leading indent) were already
+            # consumed by parseList(), so `i` starts at the item's effective `minIndent`.
             firstLineTrimmed = False
             lineStart = i
             lineEnd = findLineEnd(s, lineStart)
@@ -1174,18 +1117,17 @@ def parseBlocks(
                 canStartParagraph = True
                 i = lineEnd + 1 if lineEnd < length else length
                 continue
-            if (nextAfterComment := trySkipCommentOrDoctypeLine(s, bodyStart)) is not None:
-                i = nextAfterComment
-                continue
+            if chars[cStart] == "<" and cStart + 1 < lineEnd and chars[cStart + 1] == "!":
+                if (nextAfterComment := trySkipCommentOrDoctypeAt(s, cStart)) is not None:
+                    i = nextAfterComment
+                    continue
         else:
             lineStart = i
             if checkIndents and state.indentChecker is not None:
                 state.indentChecker.checkLine(s, lineStart)
-            if (nextAfterComment := trySkipCommentOrDoctypeLine(s, lineStart)) is not None:
-                i = nextAfterComment
-                continue
             lineEnd = findLineEnd(s, lineStart)
-            if skipHws(chars, lineStart, lineEnd) == lineEnd:
+            lineCStart = skipHws(chars, lineStart, lineEnd)
+            if lineCStart == lineEnd:
                 if stopAt is not None and blankEndsList(s, lineEnd, stopAt):
                     break
                 if lineStart < lineEnd:
@@ -1194,6 +1136,10 @@ def parseBlocks(
                 canStartParagraph = True
                 i = lineEnd + 1 if lineEnd < length else length
                 continue
+            if chars[lineCStart] == "<" and lineCStart + 1 < lineEnd and chars[lineCStart + 1] == "!":
+                if (nextAfterComment := trySkipCommentOrDoctypeAt(s, lineCStart)) is not None:
+                    i = nextAfterComment
+                    continue
             absIndent = prefixCountAt(s, lineStart, indent)
             if shouldStopForList(s, lineStart, lineEnd, absIndent, stopAt):
                 break
@@ -1201,12 +1147,17 @@ def parseBlocks(
                 underIndented = True
                 bodyStart = lineStart
                 relIndent = 0
+                cStart = lineCStart
+            elif minIndent == 0:
+                bodyStart = lineStart
+                relIndent = absIndent
+                cStart = lineCStart
             else:
                 consumed = consumeIndentAt(s, lineStart, indent, minIndent)
                 assert consumed is not None
                 bodyStart = consumed
                 relIndent = absIndent - minIndent
-            cStart = skipHws(chars, bodyStart, lineEnd)
+                cStart = skipHws(chars, bodyStart, lineEnd)
 
         rawKind, rawMatch = matchRawBlockStart(s, cStart, lineEnd, s.config)
         if underIndented and rawKind is not None:
@@ -1216,11 +1167,12 @@ def parseBlocks(
         if rawKind == "heading":
             assert rawMatch is not None
             headingLineNum = s.line(lineStart)
-            headingContent, i = parseInlineLine(
+            headingContent, i = parseInlineNodes(
                 s,
                 rawMatch.end(),
-                state,
+                stopAtNewline=True,
                 minIndent=minIndent,
+                onMacroNodes=state.onMacroNodes,
             )
             nodes.extend(buildSingleLineHeading(headingLineNum, rawMatch.group(1), headingContent))
             canStartParagraph = False
@@ -1269,8 +1221,13 @@ def parseBlocks(
             continue
 
         # Not a raw Markdown block opener: parse the logical line in HTML/inline mode.
-        lineNum = s.line(lineStart)
-        lineNodes, nextI = parseInlineLine(s, bodyStart, state, minIndent=minIndent)
+        lineNodes, nextI = parseInlineNodes(
+            s,
+            bodyStart,
+            stopAtNewline=True,
+            minIndent=minIndent,
+            onMacroNodes=state.onMacroNodes,
+        )
         stripped = stripWsNodes(lineNodes)
         if not stripped:
             # e.g. <pre class=metadata> stripped to empty, or empty optional macro.
@@ -1284,6 +1241,8 @@ def parseBlocks(
             i = nextI
             continue
         if underIndented:
+            # Deferred until after inline parsing so stripped metadata blocks or empty optional
+            # macros inside a list item do not falsely trigger under-indentation errors.
             m.die(
                 f'Line {s.line(lineStart)} isn\'t indented enough (needs {minIndent} indent{"" if minIndent == 1 else "s"}) to be valid Markdown:\n"{chars[lineStart:lineEnd]}"',
             )
@@ -1307,7 +1266,7 @@ def parseBlocks(
                     scanI = afterC
                     continue
                 break
-            nodes.extend(buildMultiLineHeading(lineNum, headingTag, stripped))
+            nodes.extend(buildMultiLineHeading(s.line(lineStart), headingTag, stripped))
             canStartParagraph = False
             i = afterUnderline
             continue
@@ -1315,7 +1274,7 @@ def parseBlocks(
         if canStartParagraph:
             paraNodes, i, pending = parseParagraph(
                 s,
-                lineNum,
+                s.line(lineStart),
                 stripped,
                 initialRelIndent=relIndent,
                 startAfterLine1=nextI,
