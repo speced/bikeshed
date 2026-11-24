@@ -221,6 +221,14 @@ class TreeBuilder:
             # so when I see a heading end tag, just close whatever heading is open.
             self.virtualClose(elements.HEADING_ELEMENTS)
             return
+        if tagName == "li":
+            # Per HTML list-item scoping, </li> cannot cross an enclosing <ul>/<ol>.
+            self.virtualClose(["li"], ["ol", "ul"])
+            return
+        if tagName in ("dt", "dd"):
+            # Per HTML scoping, </dt>/</dd> cannot cross an enclosing <dl>.
+            self.virtualClose([tagName], ["dl"])
+            return
         if tagName in self._tagStack:
             self.autoCloseEnd(tagName)
             self.popEl()

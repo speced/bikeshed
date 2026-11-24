@@ -61,8 +61,6 @@ class ParseConfig:
     markdownBlockquotes: bool = False
     # Whether `markdown-blockquotes` was explicitly enabled (suppresses unset warning).
     markdownBlockquotesExplicit: bool = False
-    # Enable `#` and Setext (`===`/`---`) Markdown headings.
-    markdownHeadings: bool = True
     # Enable inline Markdown (`code` spans and [text](url) links).
     markdownInline: bool = False
     # Enable backslash escapes for Markdown punctuation (\*, \[, etc.).
@@ -100,7 +98,6 @@ class ParseConfig:
             markdownBlock="markdown-block" in doc.md.markupShorthands,
             markdownBlockquotes=not doc.md.markupShorthands.explicitFalse("markdown-blockquotes"),
             markdownBlockquotesExplicit=doc.md.markupShorthands.explicitTrue("markdown-blockquotes"),
-            markdownHeadings=True,
             markdownInline="markdown-inline" in doc.md.markupShorthands,
             markdownEscapes="markdown-escapes" in doc.md.markupShorthands,
             markup="markup" in doc.md.markupShorthands,

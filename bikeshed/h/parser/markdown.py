@@ -69,9 +69,9 @@ def parseCodeSpan(s: Stream, start: int) -> ResultT[list[ParserNode]]:
     return Ok([startTag, content, endTag], i)
 
 
-def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[SafeElement]:
+def parseFencedCodeBlock(s: Stream, start: int, *, atLineStart: bool = False) -> ResultT[SafeElement]:
     """Parse a Markdown fenced code block (```` ``` ```` or `~~~`) into a `<pre>` `SafeElement`."""
-    if s.precedingTextOnLine(start).strip() != "":
+    if not atLineStart and s.precedingTextOnLine(start).strip() != "":
         return Err(start)
 
     match, i, _ = s.matchRe(start, fencedStartRe)
@@ -105,13 +105,8 @@ def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[SafeElement]:
         # into the contents string.
         contents += text
 
-        # Ending fence has to have only whitespace preceding it.
+        # Ending fence needs only whitespace preceding it (tolerating minor indent differences per CommonMark).
         if s.precedingTextOnLine(i).strip() == "":
-            # Currently this doesn't enforce that the ending fence
-            # needs to be indented to the same level as the opening
-            # fence. I'll fix this better when I munge the HTML
-            # and markdown parsers.
-
             # Consume the whole fence, since it can be longer.
             _, i, _ = s.matchRe(i, fencedStartRe)
             break

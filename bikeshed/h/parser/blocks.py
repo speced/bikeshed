@@ -365,13 +365,12 @@ def matchRawBlockStart(
     """Classifies a non-blank line's raw-text Markdown block opener at `cStart`."""
     chars = s.chars
     ch = chars[cStart]
-    if config.markdownHeadings:
-        if ch == "=" and _EQUALS_LINE_RE.match(chars, cStart, lineEnd):
-            return "equals-line", None
-        if ch == "-" and _DASH_LINE_RE.match(chars, cStart, lineEnd):
-            return "dash-line", None
-        if ch == "#" and (match := _HEADING_START_RE.match(chars, cStart, lineEnd)):
-            return "heading", match
+    if ch == "=" and _EQUALS_LINE_RE.match(chars, cStart, lineEnd):
+        return "equals-line", None
+    if ch == "-" and _DASH_LINE_RE.match(chars, cStart, lineEnd):
+        return "dash-line", None
+    if ch == "#" and (match := _HEADING_START_RE.match(chars, cStart, lineEnd)):
+        return "heading", match
     if ch in ("*", "-", "_") and _RULE_RE.match(chars, cStart, lineEnd):
         return "rule", None
     if (ch == "-" or ch.isdigit()) and (match := _NUMBERED_START_RE.match(chars, cStart, lineEnd)):
@@ -465,8 +464,8 @@ def shouldStopForList(s: Stream, lineStart: int, lineEnd: int, absIndent: int, s
     return False
 
 
-def blankEndsList(s: Stream, blankLineEnd: int, stopAt: ListStop) -> bool:
-    """Returns whether the blank line ending at `blankLineEnd` terminates `stopAt`."""
+def blankEndsList(s: Stream, blankLineEnd: int, stopAt: ListStop) -> tuple[bool, int]:
+    """Return `(endsList, nextContentPos)` for the blank/comment run starting after `blankLineEnd`."""
     chars = s.chars
     length = s.length
     j = blankLineEnd + 1 if blankLineEnd < length else length
@@ -480,12 +479,12 @@ def blankEndsList(s: Stream, blankLineEnd: int, stopAt: ListStop) -> bool:
             continue
         nextAbsIndent = prefixCountAt(s, j, s.config.indent)
         if nextAbsIndent < stopAt.baseIndent:
-            return True
+            return True, j
         if nextAbsIndent > stopAt.baseIndent:
-            return False
+            return False, j
         itemType = matchLineItemType(s, j, jEnd, s.config)
-        return itemType not in stopAt.itemTypes
-    return True
+        return itemType not in stopAt.itemTypes, j
+    return True, length
 
 
 def peekSetextUnderline(
@@ -495,8 +494,6 @@ def peekSetextUnderline(
     stopAt: ListStop | None,
 ) -> tuple[str, int] | None:
     """Peeks past comment-only lines for a Setext underline (`===` or `---`), returning `(tagName, nextI)`."""
-    if not s.config.markdownHeadings:
-        return None
     chars = s.chars
     length = s.length
     j = start
@@ -1023,8 +1020,7 @@ def parseList(
             checkIndents=checkIndents,
         )
         nodes.extend(itemNodes)
-        if curKind != "bulleted":
-            nodes.append(EndTag(tag=itemTag))
+        nodes.append(EndTag(tag=itemTag))
 
         # `parseBlocks` returns only at EOF, a list-ending blank line, or a `shouldStopForList` line.
         if i >= length:
@@ -1065,6 +1061,8 @@ def parseBlocks(
     indent = s.config.indent
     canStartParagraph = True
     pending: PendingLine | None = None
+    # Tracks the first non-blank line after a verified non-ending blank run inside a list to avoid O(K^2) lookahead.
+    listContinuesUntil = -1
 
     while i < length or pending is not None:
         if pending is not None:
@@ -1097,6 +1095,7 @@ def parseBlocks(
             continue
 
         underIndented = False
+        wasFirstLineTrimmed = firstLineTrimmed
         if firstLineTrimmed:
             # First line of a list item: the list marker (and its leading indent) were already
             # consumed by parseList(), so `i` starts at the item's effective `minIndent`.
@@ -1126,8 +1125,11 @@ def parseBlocks(
             lineEnd = findLineEnd(s, lineStart)
             lineCStart = skipHws(chars, lineStart, lineEnd)
             if lineCStart == lineEnd:
-                if stopAt is not None and blankEndsList(s, lineEnd, stopAt):
-                    break
+                if stopAt is not None and lineStart >= listContinuesUntil:
+                    endsList, nextContentPos = blankEndsList(s, lineEnd, stopAt)
+                    if endsList:
+                        break
+                    listContinuesUntil = nextContentPos
                 if lineStart < lineEnd:
                     nodes.append(RawText.fromStream(s, lineStart, lineEnd))
                 nodes.append(RawText(text="\n"))
@@ -1225,6 +1227,7 @@ def parseBlocks(
             stopAtNewline=True,
             minIndent=minIndent,
             onMacroNodes=state.onMacroNodes,
+            atLineStart=wasFirstLineTrimmed,
         )
         stripped = stripWsNodes(lineNodes)
         if not stripped:
