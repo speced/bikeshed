@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from ... import messages as m
 from ... import t
 from .. import elements
+from .html import parseDoctype
+from .markdown import fencedStartRe
 from .nodes import (
     Comment,
     Doctype,
@@ -18,11 +20,7 @@ from .nodes import (
     escapeAttr,
     isTag,
 )
-from .parser import (
-    fencedStartRe,
-    parseDoctype,
-    parseInlineNodes,
-)
+from .parser import parseInlineNodes
 from .stream import ParseConfig, Stream
 
 _EQUALS_LINE_RE = re.compile(r"={3,}[ \t]*$")

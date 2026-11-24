@@ -1,0 +1,478 @@
+"""Inline Markdown constructs and fenced code blocks (complementing block-level Markdown in `blocks.py`)."""
+
+from __future__ import annotations
+
+import re
+
+from ... import messages as m
+from ... import t
+from .html import CharRefContext, isDatablockClass, parseCharRef, printChAsCharRef
+from .nodes import EndTag, ParserNode, RawText, SafeElement, SafeText, StartTag, escapeAttr
+from .preds import isControl, isWhitespace
+from .result import Err, Ok
+from .stream import Stream
+
+if t.TYPE_CHECKING:
+    from .result import ResultT
+    from .stream import ExperimentalNodesFn
+
+codeSpanStartRe = re.compile(r"`+")
+# A few common lengths to pre-compile for speed.
+codeSpanEnd1Re = re.compile(r"(.*?[^`])(`)([^`]|$)")
+codeSpanEnd2Re = re.compile(r"(.*?[^`])(``)([^`]|$)")
+
+fencedStartRe = re.compile(r"`{3,}|~{3,}")
+
+MARKDOWN_ESCAPE_RE = re.compile(r"\\([\\!\"#$%&'()*+,./:;<=>?@\[\]^_`{|}~-])")
+
+
+def parseCodeSpan(s: Stream, start: int) -> ResultT[list[ParserNode]]:
+    """Parse an inline Markdown backtick code span (`` `code` ``) into an opaque `<code>` element."""
+    if s[start - 1] == "`" and s.slice(start - 2, start) != "\\`":
+        return Err(start)
+    if s[start] != "`":
+        return Err(start)
+    match, i, _ = s.matchRe(start, codeSpanStartRe)
+    assert match is not None
+    ticks = match[0]
+    contentStart = i
+
+    if len(ticks) == 1:
+        endRe = codeSpanEnd1Re
+    elif len(ticks) == 2:
+        endRe = codeSpanEnd2Re
+    else:
+        endRe = re.compile(r"([^`])(" + ticks + ")([^`]|$)")
+    match, _, _ = s.searchRe(i, endRe)
+    if match is None:
+        # Allowed to be unmatched, they're just ticks then.
+        return Err(start)
+    contentEnd = match.end(1)
+    i = match.end(2)
+
+    text = s.slice(contentStart, contentEnd).replace("\n", " ")
+    if text.startswith(" ") and text.endswith(" ") and text.strip() != "":
+        # If you start and end with spaces, but aren't *all* spaces,
+        # strip one space off.
+        # (So you can put ticks at the start/end of your code span.)
+        text = text[1:-1]
+
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        contentStart,
+        "code",
+        {"bs-autolink-syntax": escapeAttr(f"{ticks}{text}{ticks}"), "bs-opaque": ""},
+    )
+    content = SafeText.fromStream(s, contentStart, contentEnd, text)
+    endTag = EndTag.fromStream(s, contentEnd, i, startTag)
+    return Ok([startTag, content, endTag], i)
+
+
+def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[SafeElement]:
+    """Parse a Markdown fenced code block (```` ``` ```` or `~~~`) into a `<pre>` `SafeElement`."""
+    if s.precedingTextOnLine(start).strip() != "":
+        return Err(start)
+
+    match, i, _ = s.matchRe(start, fencedStartRe)
+    if match is None:
+        return Err(start)
+    openingFence = match.group(0)
+
+    infoString, i, _ = s.skipToNextLine(i)
+    assert infoString is not None
+    infoString = infoString.strip()
+    if "`" in infoString:
+        # This isn't allowed, because it collides with inline code spans.
+        return Err(start)
+
+    contents = ""
+    while True:
+        # Ending fence has to use same character and be
+        # at least as long, so just search for the opening
+        # fence itself, as a start.
+
+        text, i, _ = s.skipTo(i, openingFence)
+
+        # No ending fence in the rest of the document
+        if text is None:
+            m.die("Hit EOF while parsing fenced code block.", lineNum=s.loc(start))
+            contents += s.slice(i, None)
+            i = len(s)
+            break
+
+        # Found a possible ending fence, put preceding text
+        # into the contents string.
+        contents += text
+
+        # Ending fence has to have only whitespace preceding it.
+        if s.precedingTextOnLine(i).strip() == "":
+            # Currently this doesn't enforce that the ending fence
+            # needs to be indented to the same level as the opening
+            # fence. I'll fix this better when I munge the HTML
+            # and markdown parsers.
+
+            # Consume the whole fence, since it can be longer.
+            _, i, _ = s.matchRe(i, fencedStartRe)
+            break
+
+        # Otherwise I just hit a line that happens to have
+        # a fence lookalike- on it, but not closing this one.
+        # Skip the fence and continue.
+
+        match, i, _ = s.matchRe(i, fencedStartRe)
+        assert match is not None
+        contents += match.group(0)
+
+    # At this point i is past the end of the code block.
+    tag = StartTag.fromStream(s, start, start, "pre")
+    if infoString:
+        tag.attrs["bs-infostring"] = escapeAttr(infoString)
+        lang = infoString.split(" ")[0]
+        if isDatablockClass(lang):
+            tag.classes.add(lang)
+        else:
+            tag.classes.add(f"language-{lang}")
+    el = SafeElement.fromStream(s, start, i, tag, contents)
+    return Ok(el, i)
+
+
+def parseMarkdownLink(
+    s: Stream,
+    start: int,
+    generateExperimentalNodes: ExperimentalNodesFn,
+) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse an inline Markdown `[text](dest "title")` link into an `<a>` element."""
+    linkTextStart = start + 1
+    startingSigil = "["
+    endingSigil = "](...)"
+
+    startTag = StartTag.fromStream(s, start, linkTextStart, "a")
+
+    # At this point, we're still not committed to this being
+    # an autolink, so it should silently fail.
+    nodes: list[ParserNode] = []
+    for i in generateExperimentalNodes(s, linkTextStart, nodes):
+        if s.chars.count("\n", start, i) > 3:
+            return Err(start)
+        if s.slice(i, i + 2) == "](":
+            linkTextEnd = i
+            linkDestStart = i + 2
+            break
+        if s[i] == "]":
+            return Err(start)
+    else:
+        return Err(start)
+    # Now that we've seen the ](, we're committed.
+    s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
+    s.observeNodes(nodes)
+    virtualEndTags = s.observeShorthandClose(s, linkTextEnd, startTag, (startingSigil, endingSigil))
+
+    # I'm not doing bracket-checking in the link text,
+    # as CommonMark requires, because I've already lost
+    # the information about whether they were escaped.
+    result, nodeEnd, _ = parseMarkdownLinkDestTitle(s, linkDestStart)
+    if result is None:
+        # Return the already-parsed stuff, with the syntax
+        # chars turned back into text.
+        openingSquare = RawText.fromStream(s, start, start + 1)
+        middleBit = RawText.fromStream(s, linkTextEnd, linkDestStart)
+        return Ok([openingSquare, *nodes, middleBit], linkDestStart)
+    dest, title = result
+    startTag.attrs["href"] = escapeAttr(dest)
+    startTag.attrs["bs-autolink-syntax"] = escapeAttr(s.slice(start, nodeEnd))
+    if title:
+        startTag.attrs["title"] = escapeAttr(title)
+    endTag = EndTag.fromStream(s, nodeEnd - 1, nodeEnd, startTag)
+    return Ok([startTag, *nodes, *virtualEndTags, endTag], nodeEnd)
+
+
+def parseMarkdownLinkDestTitle(s: Stream, start: int) -> ResultT[tuple[str, str]]:
+    """Parse the `(dest "title")` tail of a Markdown link starting after `(`, returning `(dest, title)`."""
+    res, i, _ = parseMarkdownLinkWhitespace(s, start)
+    if res is None:
+        return Err(start)
+
+    TITLE_START_CHARS = ('"', "'", "(")
+
+    dest: str | None = ""
+    title: str | None = ""
+    if s[i] == ")":
+        # Perfectly fine to be empty.
+        return Ok(("", ""), i + 1)
+
+    # Parse an optional destination
+    if s[i] == "<":
+        dest, i, _ = parseMarkdownLinkAngleDest(s, i + 1)
+        sawDest = True
+    elif s[i] in TITLE_START_CHARS:
+        # This indicates a title, so a skipped dest,
+        # which is totally fine.
+        sawDest = False
+    else:
+        dest, i, _ = parseMarkdownLinkIdentDest(s, i)
+        sawDest = True
+    if dest is None:
+        return Err(start)
+
+    ws, i, _ = parseMarkdownLinkWhitespace(s, i)
+    if ws is None:
+        return Err(start)
+    if s[i] == ")":
+        return Ok((dest, ""), i + 1)
+
+    if s[i] in TITLE_START_CHARS:
+        if ws == "" and sawDest:
+            # If you do have a dest, you *must* have whitespace
+            # between it and the title.
+            m.die("Missing required whitespace between markdown link's destination and title", lineNum=s.loc(i))
+            return Err(start)
+
+        title, i, _ = parseMarkdownLinkTitle(s, i + 1, s[i])
+        if title is None:
+            return Err(start)
+    assert title is not None
+
+    ws, i, _ = parseMarkdownLinkWhitespace(s, i)
+    if ws is None:
+        return Err(start)
+
+    if s[i] == ")":
+        return Ok((dest, title), i + 1)
+    else:
+        m.die(
+            "Tried to parse a markdown link's destination/title, but ran into some unexpected characters",
+            lineNum=s.loc(i),
+        )
+        return Err(start)
+
+
+def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
+    """Consume whitespace inside a Markdown link's destination/title, disallowing blank lines and EOF."""
+    seenLinebreak = False
+    i = start
+    while isWhitespace(s[i]):
+        if s.eof(i):
+            m.die("Hit EOF while parsing the destination/title of a markdown link", lineNum=s.loc(start))
+            return Err(start)
+        if s[i] == "\n":
+            if seenLinebreak:
+                m.die("The destination/title of a markdown link can't contain a blank line.", lineNum=s.loc(start))
+                return Err(start)
+            else:
+                seenLinebreak = True
+        i += 1
+    return Ok(s.slice(start, i), i)
+
+
+def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
+    """Parse an angle-bracketed `<url>` Markdown link destination starting after `<`."""
+    i = start
+    val = ""
+    startSeg = i
+    ch: str | SafeText | None
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start - 1))
+            return Err(start)
+        elif s.config.markdownEscapes and s[i] == "\\":
+            startEscape = i
+            ch, i, _ = parseMarkdownEscape(s, i)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startEscape) + ch
+            startSeg = i
+            continue
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
+            if ch is None:
+                i += 1
+                continue
+            if isinstance(ch, SafeText):
+                ch = ch.text
+            val += s.slice(startSeg, startRef) + ch
+            startSeg = i
+            continue
+        elif s[i] == ">":
+            break
+        elif s[i] == "<":
+            m.die(
+                "The <>-wrapped destination of a markdown link can't contain further unescaped < characters",
+                lineNum=s.loc(i),
+            )
+            return Err(start)
+        elif s[i] == "\n":
+            m.die("The <>-wrapped destination of a markdown link can't contain a newline", lineNum=s.loc(start))
+            return Err(start)
+        else:
+            i += 1
+    val += s.slice(startSeg, i)
+    i += 1
+    return Ok(val, i)
+
+
+def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
+    """Parse a bare (non-angle-bracketed) Markdown link destination, allowing balanced parentheses."""
+    i = start
+    parenDepth = 0
+    val = ""
+    startSeg = i
+    ch: str | SafeText | None
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start))
+            return Err(start)
+        elif s.config.markdownEscapes and s[i] == "\\":
+            startEscape = i
+            ch, i, _ = parseMarkdownEscape(s, i)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startEscape) + ch
+            startSeg = i
+            continue
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
+            if ch is None:
+                i += 1
+                continue
+            if isinstance(ch, SafeText):
+                ch = ch.text
+            val += s.slice(startSeg, startRef) + ch
+            startSeg = i
+            continue
+        elif isControl(s[i]):
+            m.die(
+                f"The destination of a markdown link can't contain ASCII control characters ({hex(ord(s[i]))})",
+                lineNum=s.loc(i),
+            )
+            return Err(start)
+        elif isWhitespace(s[i]):
+            break
+        elif s[i] == "(":
+            parenDepth += 1
+            i += 1
+        elif s[i] == ")":
+            if parenDepth == 0:
+                break
+            else:
+                parenDepth -= 1
+                i += 1
+        else:
+            i += 1
+    val += s.slice(startSeg, i)
+    # no ending character so no bumping the i
+    return Ok(val, i)
+
+
+def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str]:
+    """Parse a `'...'`, `"..."`, or `(...)` Markdown link title starting after its opening delimiter."""
+    i = start
+    if startChar == "'":
+        endChar = "'"
+    elif startChar == '"':
+        endChar = '"'
+    elif startChar == "(":
+        endChar = ")"
+    else:
+        assert False, "unreachable"
+    val = ""
+    startSeg = i
+    ch: str | SafeText | None
+    while True:
+        if s.eof(i):
+            m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.line(start))
+            return Err(start)
+        elif s.config.markdownEscapes and s[i] == "\\":
+            startEscape = i
+            ch, i, _ = parseMarkdownEscape(s, i)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
+            startSeg = i
+            continue
+        elif s[i] == "&":
+            startRef = i
+            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
+            if ch is None:
+                i += 1
+                continue
+            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
+            startSeg = i
+            continue
+        elif s[i] == endChar:
+            break
+        elif s[i] == startChar:
+            m.die(
+                f"The title of a markdown link can't contain the starting char ({startChar}) unless it's escaped",
+                lineNum=s.loc(i),
+            )
+            return Err(start)
+        elif isWhitespace(s[i]):
+            ws, i, _ = parseMarkdownLinkWhitespace(s, i)
+            if ws is None:
+                return Err(start)
+        else:
+            i += 1
+    val += s.slice(startSeg, i)
+    i += 1
+    return Ok(val, i)
+
+
+def parseMarkdownEscape(s: Stream, start: int) -> ResultT[str]:
+    """Parse a Markdown backslash escape at `start`, returning the unescaped character."""
+    if isMarkdownEscape(s, start):
+        return Ok(s[start + 1], start + 2)
+    return Err(start)
+
+
+def isMarkdownEscape(s: Stream, start: int) -> bool:
+    """Return True if `s[start:start+2]` is a handled Markdown backslash escape (leaving `\\*` and `\\_` for later emphasis parsing)."""
+    return s[start] == "\\" and s[start + 1] in (
+        "\\",
+        "!",
+        '"',
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "(",
+        ")",
+        # "*",
+        "+",
+        ",",
+        "-",
+        ".",
+        "/",
+        ":",
+        ";",
+        "<",
+        "=",
+        ">",
+        "?",
+        "@",
+        "[",
+        "]",
+        "^",
+        # "_",
+        "`",
+        "{",
+        "|",
+        "}",
+        "~",
+    )
+
+
+def htmlifyMarkdownEscapes(val: str) -> str:
+    """Replace Markdown backslash escapes in `val` with numeric HTML character references."""
+    return re.sub(MARKDOWN_ESCAPE_RE, markdownEscapeReplacer, val)
+
+
+def markdownEscapeReplacer(match: t.Match) -> str:
+    """Regex callback converting an escaped Markdown punctuation char into a numeric HTML entity."""
+    return f"&#{ord(match[1])};"
