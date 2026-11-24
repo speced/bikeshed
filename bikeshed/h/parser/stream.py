@@ -12,6 +12,28 @@ if t.TYPE_CHECKING:
     from .nodes import ParserNode, StartTag
     from .result import OkT, ResultT
 
+    class ResultGeneratorFn(t.Protocol):
+        """Callable matching `generateResults(s, start, experimental=...)`."""
+
+        def __call__(
+            self,
+            s: Stream,
+            start: int,
+            experimental: bool = False,
+        ) -> t.Generator[OkT[ParserNode | list[ParserNode]], None, None]:
+            """Yield `Ok` parse results from `s` starting at `start`."""
+
+    class ExperimentalNodesFn(t.Protocol):
+        """Callable matching `generateExperimentalNodes(s, start, coll)`."""
+
+        def __call__(
+            self,
+            s: Stream,
+            start: int,
+            coll: list[ParserNode],
+        ) -> t.Generator[int, None, None]:
+            """Collect experimental nodes from `s` into `coll`, yielding each stream index."""
+
 
 @dataclass
 class ParseConfig:
