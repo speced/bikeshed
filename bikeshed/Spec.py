@@ -270,8 +270,7 @@ class Spec:
             self.nodes = self.earlyParse(self.inputContent, indentChecker=indentChecker)
 
         if indentChecker is not None:
-            with self.timer.phase("assembleDocument: mixedIndents"):
-                indentChecker.emit()
+            indentChecker.emit()
 
         with self.timer.phase("assembleDocument: loadExtensions"):
             extensions.load(self)
@@ -282,10 +281,7 @@ class Spec:
         with self.timer.phase("assembleDocument: initializeBiblio"):
             self.refs.initializeBiblio(doc=self)
 
-        if self.debugPrint == "pre-md":
-            m.warn("--print=pre-md is no longer distinct from post-md; printing unified parse output.")
-            print(h.strFromNodes(self.nodes))  # noqa: T201
-        elif self.debugPrint == "post-md":
+        if self.debugPrint == "post-md":
             print(h.strFromNodes(self.nodes))  # noqa: T201
 
         with self.timer.phase("assembleDocument: addHeaderFooter"):
