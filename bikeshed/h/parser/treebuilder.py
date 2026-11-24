@@ -28,13 +28,16 @@ from .nodes import (
 
 
 def buildDocument(nodes: t.Iterable[ParserNode]) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
+    """Build a full LXML document from `nodes` and return `(html, head, body)`."""
     builder = TreeBuilder()
     consumeNodes(nodes, builder)
     return builder.finish()
 
 
 def buildFragment(nodes: t.Iterable[ParserNode]) -> t.ElementT:
+    """Build an LXML container element (`<bs-fragment-container>`) holding parsed `nodes` in body context."""
     builder = TreeBuilder()
+    # Wrapping in a non-head tag immediately transitions into <body> so fragment nodes stay together.
     builder.startTag("bs-fragment-container", {})
     consumeNodes(nodes, builder)
     builder.endTag("bs-fragment-container")
@@ -52,6 +55,7 @@ _ESCAPE_RE = re.compile(r"&(?:#x([^;]*);|#([^;]*);|(lt|amp|apos|quot);)")
 
 
 def _replaceEscape(match: re.Match[str]) -> str:
+    """Decode a single numeric or basic named HTML entity match."""
     if (hexDigits := match.group(1)) is not None:
         try:
             return chr(int(hexDigits, 16))
@@ -68,12 +72,14 @@ def _replaceEscape(match: re.Match[str]) -> str:
 
 
 def unescapeHtml(text: str) -> str:
+    """Unescape numeric and basic named (`&lt;`, `&amp;`, `&apos;`, `&quot;`) HTML character references in `text`."""
     if "&" not in text:
         return text
     return _ESCAPE_RE.sub(_replaceEscape, text)
 
 
 def prepareAttrs(node: StartTag | SelfClosedTag) -> dict[str, str]:
+    """Finalize, sort, normalize, and unescape a tag node's attributes for LXML SAX."""
     rawAttrs = node.attrs
     addLineInfo = node.s is None or not node.s.config.rawHtml
     if addLineInfo and "bs-line-number" not in rawAttrs and node.loc:
@@ -84,6 +90,7 @@ def prepareAttrs(node: StartTag | SelfClosedTag) -> dict[str, str]:
         rawAttrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
     attrs: dict[str, str] = {}
     for k, v in sortAttrs(rawAttrs):
+        # LXML's SAX handler rejects undeclared XML namespace prefixes, so strip any `prefix:`.
         if ":" in k:
             _, _, k = k.partition(":")
         if "&" in v:
@@ -94,6 +101,7 @@ def prepareAttrs(node: StartTag | SelfClosedTag) -> dict[str, str]:
 
 
 def consumeNodes(nodes: t.Iterable[ParserNode], builder: TreeBuilder) -> None:
+    """Feed each `ParserNode` into `builder` as SAX-like tree events."""
     for node in nodes:
         node = t.cast(ParserNodeT, node)
         if isinstance(node, RawText):
@@ -123,12 +131,11 @@ def consumeNodes(nodes: t.Iterable[ParserNode], builder: TreeBuilder) -> None:
             t.assert_never(node)
 
 
-# TreeBuilder holds an lxml sax handler for constructing a document from
-# ParserNodes, plus enough tag context to ensure the document structure is
-# reasonably correct per HTML's rules.
-# Note that tagStack never holds the html/head/body element; those are
-# handled specially instead.
 class TreeBuilder:
+    """Constructs an LXML document from parser events via SAX, handling HTML head/body placement and auto-closing."""
+
+    # Note that `_tagStack` never holds html/head/body; those are opened eagerly and
+    # have their attributes merged onto the real elements in `finish()`.
     _handler: t.Any  # Ugh, lxml doesn't give this a type
     _tagStack: list[str]
     _inHead: bool
@@ -137,6 +144,7 @@ class TreeBuilder:
     _bodyAttrs: list[dict[str, str]]
 
     def __init__(self) -> None:
+        """Initialize the SAX tree handler with an open `<html><head>` skeleton."""
         self._handler = lxml.sax.ElementTreeContentHandler()
         self._htmlAttrs = []
         self._headAttrs = []
@@ -147,6 +155,7 @@ class TreeBuilder:
         self._handler.startElement("head", {})
 
     def finish(self) -> tuple[t.ElementT, t.ElementT, t.ElementT]:
+        """Close all open tags, apply deferred root attributes, and return `(html, head, body)`."""
         if self._inHead:
             self.startBody()
         self.autoCloseAll()
@@ -163,6 +172,7 @@ class TreeBuilder:
         return html, head, body
 
     def startTag(self, tagName: str, attrs: dict[str, str]) -> None:
+        """Emit an opening tag, handling root-element deferral, head-to-body transitions, and HTML auto-closing."""
         if tagName == "html":
             if attrs:
                 self._htmlAttrs.append(attrs)
@@ -191,6 +201,7 @@ class TreeBuilder:
         self.pushEl(tagName)
 
     def endTag(self, tagName: str) -> None:
+        """Emit a closing tag, auto-closing intermediate open elements when needed."""
         if self._tagStack and tagName == self._tagStack[-1]:
             # Simple case
             self.popEl()
@@ -216,22 +227,26 @@ class TreeBuilder:
             self._handler.endElement(tagName)
 
     def selfClosedTag(self, tagName: str, attrs: dict[str, str]) -> None:
+        """Emit a start tag immediately followed by its matching end tag."""
         self.startTag(tagName, attrs)
         self.endTag(tagName)
 
     def characters(self, chars: str) -> None:
+        """Append character data, transitioning from `<head>` to `<body>` on non-whitespace text."""
         if self._inHead and not self._tagStack and chars.strip() != "":
             self.startBody()
         self._handler.characters(chars)
 
     def pushEl(self, tagName: str) -> None:
+        """Push `tagName` onto the open-element stack."""
         self._tagStack.append(tagName)
 
     def popEl(self) -> None:
+        """Pop the top tag name from the open-element stack."""
         self._tagStack.pop()
 
     def startBody(self) -> None:
-        # I saw something that needs to live in the <body>
+        """Transition from `<head>` to `<body>`, closing any remaining head elements."""
         if self._inHead:
             self._inHead = False
             self.autoCloseAll()
@@ -239,19 +254,19 @@ class TreeBuilder:
             self._handler.startElement("body")
 
     def autoCloseAll(self) -> None:
-        # Close all currently-open elements
+        """Close all elements currently on `_tagStack`."""
         while self._tagStack:
             tag = self._tagStack.pop()
             self._handler.endElement(tag)
 
     def autoCloseEnd(self, tagName: str) -> None:
-        # auto-close all tags still open until you hit the one that's actually being closed
+        """Close all open elements above `tagName` on `_tagStack`."""
         while self._tagStack[-1] != tagName:
             endTagName = self._tagStack.pop()
             self._handler.endElement(endTagName)
 
     def autoCloseStart(self, tagName: str) -> None:
-        # auto-close special tags who get closed by another tag opening
+        """Close any HTML elements implicitly terminated by opening `tagName`."""
         if tagName in elements.AUTO_CLOSE_P_START_ELEMENTS:
             self.virtualClose(["p"])
         if tagName == "li":
@@ -288,7 +303,7 @@ class TreeBuilder:
             self.virtualClose(["rb", "rp", "rt"], ["ruby"])
 
     def virtualClose(self, tags: list[str] | frozenset[str], scopes: list[str] | None = None) -> None:
-        # If tags exist, below a scopes, pop everything up and and including the tags.
+        """If any tag in `tags` is open within `scopes`, close it and everything nested inside it."""
         i = len(self._tagStack) - 1
         while i >= 0:
             if self._tagStack[i] in tags:
@@ -307,6 +322,7 @@ class TreeBuilder:
 
 
 def applyAttrs(el: t.ElementT, attrList: list[dict[str, str]]) -> t.ElementT:
+    """Merge a sequence of attribute dicts onto `el`, concatenating `class` values."""
     for attrs in attrList:
         for k, v in attrs.items():
             if k == "class" and el.get("class"):

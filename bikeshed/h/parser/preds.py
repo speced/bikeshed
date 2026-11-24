@@ -273,15 +273,18 @@ _NONCHARACTER_CPS = frozenset(
 
 
 def isXMLishTagname(tagname: str) -> bool:
+    """Return True if `tagname` is a known SVG or MathML tag name (which allow `/>` self-closing)."""
     return tagname in xmlishTagnames
 
 
 def isTagnameChar(ch: str) -> bool:
+    """Return True if `ch` is a valid HTML/XML tag name character (following XML NameChar ranges for LXML)."""
     if ch in _ASCII_TAGNAME:
         return True
     if len(ch) != 1:
         return False
     cp = ord(ch)
+    # Non-ASCII ranges follow XML 1.0 NameStartChar / NameChar so output stays valid for LXML.
     if cp < 0xB7:
         return False
     if cp == 0xB7:
@@ -306,9 +309,10 @@ def isTagnameChar(ch: str) -> bool:
 
 
 def isAttrNameChar(ch: str) -> bool:
+    """Return True if `ch` is a valid XML attribute name character (stricter than HTML for LXML compatibility)."""
     # Technically, HTML is super forgiving of attr name chars, for some reason.
     # But since I eventually pass this into LXML, I need to abide by XML name rules,
-    # where attr names follow the same rules as tag names.
+    # where attr names follow the same rules as tag names (plus ":").
     # For example, <foo \=val> is valid in HTML, but not in XML.
     if ch in _ASCII_ATTRNAME:
         return True
@@ -322,42 +326,51 @@ def isAttrNameChar(ch: str) -> bool:
 
 
 def isASCII(ch: str) -> bool:
+    """Return True if `ch` is a single ASCII character (U+0000 to U+007F)."""
     if len(ch) != 1:
         return False
     return ord(ch) <= 127
 
 
 def isASCIIAlphanum(ch: str) -> bool:
+    """Return True if `ch` is an ASCII letter or digit."""
     return ch in _ASCII_ALPHANUM
 
 
 def isASCIIAlpha(ch: str) -> bool:
+    """Return True if `ch` is an ASCII letter (A-Z or a-z)."""
     return ch in _ASCII_ALPHA
 
 
 def isASCIILowerAlpha(ch: str) -> bool:
+    """Return True if `ch` is a lowercase ASCII letter (a-z)."""
     return ch in _ASCII_LOWER
 
 
 def isASCIIUpperAlpha(ch: str) -> bool:
+    """Return True if `ch` is an uppercase ASCII letter (A-Z)."""
     return ch in _ASCII_UPPER
 
 
 def isDigit(ch: str) -> bool:
+    """Return True if `ch` is an ASCII decimal digit (0-9)."""
     return ch in _DIGIT
 
 
 def isHexDigit(ch: str) -> bool:
+    """Return True if `ch` is an ASCII hexadecimal digit (0-9, a-f, A-F)."""
     return ch in _HEX_DIGIT
 
 
 def isWhitespace(ch: str | int) -> bool:
+    """Return True if `ch` (a character or code point) is HTML ASCII whitespace (tab, LF, FF, space)."""
     if isinstance(ch, str):
         return ch in WHITESPACE_CHARS
     return ch in _WHITESPACE_CPS
 
 
 def isControl(ch: str | int) -> bool:
+    """Return True if `ch` (a character or code point) is an HTML/Infra control character."""
     if isinstance(ch, str):
         if len(ch) != 1:
             return False
@@ -368,6 +381,7 @@ def isControl(ch: str | int) -> bool:
 
 
 def isNoncharacter(ch: str | int) -> bool:
+    """Return True if `ch` (a character or code point) is a Unicode noncharacter."""
     if isinstance(ch, str):
         if len(ch) != 1:
             return False

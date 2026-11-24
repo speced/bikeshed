@@ -40,65 +40,252 @@ BRACKET_AUTOLINK_CHARS = "=$:[]^"
 #  smaller chunks; it doesn't affect correctness.)
 POSSIBLE_NODE_START_CHARS = "&<>`'~[]{}()\\—-|" + BRACKET_AUTOLINK_CHARS
 POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(POSSIBLE_NODE_START_CHARS)}]")
-ACTUAL_NODE_START_SET = frozenset("&<>`'~[{|\\—-")
+ACTUAL_NODE_START_CHARS = "&<>`'~[{|\\—-"
+ACTUAL_NODE_START_SET = frozenset(ACTUAL_NODE_START_CHARS)
+_ACTUAL_NODE_START_RE = re.compile(f"[{re.escape(ACTUAL_NODE_START_CHARS)}]")
+_ACTUAL_LINE_STOP_RE = re.compile(f"[\n{re.escape(ACTUAL_NODE_START_CHARS)}]")
 _RAW_HTML_START_RE = re.compile(r"[&<]")
 
 
-def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
-    # Consumes the stream until eof, yielding ParserNodes.
-    # Massages the results slightly for final consumption,
-    # adding curly quotes and combining adjacent RawText nodes.
-    #
-    # `lastNode` is always the previous node (for curlifyApostrophes context);
-    # when `heldLast` is True, it is an unyielded RawText buffered for merging.
+def _stripIndentAfterNewlines(text: str, indent: int, numIndents: int) -> str:
+    """Strips up to `numIndents` indentation levels after each `\\n` in multi-line inline text."""
+    spaces = " " * indent
+    parts = text.split("\n")
+    for idx in range(1, len(parts)):
+        part = parts[idx]
+        offset = 0
+        for _ in range(numIndents):
+            if offset < len(part) and part[offset] == "\t":
+                offset += 1
+            elif part.startswith(spaces, offset):
+                offset += indent
+            else:
+                break
+        if offset:
+            parts[idx] = part[offset:]
+    return "\n".join(parts)
+
+
+def _parseRawHtmlNodes(s: Stream, start: int) -> tuple[list[ParserNode], int]:
+    """Fast-path plain-HTML parser for `rawHtml` mode, skipping Bikeshed shorthands, macros, and TagStack tracking."""
+    nodes: list[ParserNode] = []
+    chars = s.chars
+    end = s.length
+    i = start
+    lastRaw: RawText | None = None
+    # Start offset of an accumulated plain-text run (-1 when no run is open).
+    textStart = -1
+
+    while i < end:
+        ch = chars[i]
+        if ch in ("&", "<"):
+            res = parseNode(s, i)
+            if isOk(res):
+                if textStart != -1:
+                    textNode = RawText.fromStream(s, textStart, i)
+                    if lastRaw is not None and lastRaw.end == textNode.start:
+                        lastRaw.text += textNode.text
+                        lastRaw.end = textNode.end
+                    else:
+                        if lastRaw is not None:
+                            nodes.append(lastRaw)
+                        lastRaw = textNode
+                    textStart = -1
+                val, i, _ = res
+                assert not isinstance(val, list)
+                if isinstance(val, SafeText):
+                    val = RawText.fromSafeText(val)
+                if isinstance(val, RawText):
+                    canMerge = val.s is s and val.text.count("\n") == chars.count("\n", val.start, val.end)
+                    if canMerge and lastRaw is not None and lastRaw.end == val.start:
+                        lastRaw.text += val.text
+                        lastRaw.end = val.end
+                    else:
+                        if lastRaw is not None:
+                            nodes.append(lastRaw)
+                        if canMerge:
+                            lastRaw = val
+                        else:
+                            nodes.append(val)
+                            lastRaw = None
+                else:
+                    if lastRaw is not None:
+                        nodes.append(lastRaw)
+                        lastRaw = None
+                    nodes.append(val)
+                continue
+        if textStart == -1:
+            textStart = i
+        match = _RAW_HTML_START_RE.search(chars, i + 1)
+        i = match.start() if match else end
+
+    if textStart != -1:
+        textNode = RawText.fromStream(s, textStart, i)
+        if lastRaw is not None and lastRaw.end == textNode.start:
+            lastRaw.text += textNode.text
+            lastRaw.end = textNode.end
+        else:
+            if lastRaw is not None:
+                nodes.append(lastRaw)
+            lastRaw = textNode
+    if lastRaw is not None:
+        nodes.append(lastRaw)
+    return nodes, i
+
+
+def parseInlineNodes(
+    s: Stream,
+    start: int,
+    *,
+    stopAtNewline: bool = False,
+    minIndent: int = 0,
+    onMacroNodes: t.Callable[[list[ParserNode], bool], None] | None = None,
+) -> tuple[list[ParserNode], int]:
+    """Parses HTML/inline Bikeshed nodes from `s` starting at `start`, applying curly
+    apostrophes and merging contiguous `RawText` nodes.
+
+    When `stopAtNewline` is True, stops at (and consumes) the first `\\n` outside any
+    multi-line construct and outside any open opaque element (`s.inOpaqueElement()`).
+    """
+    if s.config.rawHtml:
+        assert not stopAtNewline
+        return _parseRawHtmlNodes(s, start)
+
+    nodes: list[ParserNode] = []
+    # `lastNode` is always the previous emitted node (for curlifyApostrophes context);
+    # when `heldLast` is True, it is an unappended RawText buffered for merging.
     lastNode: ParserNode | None = None
     heldLast = False
     heldCanMerge = False
-    for node in generateNodes(s, start):
-        if isinstance(node, SafeText):
-            # Escape SafeText into RawText so all text nodes follow one path and can merge.
-            node = RawText.fromSafeText(node)
-        if isinstance(node, RawText):
-            if not s.config.rawHtml and not s.inOpaqueElement():
-                node.curlifyApostrophes(lastNode)
-            # Only merge RawText nodes that belong to this stream (not macro sub-streams)
-            # and whose emitted newlines match their source line span (not transforms like
-            # line-ending em-dashes that collapse newlines), so downstream line splitting
-            # (`node.line + j`) stays accurate.
-            nodeCanMerge = node.s is s and node.text.count("\n") == node.height
-            if (
-                heldLast
-                and heldCanMerge
-                and nodeCanMerge
-                and isinstance(lastNode, RawText)
-                and lastNode.end == node.start
-            ):
-                # Contiguous spans preserve `text.count("\n") == height`, so heldCanMerge stays True.
-                lastNode.text += node.text
-                lastNode.end = node.end
-            else:
-                if heldLast:
-                    assert lastNode is not None
-                    yield lastNode
-                lastNode = node
-                heldLast = True
-                heldCanMerge = nodeCanMerge
+    textStart = -1
+    chars = s.chars
+    end = s.length
+    i = start
+    openEls = s.openEls
+    inOpaque = openEls.inOpaqueElement()
+    indent = s.config.indent
+
+    while i < end:
+        ch = chars[i]
+        if stopAtNewline and ch == "\n" and not inOpaque:
+            break
+        if ch in ACTUAL_NODE_START_SET:
+            res = parseNode(s, i)
+            if isOk(res):
+                if textStart != -1:
+                    textNode = RawText.fromStream(s, textStart, i)
+                    if not inOpaque:
+                        if minIndent > 0 and "\n" in textNode.text:
+                            textNode.text = _stripIndentAfterNewlines(textNode.text, indent, minIndent)
+                        textNode.curlifyApostrophes(lastNode)
+                    if heldLast and heldCanMerge and isinstance(lastNode, RawText) and lastNode.end == textNode.start:
+                        lastNode.text += textNode.text
+                        lastNode.end = textNode.end
+                    else:
+                        if heldLast:
+                            assert lastNode is not None
+                            nodes.append(lastNode)
+                        lastNode = textNode
+                        heldLast = True
+                        heldCanMerge = True
+                    textStart = -1
+
+                val, nextI, _ = res
+                wasOpaque = inOpaque
+                s.observeResult(res)
+                inOpaque = openEls.inOpaqueElement()
+                if isinstance(val, list):
+                    # Macro expansions are parsed in a child Stream, so `val[0].s is not s` identifies them.
+                    if (
+                        onMacroNodes is not None
+                        and not wasOpaque
+                        and val
+                        and val[0].s is not None
+                        and val[0].s is not s
+                    ):
+                        onMacroNodes(val, s.col(i) == 1)
+                    items: t.Sequence[ParserNode] = val
+                else:
+                    items = (val,)
+
+                for item in items:
+                    if isinstance(item, SafeText):
+                        item = RawText.fromSafeText(item)
+                    if isinstance(item, RawText):
+                        if not inOpaque:
+                            if minIndent > 0 and "\n" in item.text and item.s is s:
+                                item.text = _stripIndentAfterNewlines(item.text, indent, minIndent)
+                            item.curlifyApostrophes(lastNode)
+                        # Only merge RawText nodes belonging to this stream whose emitted
+                        # newlines match their source line span (not line-ending em-dashes),
+                        # so downstream `node.line + j` line tracking stays accurate.
+                        nodeCanMerge = item.s is s and item.text.count("\n") == chars.count("\n", item.start, item.end)
+                        if (
+                            heldLast
+                            and heldCanMerge
+                            and nodeCanMerge
+                            and isinstance(lastNode, RawText)
+                            and lastNode.end == item.start
+                        ):
+                            lastNode.text += item.text
+                            lastNode.end = item.end
+                        else:
+                            if heldLast:
+                                assert lastNode is not None
+                                nodes.append(lastNode)
+                            lastNode = item
+                            heldLast = True
+                            heldCanMerge = nodeCanMerge
+                    else:
+                        if heldLast:
+                            assert lastNode is not None
+                            nodes.append(lastNode)
+                        nodes.append(item)
+                        lastNode = item
+                        heldLast = False
+                        heldCanMerge = False
+                i = nextI
+                continue
+
+        if textStart == -1:
+            textStart = i
+        if stopAtNewline and not inOpaque:
+            match = _ACTUAL_LINE_STOP_RE.search(chars, i + 1)
         else:
-            # Flush any buffered text, yield the non-text node, and retain it in
-            # `lastNode` so a following RawText can curlify leading apostrophes (e.g. `</var>'s`).
+            match = _ACTUAL_NODE_START_RE.search(chars, i + 1)
+        i = match.start() if match else end
+
+    if textStart != -1:
+        textNode = RawText.fromStream(s, textStart, i)
+        if not inOpaque:
+            if minIndent > 0 and "\n" in textNode.text:
+                textNode.text = _stripIndentAfterNewlines(textNode.text, indent, minIndent)
+            textNode.curlifyApostrophes(lastNode)
+        if heldLast and heldCanMerge and isinstance(lastNode, RawText) and lastNode.end == textNode.start:
+            lastNode.text += textNode.text
+            lastNode.end = textNode.end
+        else:
             if heldLast:
                 assert lastNode is not None
-                yield lastNode
-            yield node
-            lastNode = node
-            heldLast = False
-            heldCanMerge = False
+                nodes.append(lastNode)
+            lastNode = textNode
+            heldLast = True
     if heldLast:
         assert lastNode is not None
-        yield lastNode
+        nodes.append(lastNode)
+    if stopAtNewline and i < end and chars[i] == "\n" and not inOpaque:
+        i += 1
+    return nodes, i
+
+
+def nodesFromStream(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
+    """Consume `s` from `start` to EOF, yielding curlified and coalesced `ParserNode`s."""
+    nodes, _ = parseInlineNodes(s, start)
+    yield from nodes
 
 
 def closeOpenElements(s: Stream, start: int | None, context: str | StartTag | t.ElementT | None) -> list[EndTag]:
+    """Close any elements still open on `s.openEls` at EOF (silently for a trailing `<p>`, logging an error otherwise)."""
     nodes = []
     if start is None:
         i = len(s)
@@ -144,7 +331,7 @@ def closeOpenElements(s: Stream, start: int | None, context: str | StartTag | t.
 
 
 def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
-    # Consumes the stream until eof, yielding ParserNodes.
+    """Consume `s` from `start` to EOF using `parseAnything()`, yielding unmerged `ParserNode`s."""
     i = start
     end = len(s)
     while i < end:
@@ -158,6 +345,7 @@ def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
 
 
 def debugNode(node: ParserNode | list[ParserNode]) -> str:
+    """Return a compact human-readable string representation of a `ParserNode` (or list of nodes) for debugging."""
     if isinstance(node, list):
         return "".join(debugNode(x) for x in node)
     if isinstance(node, StartTag):
@@ -178,8 +366,7 @@ def generateResults(
     start: int,
     experimental: bool = False,
 ) -> t.Generator[OkT[ParserNode | list[ParserNode]], None, None]:
-    # Consumes the stream until eof, yielding the individual Results
-    # (rather than unwrapping the Results, as generateNodes does).
+    """Yield raw `Ok` parse results from `parseAnything()` until EOF, stopping at every `POSSIBLE_NODE_START_CHARS` boundary."""
     i = start
     end = len(s)
     while i < end:
@@ -307,6 +494,8 @@ def parseNode(
         node, i, _ = parseAngleStart(s, start)
         if node is not None:
             return Ok(node, i)
+        # Only fall through for `<<` (CSS production) and `<{` (markup autolink);
+        # any other unrecognized `<` is escaped immediately as SafeText.
         if s[start + 1] not in ("<", "{"):
             return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
 
@@ -591,10 +780,7 @@ def parseRepositoryLink(
     org: str | None = None,
     originalStart: int | None = None,
 ) -> ResultT[list[ParserNode]]:
-    # Parses <#123> and <org/repo#123>.
-
-    # parseStartTag() can enter this method with the (potential) org already parsed,
-    # to avoid repeating parsing work.
+    """Parse a repository issue link (`<#123>` or `<org/repo#123>`), optionally reusing `org` parsed by `parseStartTag()`."""
     repo: str | None
     if org is None:
         if s[start] != "<":
@@ -636,6 +822,7 @@ def parseRepositoryLink(
 
 
 def parseRepositoryStart(s: Stream, start: int) -> ResultT[tuple[str, str]]:
+    """Parse the `org/repo` prefix of a repository issue link."""
     org, i, _ = parseTagName(s, start)
     if not org:
         return Err(start)
@@ -649,6 +836,7 @@ def parseRepositoryStart(s: Stream, start: int) -> ResultT[tuple[str, str]]:
 
 
 def parseDigits(s: Stream, start: int) -> ResultT[str]:
+    """Parse 1 to 10 consecutive ASCII decimal digits starting at `start`."""
     i = start
     while not s.eof(i):
         if not isDigit(s[i]):
@@ -662,7 +850,7 @@ def parseDigits(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
-    # Assuming the stream starts with an <
+    """Dispatch constructs starting with `<`: doctypes, comments, tags, raw elements, metadata blocks, and repo links."""
     i = start + 1
     if s[i] == "!":
         dtRes = parseDoctype(s, start)
@@ -719,6 +907,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                     startTag.attrs["bs-link-type"] = startTag.attrs.pop("data-link-type")
         el: ParserNode | None
         if startTag.tag == "title" and not s.openEls.inTagContext("svg"):
+            # Stash the HTML `<title>` text in an attribute so later pipeline stages can inspect it cleanly.
             text, endI, _ = parseTitleToEnd(s, i)
             if text is not None:
                 startTag.attrs["bs-title-contents"] = escapeAttr(text)
@@ -768,6 +957,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             el = RawElement.fromStream(s, start, i, startTag, text)
             return Ok(el, i)
         elif startTag.tag == "xmp":
+            # Rewrite deprecated `<xmp>` to `<pre bs-was-xmp>` with HTML-escaped body.
             startTag.tag = "pre"
             startTag.attrs["bs-was-xmp"] = ""
             text, i, _ = parseXmpToEnd(s, i)
@@ -782,6 +972,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
         else:
             return Ok(startTag, i)
 
+    # `<org/repo#123>` is handled inside parseStartTag(); this catches tagless `<#123>` links.
     if s.config.repositoryLinks:
         repolink, i, _ = parseRepositoryLink(s, start)
         if repolink is not None:
@@ -791,6 +982,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
 
 
 def isDatablock(tag: StartTag, loc: str) -> str | None:
+    """Return the single Bikeshed datablock class on `tag`, or `None` (logging an error if multiple match)."""
     tag.finalize()
     types = [x for x in tag.classes if isDatablockClass(x)]
     if len(types) == 0:
@@ -830,10 +1022,12 @@ _DATABLOCK_CLASSES = frozenset(
 
 
 def isDatablockClass(text: str) -> bool:
+    """Return True if `text` is a recognized Bikeshed datablock class name."""
     return text in _DATABLOCK_CLASSES
 
 
 def parseStartTag(s: Stream, start: int) -> ResultT[StartTag | SelfClosedTag | list[ParserNode]]:
+    """Parse an HTML start tag (or void/self-closed tag, or `<org/repo#123>` repository link) at `start`."""
     if s[start] != "<":
         return Err(start)
     else:
@@ -973,7 +1167,7 @@ ATTR_SHORTCUTS = {
 
 
 def canonicalizeShortcuts(el: StartTag | SelfClosedTag) -> StartTag | SelfClosedTag:
-    # Take all the invalid-HTML shortcuts and fix them.
+    """Rewrite Bikeshed shorthand attributes (like `export`, `for`, `lt`, and boolean dfn/link types) to canonical `bs-*`/`data-*` names."""
     attrs = el.attrs
     if not attrs:
         return el
@@ -1045,6 +1239,7 @@ _WHITESPACE_RE = re.compile(r"[\t\n\x0c ]+")
 
 
 def parseTagName(s: Stream, start: int) -> ResultT[str]:
+    """Parse an HTML/XML tag name at `start` and return it lowercased."""
     match = _ASCII_TAGNAME_RE.match(s.chars, start)
     if not match:
         return Err(start)
@@ -1055,6 +1250,7 @@ def parseTagName(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
+    """Parse zero or more HTML attributes (and attribute-list macros) inside a start tag."""
     _, i, _ = parseWhitespace(s, start)
     attr = None
     attrs: dict[str, str] = {}
@@ -1121,6 +1317,7 @@ def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
 
 
 def parseAttribute(s: Stream, start: int) -> ResultT[tuple[str, str]]:
+    """Parse a single HTML attribute (`name` or `name=value`) at `start`."""
     match = _ASCII_ATTRNAME_RE.match(s.chars, start)
     i = match.end() if match else start
     while preds.isAttrNameChar(s[i]):
@@ -1154,6 +1351,7 @@ def parseAttribute(s: Stream, start: int) -> ResultT[tuple[str, str]]:
 
 
 def parseQuotedAttrValue(s: Stream, start: int) -> ResultT[str]:
+    """Parse a single- or double-quoted HTML attribute value, normalizing character references."""
     endChar = s[start]
     i = start + 1
     val = ""
@@ -1179,6 +1377,7 @@ _UNQUOTED_ATTR_STOP_RE = re.compile(r"[\t\n\x0c >\"'<`&]")
 
 
 def parseUnquotedAttrValue(s: Stream, start: int) -> ResultT[str]:
+    """Parse an unquoted HTML attribute value up to whitespace or `>`, normalizing character references."""
     i = start
     val = ""
     while match := _UNQUOTED_ATTR_STOP_RE.search(s.chars, i):
@@ -1227,12 +1426,15 @@ def printChAsCharRef(ch: str | SafeText) -> str:
 
 
 class CharRefContext(Enum):
+    """Parsing context controlling whether `&name=` is left unparsed as a query parameter."""
+
     Attr = "Attr"
     NonAttr = "NonAttr"
     DatablockPre = "DatablockPre"
 
 
 def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str | SafeText]:
+    """Parse an HTML named/numeric or Bikeshed `&bs...;` character reference at `start`."""
     if s[start] != "&":
         return Err(start)
     i = start + 1
@@ -1338,6 +1540,7 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str 
 
 
 def parseWhitespace(s: Stream, start: int) -> ResultT[bool]:
+    """Consume one or more HTML ASCII whitespace characters at `start`."""
     if start >= s.length or s.chars[start] not in preds.WHITESPACE_CHARS:
         return Err(start)
     match = _WHITESPACE_RE.match(s.chars, start)
@@ -1346,6 +1549,7 @@ def parseWhitespace(s: Stream, start: int) -> ResultT[bool]:
 
 
 def parseEndTag(s: Stream, start: int) -> ResultT[EndTag]:
+    """Parse an HTML closing tag (`</tag>`) at `start`."""
     if s.slice(start, start + 2) != "</":
         return Err(start)
     i = start + 2
@@ -1378,6 +1582,7 @@ def parseEndTag(s: Stream, start: int) -> ResultT[EndTag]:
 
 
 def parseComment(s: Stream, start: int) -> ResultT[Comment]:
+    """Parse an HTML `<!-- ... -->` comment at `start`."""
     if s.slice(start, start + 2) != "<!":
         return Err(start)
     i = start + 2
@@ -1411,6 +1616,7 @@ _SVG_DOCTYPE_RE = re.compile(r"\s+svg(?![\w-])", re.I)
 
 
 def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
+    """Parse an HTML `<!doctype ...>` declaration, rejecting non-leading doctypes in Bikeshed markup."""
     if s.slice(start, start + 2) != "<!":
         return Err(start)
     if s.slice(start + 2, start + 9).lower() != "doctype":
@@ -1434,9 +1640,7 @@ def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
 
 
 def parseScriptToEnd(s: Stream, start: int) -> OkT[str]:
-    # Call with s[i] after the opening <script> tag.
-    # Returns with s[i] after the </script> tag,
-    # with text contents in the Result.
+    """Read raw `<script>` contents from `start` through `</script>` (or EOF), returning the body text."""
     i = s.chars.find("</script>", start)
     if i == -1:
         m.die("Hit EOF in the middle of a <script>.", lineNum=s.loc(start))
@@ -1445,7 +1649,7 @@ def parseScriptToEnd(s: Stream, start: int) -> OkT[str]:
 
 
 def parseStyleToEnd(s: Stream, start: int) -> OkT[str]:
-    # Identical to parseScriptToEnd
+    """Read raw `<style>` contents from `start` through `</style>` (or EOF), returning the body text."""
     i = s.chars.find("</style>", start)
     if i == -1:
         m.die("Hit EOF in the middle of a <style>.", lineNum=s.loc(start))
@@ -1454,7 +1658,7 @@ def parseStyleToEnd(s: Stream, start: int) -> OkT[str]:
 
 
 def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
-    # Identical to parseScriptToEnd
+    """Read raw `<xmp>` contents from `start` through `</xmp>` (or EOF), returning the body text."""
     i = s.chars.find("</xmp>", start)
     if i == -1:
         m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
@@ -1463,8 +1667,7 @@ def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
 
 
 def parseTitleToEnd(s: Stream, start: int) -> ResultT[str]:
-    # <title> contents are raw strings, except HTML escapes are allowed,
-    # and BS macros are allowed.
+    """Read `<title>` contents through `</title>`, normalizing HTML character references and expanding text macros."""
     i = start
     val = ""
     startSeg = i
@@ -1502,10 +1705,7 @@ _DATABLOCK_PRE_STOP_RE = re.compile(r"</pre>|&")
 
 
 def parseDatablockPreToEnd(s: Stream, start: int) -> ResultT[str]:
-    # Identical to parseScriptToEnd, except I need to
-    # convert named HTML entities to numeric ones,
-    # since the lxml parser doesn't understand them.
-
+    """Read a datablock `<pre>` body through `</pre>`, normalizing named HTML entities to numeric ones for LXML."""
     i = start
     val = ""
     startSeg = i
@@ -1556,6 +1756,7 @@ TYPEWITHARGS_RE = re.compile(
 
 
 def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse a CSS grammar production autolink (`<<type>>`, `<<'prop'>>`, `<<func()>>`, `<<@rule>>`, or ranged/parameterized types)."""
     if s.slice(start, start + 2) != "<<":
         return Err(start)
     textStart = start + 2
@@ -1600,6 +1801,7 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
         "class": t.SafeAttrStr("production"),
         "bs-opaque": "",
     }
+    # Single-iteration loop used as a breakable dispatch block; the `else:` runs if no grammar matches.
     for _ in [1]:
         match = PROD_PROPDESC_RE.match(text)
         if match:
@@ -1695,6 +1897,7 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
 
 
 def parseRangeComponent(s: Stream, i: int, val: str) -> tuple[str | None, float | int]:
+    """Parse one bound of a CSS range notation (`[min, max]`), returning `(formatted_str, numeric_val)`."""
     sign = ""
     signVal = 1
     num: float | int
@@ -1726,6 +1929,7 @@ def parseRangeComponent(s: Stream, i: int, val: str) -> tuple[str | None, float 
 
 
 def parseCSSMaybe(s: Stream, start: int) -> ResultT[list[ParserNode]]:
+    """Parse a `''...''` CSS maybe shorthand, trying a `prop: value` declaration first and then a value."""
     if s.slice(start, start + 2) != "''":
         return Err(start)
     textStart = start + 2
@@ -1745,6 +1949,7 @@ MAYBE_DECL_RE = re.compile(r"(@[\w-]+/)?([\w-]+)$")
 
 
 def parseMaybeDecl(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
+    """Parse a `''prop: value''` CSS declaration shorthand starting right after the opening `''`."""
     rawText, colonStart, _ = s.skipToSameLine(textStart, ":")
     if not rawText:
         return Err(textStart)
@@ -1803,6 +2008,7 @@ MAYBE_VAL_RE = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
 
 
 def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
+    """Parse a `''value''` CSS maybe autolink (or inline CSS snippet), distinguishing explicit autolinks from rich content."""
     start = textStart - 2
 
     # Ugh, "maybe" autolinks might be text *or* html; we can't tell until we examine them.
@@ -1921,15 +2127,14 @@ def parseMaybeValue(s: Stream, textStart: int) -> ResultT[list[ParserNode]]:
 
 
 def rawFromDoubleAngles(text: str) -> str:
-    # <<foo>> is used a lot in maybe autolinks, but it's never
-    # actually meant to be a link. Generally, I just want to
-    # turn them into single angles as text.
+    """Convert `<<` and `>>` in CSS maybe text into HTML-escaped `&lt;` and `>`."""
     text = re.sub(r"<<", "&lt;", text)
     text = re.sub(r">>", ">", text)
     return text
 
 
 def safeFromDoubleAngles(text: str) -> str:
+    """Convert `<<` and `>>` in CSS maybe text into literal `<` and `>` (for `SafeText` or attribute escaping)."""
     text = re.sub(r"<<", "<", text)
     text = re.sub(r">>", ">", text)
     return text
@@ -1946,6 +2151,7 @@ AUTOLINK_PROPDESC_RE = re.compile(
 
 
 def parseCSSPropdesc(s: Stream, start: int) -> ResultT[SafeText | list[ParserNode]]:
+    """Parse a single-quoted CSS property/descriptor autolink (`'prop'`, `'@rule/desc'`, `'--custom'`)."""
     if s[start] != "'":
         return Err(start)
     if s.slice(start, start + 3) == "'-'":
@@ -2046,6 +2252,7 @@ AUTOLINK_DFN_RE = re.compile(r".*?(?=\||=])", flags=re.DOTALL)
 
 
 def parseAutolinkDfn(s: Stream, start: int) -> ResultT[SafeText | list[ParserNode]]:
+    """Parse a `[=dfn=]` or `[=dfn|text=]` definition autolink at `start`."""
     if s.slice(start, start + 2) != "[=":
         return Err(start)
     innerStart = start + 2
@@ -2087,6 +2294,7 @@ def parseAutolinkDfn(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
         if rest is not None:
             return Ok([startTag, *rest], nodeEnd)
         else:
+            # Explicit link text never closed; stop right after `|` so the remaining text is parsed normally.
             nodeEnd = innerEnd + 1
     else:
         nodeEnd = innerEnd + 2
@@ -2099,6 +2307,7 @@ AUTOLINK_ABSTRACT_RE = re.compile(r".*?(?=\||\$])", flags=re.DOTALL)
 
 
 def parseAutolinkAbstract(s: Stream, start: int) -> ResultT[SafeText | list[ParserNode]]:
+    """Parse a `[$op$]` or `[$op|text$]` abstract-operation autolink at `start`."""
     if s.slice(start, start + 2) != "[$":
         return Err(start)
     innerStart = start + 2
@@ -2152,6 +2361,7 @@ AUTOLINK_HEADER_RE = re.compile(r":?.*?(?=\||:])", flags=re.DOTALL)
 
 
 def parseAutolinkHeader(s: Stream, start: int) -> ResultT[SafeText | list[ParserNode]]:
+    """Parse a `[:Header:]` or `[:Header|text:]` HTTP header autolink, wrapped in backticks and `<code>`."""
     if s.slice(start, start + 2) != "[:":
         return Err(start)
     innerStart = start + 2
@@ -2188,6 +2398,7 @@ def parseAutolinkHeader(s: Stream, start: int) -> ResultT[SafeText | list[Parser
         startTag.attrs["bs-link-for"] = escapeAttr(linkFor)
     startTag = startTag.finalize()
 
+    # HTTP specs format header names inside literal backticks around `<code><a>...</a></code>`.
     startTick = RawText.fromStream(s, start, start, "`")
     startCode = StartTag.fromStream(s, start, start, "code")
 
@@ -2212,6 +2423,7 @@ AUTOLINK_IDL_RE = re.compile(r".*?(?=\||}})", flags=re.DOTALL)
 
 
 def parseAutolinkIdl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse a `{{Interface}}` or `{{Interface/member|text}}` WebIDL autolink wrapped in `<code class=idl>`."""
     if s.slice(start, start + 2) != "{{":
         return Err(start)
     innerStart = start + 2
@@ -2292,6 +2504,7 @@ AUTOLINK_CDDL_RE = re.compile(r".*?(?=\||\^})", flags=re.DOTALL)
 
 
 def parseAutolinkCddl(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse a `{^type^}` or `{^type|text^}` CDDL autolink wrapped in `<code class=cddl>`."""
     if s.slice(start, start + 2) != "{^":
         return Err(start)
     innerStart = start + 2
@@ -2357,6 +2570,7 @@ AUTOLINK_ELEMENT_RE = re.compile(r".*?(?=\||}>)", flags=re.DOTALL)
 
 
 def parseAutolinkElement(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse a `<{element}>`, `<{el/attr}>`, or `<{el/attr/val}>` markup autolink wrapped in `<code>`."""
     if s.slice(start, start + 2) != "<{":
         return Err(start)
     innerStart = start + 2
@@ -2419,6 +2633,7 @@ SHORTHAND_VARIABLE_RE = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
 
 
 def parseShorthandVariable(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse an algorithm variable shorthand (`|var|`) into `<var>var</var>`."""
     match, nodeEnd, _ = s.matchRe(start, SHORTHAND_VARIABLE_RE)
     if not match:
         return Err(start)
@@ -2436,6 +2651,7 @@ def parseShorthandVariable(s: Stream, start: int) -> ResultT[ParserNode | list[P
 
 
 def parseAutolinkBiblioSection(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse a `[[SPEC]]` bibliography or `[[SPEC#sec]]` / `[[#sec]]` section autolink."""
     if s.slice(start, start + 2) != "[[":
         return Err(start)
 
@@ -2480,6 +2696,8 @@ def parseAutolinkBiblioSection(s: Stream, start: int) -> ResultT[ParserNode | li
 
 @dataclasses.dataclass
 class LinkData:
+    """Parsed metadata (`lt`, optional `for`, optional `type`) from the target section of an autolink shorthand."""
+
     lt: str
     lfor: str | None = None
     ltype: str | None = None
@@ -2496,6 +2714,7 @@ def parseLinkInfo(
     endSigil: str,
     infoRe: t.Pattern,
 ) -> ResultT[LinkData]:
+    """Parse the `for/lt!!type` target portion of an autolink shorthand up to `|` or `endSigil`."""
     start = innerStart - len(startSigil)
     match, innerEnd, _ = s.searchRe(innerStart, infoRe)
     if match is None or match[0].count("\n") > 1:
@@ -2558,9 +2777,11 @@ def parseLinkText(
     endingSigil: str,
     startTag: StartTag,
 ) -> ResultT[list[ParserNode]]:
+    """Parse rich inline content inside an autolink up to `endingSigil` (within 3 lines), returning inner nodes + closing `EndTag`."""
     endingLength = len(endingSigil)
     content: list[ParserNode] = []
     s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
+    # generateResults() stops at every POSSIBLE_NODE_START_CHARS boundary, guaranteeing `endingSigil` lands on `i`.
     for res in generateResults(s, start):
         value, i, _ = res
         assert value is not None
@@ -2593,6 +2814,7 @@ AUTOLINK_BIBLIO_KEYWORDS = ["current", "snapshot", "inline", "index", "direct", 
 
 
 def parseBiblioInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]]:
+    """Parse the body of a `[[!SPEC modifiers]]` bibliography autolink, returning `(startTag, defaultVisibleText)`."""
     match, innerEnd, _ = s.matchRe(innerStart, AUTOLINK_BIBLIO_RE)
     if not match:
         return Err(innerStart)
@@ -2668,6 +2890,7 @@ AUTOLINK_SECTION_RE = re.compile(
 
 
 def parseSectionInner(s: Stream, innerStart: int) -> ResultT[tuple[StartTag, str]]:
+    """Parse the body of a local (`[[#sec]]`) or foreign (`[[SPEC/page#sec]]`) section autolink."""
     nodeStart = innerStart - 2
     match, innerEnd, _ = s.matchRe(innerStart, AUTOLINK_SECTION_RE)
     if not match:
@@ -2723,6 +2946,7 @@ codeSpanEnd2Re = re.compile(r"(.*?[^`])(``)([^`]|$)")
 
 
 def parseCodeSpan(s: Stream, start: int) -> ResultT[list[ParserNode]]:
+    """Parse an inline Markdown backtick code span (`` `code` ``) into an opaque `<code>` element."""
     if s[start - 1] == "`" and s.slice(start - 2, start) != "\\`":
         return Err(start)
     if s[start] != "`":
@@ -2768,6 +2992,7 @@ fencedStartRe = re.compile(r"`{3,}|~{3,}")
 
 
 def parseFencedCodeBlock(s: Stream, start: int) -> ResultT[SafeElement]:
+    """Parse a Markdown fenced code block (```` ``` ```` or `~~~`) into a `<pre>` `SafeElement`."""
     if s.precedingTextOnLine(start).strip() != "":
         return Err(start)
 
@@ -2838,6 +3063,8 @@ MACRO_RE = re.compile(r"([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
 class MacroContext(Enum):
+    """Expansion mode for `parseMacro()`, determining whether the macro body is parsed as nodes, attributes, or text."""
+
     Nodes = "Nodes"
     AttrList = "AttrList"
     Text = "Text"
@@ -2848,10 +3075,7 @@ def parseMacro(
     start: int,
     context: MacroContext,
 ) -> ResultT[ParserNode | list[ParserNode] | dict[str, str] | str]:
-    # Macros all look like `[FOO]` or `[FOO?]`:
-    # uppercase ASCII, possibly with a ? suffix,
-    # tightly wrapped by square brackets.
-
+    """Parse and expand a `[MACRO]` or optional `[MACRO?]` text macro according to `context`."""
     if s[start] != "[":
         return Err(start)
     match, i, _ = s.matchRe(start + 1, MACRO_RE)
@@ -2929,14 +3153,17 @@ def parseMacro(
 
 
 def parseMacroToNodes(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse a `[MACRO]` at `start` and expand its replacement text into `ParserNode`s."""
     return t.cast("ResultT[ParserNode | list[ParserNode]]", parseMacro(s, start, MacroContext.Nodes))
 
 
 def parseMacroToAttrs(s: Stream, start: int) -> ResultT[dict[str, str]]:
+    """Parse a `[MACRO]` at `start` and expand its replacement text into a dict of HTML attributes."""
     return t.cast("ResultT[dict[str, str]]", parseMacro(s, start, MacroContext.AttrList))
 
 
 def parseMacroToText(s: Stream, start: int) -> ResultT[str]:
+    """Parse a `[MACRO]` at `start` and expand its replacement text recursively as a string."""
     return t.cast("ResultT[str]", parseMacro(s, start, MacroContext.Text))
 
 
@@ -2946,20 +3173,15 @@ MACRO_ATTRIBUTE_RE = re.compile(r"([\[\\]?)\[([A-Z\d-]*[A-Z][A-Z\d-]*)(\??)\]")
 
 
 def replaceMacrosInText(text: str, macros: dict[str, str], s: Stream, start: int, context: str) -> str:
-    # Since I just loop over the substituted text,
-    # rather than recursing as I go like I do for content macros,
-    # I need to protect against accidentally replacing something
-    # that wasn't originally a macro. So:
-    # * if I see an escaped macro or leave a sub failure in,
-    #   turn their brackets into HTML escapes.
-    # * wrap every substitution in magic chars, so adjacent
-    #   substitutions can't combine to form a macro,
-    #   like `[F` next to `OO]`. They're removed at the end.
-
+    """Iteratively expand `[MACRO]` references inside plain-text contexts (attributes, raw blocks, autolink data)."""
+    # Wrap each substitution in sentinel chars (stripped at the end) so adjacent
+    # expansions cannot accidentally fuse into a new `[MACRO]`, and escape failed/escaped
+    # brackets as numeric entities so subsequent passes skip them.
     msc = constants.macroStartChar
     mec = constants.macroEndChar
 
     def doRep(match: t.Match) -> str:
+        """Expand a single `MACRO_ATTRIBUTE_RE` match, preserving escaped or `[[...]]` brackets."""
         escaped = match[1] == "\\"
         biblio = match[1] == "["
         macroName = match[2].lower()
@@ -2999,6 +3221,7 @@ def replaceMacrosInText(text: str, macros: dict[str, str], s: Stream, start: int
 
 
 def isMetadataBlock(startTag: StartTag) -> bool:
+    """Return True if `startTag` is a `<pre class=metadata>` or `<xmp class=metadata>` opener."""
     if startTag.tag not in ("pre", "xmp"):
         return False
     startTag.finalize()
@@ -3010,10 +3233,7 @@ metadataXmpEndRe = re.compile(r"</xmp>(.*)")
 
 
 def parseMetadataBlockToEnd(s: Stream, start: int, startTag: StartTag, i: int) -> ResultT[RawElement]:
-    # Metadata blocks aren't actually HTML elements,
-    # they're line-based BSF-Markdown constructs
-    # and contain unparsed text.
-
+    """Consume an unindented `<pre/xmp class=metadata>` block through its closing tag."""
     if start != s.currentLineStart(start):
         # Metadata blocks must have their start/end tags
         # on the left margin, completely unindented.
@@ -3050,6 +3270,7 @@ def parseMetadataBlockToEnd(s: Stream, start: int, startTag: StartTag, i: int) -
 
 
 def isMacroStart(s: Stream, start: int) -> bool:
+    """Fast pre-check returning True if `s[start]` could begin a `[MACRO]` name."""
     ch = s[start]
     return ch.isalpha() or ch.isdigit() or ch == "-"
 
@@ -3060,6 +3281,7 @@ def isMacroStart(s: Stream, start: int) -> bool:
 
 
 def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
+    """Parse an inline Markdown `[text](dest "title")` link into an `<a>` element."""
     linkTextStart = start + 1
     startingSigil = "["
     endingSigil = "](...)"
@@ -3105,6 +3327,7 @@ def parseMarkdownLink(s: Stream, start: int) -> ResultT[ParserNode | list[Parser
 
 
 def parseMarkdownLinkDestTitle(s: Stream, start: int) -> ResultT[tuple[str, str]]:
+    """Parse the `(dest "title")` tail of a Markdown link starting after `(`, returning `(dest, title)`."""
     res, i, _ = parseMarkdownLinkWhitespace(s, start)
     if res is None:
         return Err(start)
@@ -3164,6 +3387,7 @@ def parseMarkdownLinkDestTitle(s: Stream, start: int) -> ResultT[tuple[str, str]
 
 
 def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
+    """Consume whitespace inside a Markdown link's destination/title, disallowing blank lines and EOF."""
     seenLinebreak = False
     i = start
     while isWhitespace(s[i]):
@@ -3181,6 +3405,7 @@ def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
+    """Parse an angle-bracketed `<url>` Markdown link destination starting after `<`."""
     i = start
     val = ""
     startSeg = i
@@ -3228,6 +3453,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
+    """Parse a bare (non-angle-bracketed) Markdown link destination, allowing balanced parentheses."""
     i = start
     parenDepth = 0
     val = ""
@@ -3282,6 +3508,7 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
 
 
 def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str]:
+    """Parse a `'...'`, `"..."`, or `(...)` Markdown link title starting after its opening delimiter."""
     i = start
     if startChar == "'":
         endChar = "'"
@@ -3336,14 +3563,14 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
 
 
 def parseMarkdownEscape(s: Stream, start: int) -> ResultT[str]:
+    """Parse a Markdown backslash escape at `start`, returning the unescaped character."""
     if isMarkdownEscape(s, start):
         return Ok(s[start + 1], start + 2)
     return Err(start)
 
 
-# not escaping * or _ currently, so the slash remains until after HTML parsing,
-# because em/strong aren't parsed until then.
 def isMarkdownEscape(s: Stream, start: int) -> bool:
+    """Return True if `s[start:start+2]` is a handled Markdown backslash escape (leaving `\\*` and `\\_` for later emphasis parsing)."""
     return s[start] == "\\" and s[start + 1] in (
         "\\",
         "!",
@@ -3384,8 +3611,10 @@ MARKDOWN_ESCAPE_RE = re.compile(r"\\([\\!\"#$%&'()*+,./:;<=>?@\[\]^_`{|}~-])")
 
 
 def htmlifyMarkdownEscapes(val: str) -> str:
+    """Replace Markdown backslash escapes in `val` with numeric HTML character references."""
     return re.sub(MARKDOWN_ESCAPE_RE, markdownEscapeReplacer, val)
 
 
 def markdownEscapeReplacer(match: t.Match) -> str:
+    """Regex callback converting an escaped Markdown punctuation char into a numeric HTML entity."""
     return f"&#{ord(match[1])};"

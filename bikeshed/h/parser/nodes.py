@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from abc import ABCMeta, abstractmethod
 from collections import Counter
 from dataclasses import InitVar, dataclass, field
 
@@ -21,11 +20,12 @@ TagNodeT: t.TypeAlias = "StartTag | EndTag | SelfClosedTag | RawElement | SafeEl
 
 _APOS_START_WORD_RE = re.compile(r"'\w")
 _APOS_WORD_CHAR_RE = re.compile(r"\w")
-_APOS_IN_WORD_RE = re.compile(r"(\w)'(\w)")
+_APOS_IN_WORD_RE = re.compile(r"(?<=\w)'(?=\w)")
 _APOS_START_SPACE_RE = re.compile(r"'\s")
 
 
 def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
+    """Serialize an HTML start tag with canonically sorted attributes."""
     s = f"<{tagName}"
     for k, v in sortAttrs(attrs):
         s += f' {k}="{v}"'
@@ -34,6 +34,8 @@ def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
 
 
 def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
+    """Yield `(name, value)` pairs with `bs-line-number` first, `class` last, and others alphabetical."""
+    # Fast-path common tags that only carry bs-line-number (and optionally class) to avoid sorting.
     if "bs-line-number" in attrs:
         yield "bs-line-number", attrs["bs-line-number"]
         if len(attrs) == 1:
@@ -50,6 +52,7 @@ def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
 
 
 def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
+    """Populate synthetic line/context/class attributes on `node` and serialize its start tag."""
     if "bs-line-number" not in node.attrs and node.loc:
         node.attrs["bs-line-number"] = escapeAttr(node.loc)
     if "bs-parse-context" not in node.attrs and node.context:
@@ -60,56 +63,72 @@ def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
 
 
 @dataclass
-class ParserNode(metaclass=ABCMeta):
+class ParserNode:
+    """Base class for all nodes emitted by the HTML/Markdown parser, carrying optional source span info."""
+
     s: Stream | None = field(default=None, repr=False, kw_only=True)
     start: int = field(default=0, repr=False, kw_only=True)
     end: int = field(default=0, repr=False, kw_only=True)
 
     @property
     def line(self) -> int:
+        """Return the 1-based starting line number of this node."""
         return self.s.line(self.start) if self.s is not None else 1
 
     @property
     def endLine(self) -> int:
+        """Return the 1-based ending line number of this node."""
         return self.s.line(self.end) if self.s is not None else 1
 
     @property
     def loc(self) -> str:
+        """Return the formatted starting `line:col` location (or `""` for synthetic nodes)."""
         return self.s.loc(self.start) if self.s is not None else ""
 
     @property
     def endLoc(self) -> str:
+        """Return the formatted ending `line:col` location (or `""` for synthetic nodes)."""
         return self.s.loc(self.end) if self.s is not None else ""
 
     @property
     def context(self) -> str | None:
+        """Return the source context label from this node's stream, if any."""
         return self.s.context if self.s is not None else None
 
     @property
     def height(self) -> int:
+        """Return the number of newlines spanned by this node."""
         if self.start == self.end or self.s is None:
             return 0
         return self.s.line(self.end) - self.s.line(self.start)
 
-    @abstractmethod
     def __str__(self) -> str:
-        pass
+        """Serialize this node to HTML."""
+        raise NotImplementedError
 
 
 @dataclass
-class Text(ParserNode, metaclass=ABCMeta):
+class Text(ParserNode):
+    """Base class for text nodes (`RawText` and `SafeText`)."""
+
     text: str
+
+    def __str__(self) -> str:
+        """Serialize this text node to HTML."""
+        raise NotImplementedError
 
 
 @dataclass
 class RawText(Text):
-    # Raw source text, might contain HTML characters/etc
+    """Raw source text that may already contain HTML entities and is serialized verbatim."""
 
     def __str__(self) -> str:
+        """Return the raw text unchanged."""
         return self.text
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
+        """Construct a `RawText` node tied to `s[start:end]` (or explicit `text`)."""
         return cls(
             s=s,
             start=start,
@@ -119,6 +138,7 @@ class RawText(Text):
 
     @classmethod
     def fromSafeText(cls, node: SafeText) -> t.Self:
+        """Convert a `SafeText` node into an already-escaped `RawText` node."""
         return cls(
             s=node.s,
             start=node.start,
@@ -127,6 +147,7 @@ class RawText(Text):
         )
 
     def curlifyApostrophes(self, lastNode: ParserNode | None) -> RawText:
+        """Convert straight apostrophes in contractions and possessives (including after `</var>`) to `’`."""
         if "'" not in self.text:
             return self
         if self.text[0] == "'":
@@ -140,24 +161,27 @@ class RawText(Text):
                 and lastNode.tag == "var"
                 and (
                     _APOS_START_SPACE_RE.match(self.text)
+                    # Inline line parsing stops before "\n", so a line-ending `|var|'` leaves self.text == "'".
                     or (self.text == "'" and self.s is not None and self.s[self.end] == "\n")
                 )
             ):
                 self.text = "’" + self.text[1:]
         if "'" in self.text:
-            self.text = _APOS_IN_WORD_RE.sub(r"\1’\2", self.text)
+            self.text = _APOS_IN_WORD_RE.sub("’", self.text)
         return self
 
 
 @dataclass
 class SafeText(Text):
-    # "Safe" text, automatically escapes special HTML chars
-    # when stringified.
+    """Plain text whose `<` and `&` characters are HTML-escaped when serialized."""
+
     def __str__(self) -> str:
+        """Return the HTML-escaped text."""
         return escapeHTML(self.text)
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, text: str | None = None) -> t.Self:
+        """Construct a `SafeText` node tied to `s[start:end]` (or explicit `text`)."""
         return cls(
             s=s,
             start=start,
@@ -168,13 +192,17 @@ class SafeText(Text):
 
 @dataclass
 class Doctype(ParserNode):
+    """An HTML `<!doctype ...>` declaration node."""
+
     data: str
 
     def __str__(self) -> str:
+        """Return the doctype declaration text."""
         return self.data
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:
+        """Construct a `Doctype` node tied to `s[start:end]`."""
         return cls(
             s=s,
             start=start,
@@ -185,6 +213,8 @@ class Doctype(ParserNode):
 
 @dataclass
 class StartTag(ParserNode):
+    """An HTML opening tag node with attributes, parsed class set, and optional paired `EndTag`."""
+
     tag: str
     attrs: t.SafeAttrDict = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
@@ -199,6 +229,7 @@ class StartTag(ParserNode):
         tag: str,
         attrs: t.SafeAttrDict | None = None,
     ) -> t.Self:
+        """Construct a `StartTag` node tied to `s[start:end]`."""
         if attrs is None:
             attrs = {}
         return cls(
@@ -210,23 +241,29 @@ class StartTag(ParserNode):
         )
 
     def __str__(self) -> str:
+        """Serialize this start tag to HTML."""
         return startTagStrFromNode(self)
 
     def printEndTag(self) -> str:
+        """Return the matching `</tag>` string for this start tag."""
         return f"</{self.tag}>"
 
     def finalize(self) -> StartTag:
+        """Move any `class` attribute into `self.classes` for easier manipulation."""
         if "class" in self.attrs:
             self.classes = set(unescapeAttr(self.attrs["class"]).split())
             del self.attrs["class"]
         return self
 
     def clone(self, **kwargs: t.Any) -> StartTag:
+        """Return a shallow copy of this `StartTag` with optional field overrides."""
         return dataclasses.replace(self, **kwargs)
 
 
 @dataclass
 class SelfClosedTag(ParserNode):
+    """An HTML void element or self-closed SVG/MathML tag node."""
+
     tag: str
     attrs: t.SafeAttrDict = field(default_factory=dict)
     classes: set[str] = field(default_factory=set)
@@ -240,6 +277,7 @@ class SelfClosedTag(ParserNode):
         tag: str,
         attrs: t.SafeAttrDict | None = None,
     ) -> t.Self:
+        """Construct a `SelfClosedTag` node tied to `s[start:end]`."""
         if attrs is None:
             attrs = {}
         return cls(
@@ -252,6 +290,7 @@ class SelfClosedTag(ParserNode):
 
     @classmethod
     def fromStartTag(cls, tag: StartTag) -> t.Self:
+        """Convert an existing `StartTag` into an equivalent `SelfClosedTag`."""
         return cls(
             s=tag.s,
             start=tag.start,
@@ -262,28 +301,34 @@ class SelfClosedTag(ParserNode):
         )
 
     def __str__(self) -> str:
+        """Serialize as `<tag ...>` for void elements, or `<tag ...></tag>` for non-void elements."""
         s = startTagStrFromNode(self)
         if self.tag in elements.VOID_ELEMENTS:
             return s
         return s + f"</{self.tag}>"
 
     def finalize(self) -> SelfClosedTag:
+        """Move any `class` attribute into `self.classes` for easier manipulation."""
         if "class" in self.attrs:
             self.classes = set(unescapeAttr(self.attrs["class"]).split())
             del self.attrs["class"]
         return self
 
     def clone(self, **kwargs: t.Any) -> SelfClosedTag:
+        """Return a shallow copy of this `SelfClosedTag` with optional field overrides."""
         return dataclasses.replace(self, **kwargs)
 
 
 @dataclass
 class EndTag(ParserNode):
+    """An HTML closing tag node, optionally linked back to its opening `StartTag`."""
+
     tag: str
     startTag: StartTag | None = None
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, tag: str | StartTag) -> t.Self:
+        """Construct an `EndTag` tied to `s[start:end]`, linking `tag.endTag` when given a `StartTag`."""
         endTag = cls(
             s=s,
             start=start,
@@ -296,15 +341,19 @@ class EndTag(ParserNode):
         return endTag
 
     def __str__(self) -> str:
+        """Serialize as `</tag>`."""
         return f"</{self.tag}>"
 
 
 @dataclass
 class Comment(ParserNode):
+    """An HTML `<!-- ... -->` comment node."""
+
     data: str
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, data: str) -> t.Self:
+        """Construct a `Comment` node tied to `s[start:end]`."""
         return cls(
             s=s,
             start=start,
@@ -313,20 +362,21 @@ class Comment(ParserNode):
         )
 
     def __str__(self) -> str:
+        """Serialize as an HTML comment with escaped body text."""
         return f"<!--{escapeHTML(self.data)}-->"
 
 
-# RawElement is for HTML raw-text elements (like <script>, <style>, or <xmp>)
-# which have special parsing rules that just look for the ending tag and treat
-# the rest of the contents as raw text, serialized without HTML-escaping.
 @dataclass
 class RawElement(ParserNode):
+    """An HTML raw-text element (e.g. `<script>`, `<style>`) whose body is serialized without HTML-escaping."""
+
     tag: str
     startTag: StartTag
     data: str
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:
+        """Construct a `RawElement` node spanning `s[start:end]`."""
         return cls(
             s=s,
             start=start,
@@ -337,20 +387,21 @@ class RawElement(ParserNode):
         )
 
     def __str__(self) -> str:
+        """Serialize the start tag, raw body, and matching end tag."""
         return f"{self.startTag}{self.data}</{self.tag}>"
 
 
-# SafeElement is for normal HTML elements (like <pre> produced from <xmp>,
-# fenced code blocks, or datablocks) whose source contents were read literally
-# as raw text, and therefore must be HTML-escaped when serialized as HTML.
 @dataclass
 class SafeElement(ParserNode):
+    """An element (e.g. `<pre>` from `<xmp>`, fenced code, or datablocks) whose literal body is HTML-escaped on output."""
+
     tag: str
     startTag: StartTag
     data: str
 
     @classmethod
     def fromStream(cls, s: Stream, start: int, end: int, startTag: StartTag, data: str) -> t.Self:
+        """Construct a `SafeElement` node spanning `s[start:end]`."""
         return cls(
             s=s,
             start=start,
@@ -361,27 +412,32 @@ class SafeElement(ParserNode):
         )
 
     def __str__(self) -> str:
+        """Serialize the start tag, HTML-escaped body, and matching end tag."""
         return f"{self.startTag}{escapeHTML(self.data)}</{self.tag}>"
 
 
 def isTag(node: ParserNode) -> t.TypeIs[TagNodeT]:
+    """Return True if `node` represents an HTML tag or whole-element node."""
     return isinstance(node, (StartTag, EndTag, SelfClosedTag, RawElement, SafeElement))
 
 
 def escapeHTML(text: str) -> str:
-    # Escape HTML
+    """Escape `&` and `<` as numeric character references for HTML text serialization."""
     return text.replace("&", "&#38;").replace("<", "&#60;")
 
 
 def escapeAttr(text: str) -> t.SafeAttrStr:
+    """Escape `&` and `"` as numeric character references for double-quoted HTML attributes."""
     return t.SafeAttrStr(text.replace("&", "&#38;").replace('"', "&#34;"))
 
 
 def minimalEscapeAttr(text: str) -> t.SafeAttrStr:
+    """Escape only `"` (preserving existing `&` entities) for double-quoted HTML attributes."""
     return t.SafeAttrStr(text.replace('"', "&#34;"))
 
 
 def unescapeAttr(text: t.SafeAttrStr | t.EmptyLiteralStr) -> str:
+    """Reverse `escapeAttr` by decoding `&#34;` and `&#38;`."""
     return str(text.replace("&#34;", '"').replace("&#38;", "&"))
 
 
@@ -405,18 +461,24 @@ _TAG_CONTEXT_REQS: dict[str, tuple[str, ...]] = {
 
 @dataclass
 class TagStack:
+    """Tracks currently open HTML elements and shorthands for opacity checks, auto-closing, and nesting errors."""
+
     tags: list[TagStackEntry] = field(default_factory=list)
     opaqueTags: set[str] = field(default_factory=lambda: set(elements.DEFAULT_OPAQUE_ELEMENTS))
+    # O(1) counters kept in sync by pushEntry/popEntry to avoid linear scans on hot parser paths.
     _opaqueCount: int = 0
     _tagCounts: Counter[str] = field(default_factory=Counter)
 
     def printOpenTags(self) -> list[str]:
+        """Format all currently open tags with their source locations for error messages."""
         return [f"{x.name} at {x.startTag.loc}" for x in self.tags]
 
     def inOpaqueElement(self) -> bool:
+        """Return True if any currently open element is opaque."""
         return self._opaqueCount > 0
 
     def inTagContext(self, tagName: str, stopTags: list[str] | None = None) -> bool:
+        """Return True if `<tagName>` is open (and appears above any `stopTags` scoping barrier)."""
         if self._tagCounts[tagName] == 0:
             return False
         if not stopTags:
@@ -431,18 +493,21 @@ class TagStack:
         assert False, "unreachable"
 
     def getDeepestFromTag(self, tagName: str) -> TagStackEntry | None:
+        """Return the innermost open `TagStackEntry` matching `tagName`, or `None`."""
         for entry in reversed(self.tags):
             if entry.startTag.tag == tagName:
                 return entry
         return None
 
     def pushEntry(self, entry: TagStackEntry) -> None:
+        """Push `entry` onto the stack and update opacity and per-tag counters."""
         self.tags.append(entry)
         if entry.isOpaque:
             self._opaqueCount += 1
         self._tagCounts[entry.startTag.tag] += 1
 
     def popEntry(self) -> TagStackEntry:
+        """Pop the top entry from the stack and update opacity and per-tag counters."""
         entry = self.tags.pop()
         if entry.isOpaque:
             self._opaqueCount -= 1
@@ -450,7 +515,7 @@ class TagStack:
         return entry
 
     def undo(self, startTag: StartTag) -> None:
-        # If a tag was added experimentally, reverse back to undo any stack changes
+        """Roll back the stack through an experimentally pushed `startTag`."""
         while entry := self.popEntry():
             if entry.startTag == startTag:
                 return
@@ -460,10 +525,7 @@ class TagStack:
         )
 
     def update(self, node: ParserNode) -> None:
-        # Updates the stack based on the passed node.
-        # Start tags add to the stack, close tags pop from it.
-        # Auto-closing tags mean start tags can also pop from the stack.
-        # If any auto-closing occurs, this method yields the appropriate EndTags for it.
+        """Update the open-element stack for `node`, applying HTML auto-closing and logging nesting errors."""
         node = t.cast(ParserNodeT, node)
         if isinstance(node, StartTag):
             self.autoCloseStart(node.tag, node)
@@ -522,6 +584,7 @@ class TagStack:
             t.assert_never(node)
 
     def updateShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        """Push a shorthand-backed `StartTag` onto the stack as a scoping barrier."""
         self.pushEntry(TagStackShorthandEntry(startTag, self.opaqueTags, sigils))
 
     def updateShorthandClose(
@@ -531,6 +594,7 @@ class TagStack:
         startTag: StartTag,
         sigils: tuple[str, str],
     ) -> t.Generator[EndTag, None, None]:
+        """Close a shorthand entry on the stack, reporting and auto-closing any unclosed inner elements."""
         if self.tags and self.tags[-1].startTag == startTag:
             self.popEntry()
             return
@@ -548,6 +612,7 @@ class TagStack:
             )
 
     def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
+        """Discard a failed shorthand opener and any elements pushed inside it."""
         if not any(x.startTag == startTag for x in self.tags):
             shorthand = sigils[0] + "..." + sigils[1]
             m.die(
@@ -560,8 +625,7 @@ class TagStack:
         self.popEntry()
 
     def autoCloseStart(self, tag: str, node: ParserNode) -> None:
-        # Handle any auto-closing that occurs as a result
-        # of seeing a particular start tag.
+        """Handle valid HTML auto-closing triggered by opening `tag`."""
         # (Only valid HTML; real parsers do a lot more work.)
         if not self.tags:
             return
@@ -608,8 +672,7 @@ class TagStack:
             self.virtualClose(node, ["rb", "rp", "rt"], ["ruby"])
 
     def autoCloseEnd(self, tag: str, node: ParserNode) -> None:
-        # Handle any auto-closing that occurs as a result
-        # of seeing a particular end tag.
+        """Handle valid HTML auto-closing triggered by closing `tag`."""
         # (Only valid HTML; real parsers do a lot more work.)
         if not self.tags:
             return
@@ -645,6 +708,7 @@ class TagStack:
         tags: list[str],
         stopTags: list[str] | None = None,
     ) -> None:
+        """Pop the top tag if it matches `tags`; otherwise log an error if a matching tag is buried under unclosed elements."""
         if not self.tags:
             return
         entry: TagStackEntry | None
@@ -665,10 +729,9 @@ class TagStack:
                     # yield from self.virtualCloseUntil([tag], node)
 
     def virtualCloseUntil(self, tags: t.Collection[str], node: ParserNode, realEndTag: bool = False) -> None:
-        # Now that the lxml parser doesn't run HTML's auto-closing rules,
-        # I need to auto-close things myself when they're misordered.
-        # Don't go past a shorthand, tho, as those are definitively scoped.
-        # node
+        """Pop misordered open tags up to and including one in `tags`, stopping at shorthand or paired-tag barriers."""
+        # Shorthand entries and manually-paired start tags act as hard scoping barriers
+        # so a stray end tag inside a shorthand cannot close elements outside it.
         while self.tags:
             lastEntry = self.tags[-1]
             lastStartTag = lastEntry.startTag
@@ -694,7 +757,7 @@ class TagStack:
         )
 
     def virtualCloseShorthand(self, s: Stream, i: int, startTag: StartTag) -> t.Generator[EndTag, None, None]:
-        # Auto-close anything that was opened inside the shorthand and left open.
+        """Pop and yield synthetic `EndTag`s for elements left open inside a shorthand, then pop `startTag`."""
         while self.tags and self.tags[-1].startTag != startTag:
             entry = self.popEntry()
             yield EndTag.fromStream(s, i, i, entry.startTag)
@@ -708,14 +771,14 @@ class TagStack:
             )
 
     def nearestHeading(self) -> TagStackEntry | None:
+        """Return the innermost open `<h1>`-`<h6>` entry on the stack, or `None`."""
         for entry in reversed(self.tags):
             if entry.startTag.tag in elements.HEADING_ELEMENTS:
                 return entry
         return None
 
     def verifyTagContext(self, node: StartTag) -> None:
-        # Checks that elements that can only live in certain contexts
-        # actually have their correct wrappers.
+        """Log an error if `node` requires an enclosing ancestor element (e.g. `<td>` in `<tr>`/`<table>`) that is missing."""
         if reqParents := _TAG_CONTEXT_REQS.get(node.tag):
             for parentTag in reqParents:
                 if not self.inTagContext(parentTag):
@@ -735,11 +798,14 @@ class TagStack:
 
 @dataclass
 class TagStackEntry:
+    """An open element frame on `TagStack` with its cached opacity flag."""
+
     startTag: StartTag
     opaqueTags: InitVar[set[str]]
     isOpaque: bool = field(init=False)
 
     def __post_init__(self, opaqueTags: set[str]) -> None:
+        """Compute `isOpaque` from the element's tag name and `bs-opaque` attribute."""
         if (
             self.startTag.tag in opaqueTags
             or self.startTag.tag in elements.DEFAULT_OPAQUE_ELEMENTS
@@ -751,13 +817,17 @@ class TagStackEntry:
 
     @property
     def name(self) -> str:
+        """Return a human-readable `<tag>` label for error messages."""
         return "<" + self.startTag.tag + ">"
 
 
 @dataclass
 class TagStackShorthandEntry(TagStackEntry):
+    """A `TagStackEntry` representing an inline shorthand (e.g. `[=...=]`) that scopes inner HTML tags."""
+
     sigils: tuple[str, str]
 
     @property
     def name(self) -> str:
+        """Return a human-readable `open...close` shorthand label for error messages."""
         return self.sigils[0] + "..." + self.sigils[1]
