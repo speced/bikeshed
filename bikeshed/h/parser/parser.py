@@ -133,12 +133,15 @@ def parseInlineNodes(
     stopAtNewline: bool = False,
     minIndent: int = 0,
     onMacroNodes: t.Callable[[list[ParserNode], bool], None] | None = None,
+    atLineStart: bool = False,
 ) -> tuple[list[ParserNode], int]:
     """Parses HTML/inline Bikeshed nodes from `s` starting at `start`, applying curly
     apostrophes and merging contiguous `RawText` nodes.
 
     When `stopAtNewline` is True, stops at (and consumes) the first `\\n` outside any
     multi-line construct and outside any open opaque element (`s.inOpaqueElement()`).
+    When `atLineStart` is True, `start` is treated as column 0 of the logical line
+    (e.g. after a list marker) so leading fenced code blocks are recognized.
     """
     if s.config.rawHtml:
         assert not stopAtNewline
@@ -163,7 +166,8 @@ def parseInlineNodes(
         if stopAtNewline and ch == "\n" and not inOpaque:
             break
         if ch in ACTUAL_NODE_START_SET:
-            res = parseNode(s, i)
+            isAtLineStart = atLineStart and lastNode is None and (textStart == -1 or chars[textStart:i].strip() == "")
+            res = parseNode(s, i, atLineStart=isAtLineStart)
             if isOk(res):
                 if textStart != -1:
                     textNode = RawText.fromStream(s, textStart, i)
@@ -426,6 +430,8 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
 def parseNode(
     s: Stream,
     start: int,
+    *,
+    atLineStart: bool = False,
 ) -> ResultT[ParserNode | list[ParserNode]]:
     """
     Parses one or more Nodes from the start of the stream.
@@ -501,7 +507,7 @@ def parseNode(
 
     el: ParserNode | None
     if first1 in ("`", "~"):
-        el, i, _ = markdown.parseFencedCodeBlock(s, start)
+        el, i, _ = markdown.parseFencedCodeBlock(s, start, atLineStart=atLineStart)
         if el is not None:
             if blockType := html.isDatablock(el.startTag, s.loc(i)):
                 el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
