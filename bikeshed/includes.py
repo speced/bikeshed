@@ -44,7 +44,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             return
         doc.recordDependencies(includedInputSource)
         try:
-            lines = includedInputSource.read().rawLines
+            content = includedInputSource.read().content
         except FileNotFoundError:
             m.die(f"Couldn't find include file '{path}'.", el=el)
             h.removeNode(el)
@@ -57,7 +57,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         # can't use just path, because they're relative; including "foo/bar.txt" might use "foo/bar.txt" further nested
         # can't use just content, because then you can't do the same thing twice.
         # combined does a good job unless you purposely pervert it
-        hash = hashlib.md5((path + "".join(lines)).encode("ascii", "xmlcharrefreplace")).hexdigest()
+        hash = hashlib.md5((path + content).encode("ascii", "xmlcharrefreplace")).hexdigest()
         if hashAttr := el.get("bs-hash"):
             # This came from another included file, check if it's a loop-include
             if hash in hashAttr:
@@ -77,7 +77,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
             context=f"file '{path}' (included by a block on {h.approximateLineNumber(el)})",
         )
         parseConfig.macros = {**parseConfig.macros, **macros}
-        nodes = h.nodesFromHtml("".join(lines), parseConfig, context=el, blockMarkdown=True)
+        nodes = h.nodesFromHtml(content, parseConfig, context=el, blockMarkdown=True)
         subtree = h.E.div({}, *h.buildFragment(nodes))
         datablocks.transformDataBlocks(doc, subtree)
         for childInclude in h.findAll("pre.include", subtree):
@@ -109,7 +109,7 @@ def handleCodeInclude(el: t.ElementT, doc: t.SpecT) -> None:
         return
     doc.recordDependencies(includedInputSource)
     try:
-        lines = includedInputSource.read().rawLines
+        lines = includedInputSource.read().lines
     except FileNotFoundError:
         m.die(f"Couldn't find include-code file '{path}'.", el=el)
         h.removeNode(el)
