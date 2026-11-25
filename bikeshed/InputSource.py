@@ -13,22 +13,24 @@ import attr
 import requests
 import tenacity
 
-from . import config, line, t
+from . import config, t
 from . import messages as m
+
+
+def normalizeNewlines(text: str) -> str:
+    if "\r" in text:
+        return text.replace("\r\n", "\n").replace("\r", "\n")
+    return text
 
 
 @attr.s(auto_attribs=True)
 class InputContent:
-    rawLines: list[str]
+    content: str = attr.ib(converter=normalizeNewlines)
     date: datetime.date | None
 
     @property
-    def lines(self) -> list[line.Line]:
-        return [line.Line(i, text) for i, text in enumerate(self.rawLines, 1)]
-
-    @property
-    def content(self) -> str:
-        return "".join(self.rawLines)
+    def lines(self) -> list[str]:
+        return self.content.splitlines(keepends=True)
 
 
 def inputFromName(sourceName: str, **kwargs: t.Any) -> InputSource:
@@ -116,7 +118,7 @@ class StdinInputSource(InputSource):
         return "-"
 
     def read(self) -> InputContent:
-        return InputContent(sys.stdin.readlines(), None)
+        return InputContent(sys.stdin.read(), None)
 
 
 class StringInputSource(InputSource):
@@ -136,7 +138,7 @@ class StringInputSource(InputSource):
         return self.sourceName
 
     def read(self) -> InputContent:
-        return InputContent(self.content.splitlines(keepends=True), self.date)
+        return InputContent(self.content, self.date)
 
 
 class UrlInputSource(InputSource):
@@ -170,7 +172,7 @@ class UrlInputSource(InputSource):
             # Use the response's Date header, although servers don't always set
             # this according to the last change to the file.
             date = email.utils.parsedate_to_datetime(response.headers["Date"]).date()
-        return InputContent([x + "\n" for x in response.text.splitlines(False)], date)
+        return InputContent(response.text, date)
 
     def relative(self, *relativePathSegs: str) -> UrlInputSource:
         return UrlInputSource(urllib.parse.urljoin(self.sourceName, "/".join(relativePathSegs)))
@@ -194,7 +196,7 @@ class FileInputSource(InputSource):
     def read(self) -> InputContent:
         with open(self.sourceName, encoding="utf-8") as f:
             return InputContent(
-                f.readlines(),
+                f.read(),
                 datetime.datetime.fromtimestamp(os.path.getmtime(self.sourceName)).date(),
             )
 
@@ -248,7 +250,7 @@ class TarInputSource(InputSource):
                     )
                 with taritem as f:
                     # Decode the `bytes` to a `str`. (extractfile can't read as text.)
-                    file_contents = f.read().decode(encoding="utf-8").splitlines(keepends=True)
+                    file_contents = f.read().decode(encoding="utf-8")
                 return InputContent(file_contents, ts)
             except KeyError as e:
                 raise FileNotFoundError(errno.ENOENT, "Not found inside tar file", self.tarMemberName) from e
