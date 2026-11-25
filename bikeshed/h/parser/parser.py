@@ -8,6 +8,7 @@ from ... import messages as m
 from ... import t
 from . import autolinks, css, html, macros, markdown
 from .nodes import (
+    EmphDelim,
     EndTag,
     ParserNode,
     RawElement,
@@ -42,6 +43,11 @@ _PROD_NODE_START_RE = re.compile(f"[{re.escape(_PROD_NODE_START_CHARS)}]")
 _PROD_LINE_STOP_RE = re.compile(f"[\n{re.escape(_PROD_NODE_START_CHARS)}]")
 _PROD_POSSIBLE_NODE_START_CHARS = "".join(dict.fromkeys(POSSIBLE_NODE_START_CHARS + css.PROD_GRAMMAR_START_CHARS))
 _PROD_POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(_PROD_POSSIBLE_NODE_START_CHARS)}]")
+_EMPH_NODE_START_CHARS = ACTUAL_NODE_START_CHARS + "*"
+_EMPH_NODE_START_SET = frozenset(_EMPH_NODE_START_CHARS)
+_EMPH_NODE_START_RE = re.compile(f"[{re.escape(_EMPH_NODE_START_CHARS)}]")
+_EMPH_LINE_STOP_RE = re.compile(f"[\n{re.escape(_EMPH_NODE_START_CHARS)}]")
+_EMPH_POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(POSSIBLE_NODE_START_CHARS + '*')}]")
 _RAW_HTML_START_RE = re.compile(r"[&<]")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
@@ -167,13 +173,16 @@ def parseInlineNodes(
     inOpaque = openEls.inOpaqueElement()
     cssEnabled = s.config.css
     inProd = cssEnabled and s.inProdElement()
+    mdInline = s.config.markdownInline
+    inEmph = mdInline and not inOpaque and not inProd
     indent = s.config.indent
 
     while i < end:
         ch = chars[i]
         if stopAtNewline and ch == "\n" and not inOpaque:
             break
-        if ch in (_PROD_NODE_START_SET if inProd else ACTUAL_NODE_START_SET):
+        startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
+        if ch in startSet:
             isAtLineStart = atLineStart and lastNode is None and (textStart == -1 or chars[textStart:i].strip() == "")
             res = parseNode(s, i, atLineStart=isAtLineStart)
             if isOk(res):
@@ -200,6 +209,7 @@ def parseInlineNodes(
                 s.observeResult(res)
                 inOpaque = openEls.inOpaqueElement()
                 inProd = cssEnabled and s.inProdElement()
+                inEmph = mdInline and not inOpaque and not inProd
                 if isinstance(val, list):
                     # Macro expansions are parsed in a child Stream, so `val[0].s is not s` identifies them.
                     if (
@@ -217,7 +227,15 @@ def parseInlineNodes(
                 for item in items:
                     if isinstance(item, SafeText):
                         item = RawText.fromSafeText(item)
-                    if isinstance(item, RawText):
+                    if isinstance(item, EmphDelim):
+                        if heldLast:
+                            assert lastNode is not None
+                            nodes.append(lastNode)
+                        nodes.append(item)
+                        lastNode = item
+                        heldLast = False
+                        heldCanMerge = False
+                    elif isinstance(item, RawText):
                         if not inOpaque:
                             if minIndent > 0 and "\n" in item.text and item.s is s:
                                 item.text = _stripIndentAfterNewlines(item.text, indent, minIndent)
@@ -256,9 +274,11 @@ def parseInlineNodes(
         if textStart == -1:
             textStart = i
         if stopAtNewline and not inOpaque:
-            match = (_PROD_LINE_STOP_RE if inProd else _ACTUAL_LINE_STOP_RE).search(chars, i + 1)
+            lineRe = _PROD_LINE_STOP_RE if inProd else (_EMPH_LINE_STOP_RE if inEmph else _ACTUAL_LINE_STOP_RE)
+            match = lineRe.search(chars, i + 1)
         else:
-            match = (_PROD_NODE_START_RE if inProd else _ACTUAL_NODE_START_RE).search(chars, i + 1)
+            nodeRe = _PROD_NODE_START_RE if inProd else (_EMPH_NODE_START_RE if inEmph else _ACTUAL_NODE_START_RE)
+            match = nodeRe.search(chars, i + 1)
         i = match.start() if match else end
 
     if textStart != -1:
@@ -281,6 +301,8 @@ def parseInlineNodes(
         nodes.append(lastNode)
     if stopAtNewline and i < end and chars[i] == "\n" and not inOpaque:
         i += 1
+    if not stopAtNewline and mdInline:
+        nodes = markdown.resolveEmphasis(nodes, s.config.blockElements)
     return nodes, i
 
 
@@ -424,14 +446,19 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
         node = RawText.fromStream(s, start, i)
         return Ok(node, i)
     inProd = s.config.css and s.inProdElement()
-    if s.chars[start] in (_PROD_NODE_START_SET if inProd else ACTUAL_NODE_START_SET):
+    inEmph = s.config.markdownInline and not s.inOpaqueElement() and not inProd
+    startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
+    if s.chars[start] in startSet:
         res = parseNode(s, start)
         if isOk(res):
             val, i, err = res
             if not experimental:
                 s.observeResult(res)
             return (val, i, err)
-    match = (_PROD_POSSIBLE_NODE_START_RE if inProd else POSSIBLE_NODE_START_RE).search(s.chars, start + 1)
+    possRe = (
+        _PROD_POSSIBLE_NODE_START_RE if inProd else (_EMPH_POSSIBLE_NODE_START_RE if inEmph else POSSIBLE_NODE_START_RE)
+    )
+    match = possRe.search(s.chars, start + 1)
     i = match.start() if match else s.length
     node = RawText.fromStream(s, start, i)
     return Ok(node, i)
@@ -471,7 +498,9 @@ def parseNode(
         return Err(start)
 
     inProd = s.config.css and s.inProdElement()
-    if first1 not in (_PROD_NODE_START_SET if inProd else ACTUAL_NODE_START_SET):
+    inEmph = s.config.markdownInline and not s.inOpaqueElement() and not inProd
+    startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
+    if first1 not in startSet:
         return Err(start)
 
     if first1 == "-":
@@ -692,7 +721,12 @@ def parseNode(
         if first2 == "\\[":
             node = RawText.fromStream(s, start, start + 2, "[")
             return Ok(node, start + 2)
-        elif first1 == "[" and s[start - 1] != "[":
+        if first2 == "\\*":
+            node = RawText.fromStream(s, start, start + 2, "*")
+            return Ok(node, start + 2)
+        if first1 == "*":
+            return markdown.parseEmphasisRun(s, start)
+        if first1 == "[" and s[start - 1] != "[":
             linkRes = markdown.parseMarkdownLink(s, start, generateExperimentalNodes)
             if isOk(linkRes):
                 return linkRes

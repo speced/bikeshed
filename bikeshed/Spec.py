@@ -40,7 +40,6 @@ from . import (
     metadata,
     refs,
     retrieve,
-    shorthands,
     stylescript,
     t,
     wpt,
@@ -334,8 +333,6 @@ class Spec:
             admonitions.addNoteHeaders(self)
             boilerplate.removeUnwantedBoilerplate(self)
 
-        with self.timer.phase("processDocument: shorthands"):
-            shorthands.run(self)
         with self.timer.phase("processDocument: algorithms"):
             algorithms.addImplicitAlgorithms(self)
             datablocks.fixManualDefTables(self)

@@ -172,6 +172,26 @@ class RawText(Text):
 
 
 @dataclass
+class EmphDelim(RawText):
+    """A candidate `*` Markdown emphasis delimiter run emitted during inline scanning and resolved later."""
+
+    canOpen: bool = False
+    canClose: bool = False
+
+    @classmethod
+    def fromDelim(cls, s: Stream, start: int, end: int, *, canOpen: bool, canClose: bool) -> EmphDelim:
+        """Construct an `EmphDelim` for the `*` run `s[start:end]` with CommonMark flanking flags."""
+        return cls(
+            s=s,
+            start=start,
+            end=end,
+            text=s.chars[start:end],
+            canOpen=canOpen,
+            canClose=canClose,
+        )
+
+
+@dataclass
 class SafeText(Text):
     """Plain text whose `<` and `&` characters are HTML-escaped when serialized."""
 

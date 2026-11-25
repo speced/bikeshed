@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from ... import messages as m
 from ... import t
 from .. import elements
-from . import html, macros
-from .markdown import fencedStartRe
+from . import html, macros, markdown
 from .nodes import (
     Comment,
     Doctype,
@@ -191,6 +190,8 @@ def parseBlockStream(s: Stream, *, indentChecker: IndentChecker | None = None) -
         onMacroNodes=indentChecker.checkMacroNodes if indentChecker is not None else None,
     )
     nodes, _ = parseBlocks(s, 0, state, checkIndents=indentChecker is not None)
+    if s.config.markdownInline:
+        nodes = markdown.resolveEmphasis(nodes, state.blockElements)
     return nodes
 
 
@@ -435,7 +436,7 @@ def isFencedCodeStart(s: Stream, cStart: int, lineEnd: int) -> bool:
     chars = s.chars
     if cStart >= lineEnd or chars[cStart] not in ("`", "~"):
         return False
-    match = fencedStartRe.match(chars, cStart, lineEnd)
+    match = markdown.fencedStartRe.match(chars, cStart, lineEnd)
     if match is None:
         return False
     return "`" not in chars[match.end() : lineEnd]
@@ -830,7 +831,7 @@ def matchFenceAt(s: Stream, contentStart: int, lineEnd: int) -> tuple[int, str, 
         pos = skipHws(chars, pos + 1, lineEnd)
     if pos >= lineEnd or chars[pos] not in ("`", "~"):
         return None
-    match = fencedStartRe.match(chars, pos, lineEnd)
+    match = markdown.fencedStartRe.match(chars, pos, lineEnd)
     if match is None:
         return None
     isOpener = "`" not in chars[match.end() : lineEnd]
@@ -1531,6 +1532,8 @@ def parseBlockBsMacro(
             inheritedPrevNodes=prevNodes,
             checkIndents=checkIndents and resolved.kind == "fallback",
         )
+        if resolved.stream.config.markdownInline and expandedNodes:
+            expandedNodes = markdown.resolveEmphasis(expandedNodes, state.blockElements)
         if resolved.kind == "macro" and state.onMacroNodes is not None and expandedNodes:
             state.onMacroNodes(expandedNodes, True)
 
