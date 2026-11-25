@@ -10,9 +10,9 @@ This package implements Bikeshed's unified single-pass parser, turning raw spec 
 - [`html.py`](html.py) — HTML lexical and tag-level parsing: tags, attributes, Bikeshed attribute shortcut canonicalization, character references, whitespace, comments, doctypes, raw-text elements (`<script>`, `<style>`, `<xmp>`, `<title>`, datablock `<pre>`), `<bs-macro>` balanced body scanning, datablocks, and metadata blocks.
 - [`autolinks.py`](autolinks.py) — Non-CSS Bikeshed autolinks and shorthands (`[=dfn=]`, `[$abstract$]`, `[:Header:]`, `{{idl}}`, `{^cddl^}`, `<{element}>`, `|var|`, `[[biblio]]` / `[[#section]]`, `<#123>` / `<org/repo#123>`), plus shared `LinkData`, `parseLinkInfo`, and `parseLinkText`.
 - [`css.py`](css.py) — CSS autolink shorthands (`<<production>>`, `''maybe''` declarations/values, `'propdesc'`) and `.prod` production grammar symbol links (`parseCSSProductionGrammar()`, `parseCSSProductionGrammarInText()`).
-- [`markdown.py`](markdown.py) — Inline Markdown constructs and fenced code blocks (backtick code spans, fenced code blocks, `[text](dest "title")` links, backslash escapes).
+- [`markdown.py`](markdown.py) — Inline Markdown constructs and fenced code blocks (CommonMark `*`/`**` emphasis via `parseEmphasisRun()` and `resolveEmphasis()`, backtick code spans, fenced code blocks, `[text](dest "title")` links, backslash escapes).
 - [`macros.py`](macros.py) — `[MACRO]` / `[MACRO?]` and `<bs-macro>` lookup and expansion in node, block, attribute-list, and plain-text contexts.
-- [`nodes.py`](nodes.py) — `ParserNode` AST types (`RawText`, `SafeText`, `StartTag`, `EndTag`, `SelfClosedTag`, `Comment`, `Doctype`, `RawElement`, `SafeElement`), HTML/attribute escaping, and `TagStack`.
+- [`nodes.py`](nodes.py) — `ParserNode` AST types (`RawText`, `EmphDelim`, `SafeText`, `StartTag`, `EndTag`, `SelfClosedTag`, `Comment`, `Doctype`, `RawElement`, `SafeElement`), HTML/attribute escaping, and `TagStack`.
 - [`stream.py`](stream.py) — `ParseConfig` and `Stream` (character buffer, O(log N) line/column mapping, `subStream`, and open-element delegation).
 - [`treebuilder.py`](treebuilder.py) — LXML SAX `TreeBuilder` (`buildDocument`, `buildFragment`, `consumeNodes`).
 - [`preds.py`](preds.py) — Character classification predicates, SVG/MathML tag table, and HTML named character reference table.
@@ -92,7 +92,7 @@ Both `parseBlocks()` (with `stopAtNewline=True`) and `nodesFromStream()` (whole 
 - **`` ` `` / `~`**: **`markdown.parseFencedCodeBlock()`** and **`markdown.parseCodeSpan()`**.
 - **`''` / `'` / `<<` / `.prod` grammar symbols**: **`css.parseCSSMaybe()`** (`parseMaybeDecl()` / `parseMaybeValue()`), **`css.parseCSSPropdesc()`**, **`css.parseCSSProduction()`**, and (when `css` is enabled inside `<pre class=prod>`, `<xmp class=prod>`, ```` ```prod ````, or `propdef`/`descdef` `Value` cells via `ParseConfig.inProd`) **`css.parseCSSProductionGrammar()`** / **`css.parseCSSProductionGrammarInText()`**.
 - **`[=` / `[$` / `[:` / `{{` / `{^` / `<{` / `|` / `[[`**: **`autolinks.parseAutolink*()`** and **`parseShorthandVariable()`** — target data is parsed with `parseLinkInfo()`, and optional `|custom text` is parsed with `parseLinkText()`.
-- **`[text](url)` / `\`**: **`markdown.parseMarkdownLink()`** and **`markdown.isMarkdownEscape()`** / `htmlifyMarkdownEscapes()`.
+- **`[text](url)` / `*` / `\`**: **`markdown.parseMarkdownLink()`**, **`markdown.parseEmphasisRun()`** (emits `EmphDelim` runs resolved per HTML element scope by **`markdown.resolveEmphasis()`** at the end of `parseBlockStream()` / `parseInlineNodes()`), and **`markdown.isMarkdownEscape()`** / `htmlifyMarkdownEscapes()`.
 - **`[MACRO]`**: **`macros.parseMacroToNodes()`** — resolves the macro into a child `Stream` and recurses via `nodesFromStream()` (similarly, `html.parseAttributeList()` calls `macros.parseMacroToAttrs()`, and `html.parseTitleToEnd()` calls `macros.parseMacroToText()`).
 
 #### Recursive Inline Sub-Parsing

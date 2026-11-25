@@ -1,13 +1,28 @@
-"""Inline Markdown constructs and fenced code blocks (complementing block-level Markdown in `blocks.py`)."""
+"""Inline Markdown constructs (emphasis, code spans, links, escapes) and fenced code blocks."""
 
 from __future__ import annotations
 
 import re
+import unicodedata
+from dataclasses import dataclass, field
 
 from ... import messages as m
 from ... import t
+from .. import elements
 from .html import CharRefContext, isDatablockClass, parseCharRef, printChAsCharRef
-from .nodes import EndTag, ParserNode, RawText, SafeElement, SafeText, StartTag, escapeAttr
+from .nodes import (
+    EmphDelim,
+    EndTag,
+    ParserNode,
+    RawElement,
+    RawText,
+    SafeElement,
+    SafeText,
+    SelfClosedTag,
+    StartTag,
+    TagNodeT,
+    escapeAttr,
+)
 from .preds import isControl, isWhitespace
 from .result import Err, Ok
 from .stream import Stream
@@ -24,6 +39,356 @@ codeSpanEnd2Re = re.compile(r"(.*?[^`])(``)([^`]|$)")
 fencedStartRe = re.compile(r"`{3,}|~{3,}")
 
 MARKDOWN_ESCAPE_RE = re.compile(r"\\([\\!\"#$%&'()*+,./:;<=>?@\[\]^_`{|}~-])")
+_BLANK_LINE_RE = re.compile(r"\n[ \t]*\n")
+_INLINE_EMPH_EXTRA_TAGS = frozenset({"ins", "del"})
+
+
+def parseEmphasisRun(s: Stream, start: int) -> ResultT[RawText]:
+    """Parse a contiguous run of `*` characters at `start`, returning an `EmphDelim` if CommonMark-flanking or plain `RawText`."""
+    if s[start] != "*":
+        return Err(start)
+    chars = s.chars
+    length = s.length
+    end = start + 1
+    while end < length and chars[end] == "*":
+        end += 1
+
+    beforeChar = s[start - 1]
+    afterChar = s[end]
+    beforeIsWs = beforeChar == "" or beforeChar.isspace()
+    afterIsWs = afterChar == "" or afterChar.isspace()
+    beforeIsPunct = not beforeIsWs and unicodedata.category(beforeChar)[0] in ("P", "S")
+    afterIsPunct = not afterIsWs and unicodedata.category(afterChar)[0] in ("P", "S")
+
+    # CommonMark 6.2 flanking rules for `*` (intraword emphasis is permitted for `*`).
+    canOpen = not afterIsWs and (not afterIsPunct or beforeIsWs or beforeIsPunct)
+    canClose = not beforeIsWs and (not beforeIsPunct or afterIsWs or afterIsPunct)
+    if not canOpen and not canClose:
+        return Ok(RawText.fromStream(s, start, end), end)
+    return Ok(EmphDelim.fromDelim(s, start, end, canOpen=canOpen, canClose=canClose), end)
+
+
+@dataclass(slots=True)
+class _DelimEntry:
+    """One `*` delimiter run in the CommonMark doubly-linked delimiter stack."""
+
+    pos: int
+    nodeIdx: int
+    delim: EmphDelim
+    count: int
+    origCount: int
+    canOpen: bool
+    canClose: bool
+    leftPos: int
+    rightPos: int
+    prev: _DelimEntry | None = None
+    next: _DelimEntry | None = None
+
+
+@dataclass(slots=True)
+class _EmphFrame:
+    """One open HTML element scope accumulating candidate `*` delimiters."""
+
+    tag: str | None
+    delims: list[_DelimEntry] = field(default_factory=list)
+
+
+def _isInlineEmphTag(node: TagNodeT, blockElements: t.Collection[str]) -> bool:
+    """Return True if `node` is an inline HTML tag that emphasis may span across."""
+    tagname = node.tag
+    if tagname == "math":
+        if tagname in blockElements:
+            return False
+        attrs = (
+            node.attrs
+            if isinstance(node, (StartTag, SelfClosedTag))
+            else (node.startTag.attrs if node.startTag is not None else None)
+        )
+        return not (attrs and attrs.get("display", "inline") == "block")
+    if tagname in elements.INLINE_ELEMENTS or tagname in _INLINE_EMPH_EXTRA_TAGS:
+        return True
+    return "-" in tagname and tagname not in blockElements
+
+
+def _resolveDelimFrame(
+    delims: list[_DelimEntry],
+    openTagsAfter: dict[int, list[StartTag]],
+    closeTagsBefore: dict[int, list[EndTag]],
+    remaining: dict[int, tuple[int, int]],
+) -> None:
+    """Run the CommonMark emphasis-matching algorithm on `delims`, recording tag insertions by `nodeIdx`."""
+    if not delims:
+        return
+
+    for k, entry in enumerate(delims):
+        entry.pos = k
+        entry.prev = delims[k - 1] if k > 0 else None
+        entry.next = delims[k + 1] if k + 1 < len(delims) else None
+
+    def unlink(entry: _DelimEntry) -> None:
+        """Remove `entry` from the active doubly-linked delimiter stack in O(1)."""
+        if entry.prev is not None:
+            entry.prev.next = entry.next
+        if entry.next is not None:
+            entry.next.prev = entry.prev
+        entry.prev = None
+        entry.next = None
+
+    # Track the lowest unmatched search boundary per `(closer.origCount % 3, closer.canOpen)` for O(N) time.
+    openersBottom: dict[tuple[int, bool], int] = {}
+    closer: _DelimEntry | None = delims[0]
+    while closer is not None:
+        if not closer.canClose or closer.count == 0:
+            closer = closer.next
+            continue
+
+        bottomKey = (closer.origCount % 3, closer.canOpen)
+        bottom = openersBottom.get(bottomKey, -1)
+        opener = closer.prev
+        foundOpener: _DelimEntry | None = None
+        while opener is not None and opener.pos > bottom:
+            if opener.canOpen and opener.count > 0:
+                oddMatch = (
+                    (opener.canClose or closer.canOpen)
+                    and closer.origCount % 3 != 0
+                    and (opener.origCount + closer.origCount) % 3 == 0
+                )
+                if not oddMatch:
+                    foundOpener = opener
+                    break
+            opener = opener.prev
+
+        if foundOpener is None:
+            openersBottom[bottomKey] = closer.pos - 1
+            nextCloser = closer.next
+            if not closer.canOpen:
+                unlink(closer)
+            closer = nextCloser
+            continue
+
+        useDelims = 2 if (foundOpener.count >= 2 and closer.count >= 2) else 1
+        tagName = "strong" if useDelims == 2 else "em"
+
+        openEnd = foundOpener.rightPos
+        openStart = openEnd - useDelims
+        foundOpener.rightPos = openStart
+        foundOpener.count -= useDelims
+
+        closeStart = closer.leftPos
+        closeEnd = closeStart + useDelims
+        closer.leftPos = closeEnd
+        closer.count -= useDelims
+
+        assert foundOpener.delim.s is not None and closer.delim.s is not None
+        startTag = StartTag.fromStream(foundOpener.delim.s, openStart, openEnd, tagName)
+        endTag = EndTag.fromStream(closer.delim.s, closeStart, closeEnd, startTag)
+        openTagsAfter.setdefault(foundOpener.nodeIdx, []).append(startTag)
+        closeTagsBefore.setdefault(closer.nodeIdx, []).append(endTag)
+
+        # Drop all delimiters strictly between opener and closer in O(1).
+        foundOpener.next = closer
+        closer.prev = foundOpener
+
+        if foundOpener.count == 0:
+            unlink(foundOpener)
+        if closer.count == 0:
+            nextCloser = closer.next
+            unlink(closer)
+            closer = nextCloser
+
+    for entry in delims:
+        remaining[entry.nodeIdx] = (entry.leftPos, entry.rightPos)
+
+
+def _autoCloseFrameTop(
+    frames: list[_EmphFrame],
+    closeTags: tuple[str, ...],
+    flushFrame: t.Callable[[_EmphFrame], None],
+    stopTags: tuple[str, ...] = (),
+) -> None:
+    """Flush and pop the top frame if its tag matches `closeTags` (without crossing `stopTags`)."""
+    if len(frames) <= 1:
+        return
+    topTag = frames[-1].tag
+    if topTag in stopTags:
+        return
+    if topTag in closeTags:
+        flushFrame(frames.pop())
+
+
+def _autoCloseEmphFramesForStart(
+    tag: str,
+    frames: list[_EmphFrame],
+    flushFrame: t.Callable[[_EmphFrame], None],
+) -> None:
+    """Apply HTML optional-end-tag auto-closing rules for opening `tag` on the emphasis frame stack."""
+    if len(frames) <= 1:
+        return
+    if tag in elements.AUTO_CLOSE_P_START_ELEMENTS:
+        _autoCloseFrameTop(frames, ("p",), flushFrame)
+    if tag == "li":
+        _autoCloseFrameTop(frames, ("p",), flushFrame, ("ol", "ul"))
+        _autoCloseFrameTop(frames, ("li",), flushFrame, ("ol", "ul"))
+    elif tag in ("dt", "dd"):
+        _autoCloseFrameTop(frames, ("p",), flushFrame, ("dl",))
+        _autoCloseFrameTop(frames, ("dt", "dd"), flushFrame, ("dl",))
+    elif tag == "option":
+        _autoCloseFrameTop(frames, ("option",), flushFrame)
+    elif tag == "optgroup":
+        _autoCloseFrameTop(frames, ("option",), flushFrame)
+        _autoCloseFrameTop(frames, ("optgroup",), flushFrame)
+    elif tag in ("td", "th"):
+        _autoCloseFrameTop(frames, ("p",), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
+    elif tag == "tr":
+        _autoCloseFrameTop(frames, ("p",), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("caption", "colgroup"), flushFrame, ("table",))
+    elif tag in ("thead", "tbody", "tfoot", "caption", "colgroup", "col"):
+        _autoCloseFrameTop(frames, ("p",), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
+        if tag == "col":
+            _autoCloseFrameTop(frames, ("thead", "tbody", "tfoot", "caption"), flushFrame, ("table",))
+        else:
+            _autoCloseFrameTop(frames, ("thead", "tbody", "tfoot", "caption", "colgroup"), flushFrame, ("table",))
+    elif tag in ("rb", "rtc"):
+        _autoCloseFrameTop(frames, ("rb", "rp", "rt"), flushFrame, ("ruby",))
+        _autoCloseFrameTop(frames, ("rtc",), flushFrame, ("ruby",))
+    elif tag in ("rp", "rt"):
+        _autoCloseFrameTop(frames, ("rb", "rp", "rt"), flushFrame, ("ruby",))
+
+
+def _autoCloseEmphFramesForEnd(
+    tag: str,
+    frames: list[_EmphFrame],
+    flushFrame: t.Callable[[_EmphFrame], None],
+) -> None:
+    """Apply HTML optional-end-tag auto-closing rules for closing `tag` on the emphasis frame stack."""
+    if len(frames) <= 1:
+        return
+    if tag in elements.AUTO_CLOSE_P_END_ELEMENTS:
+        _autoCloseFrameTop(frames, ("p",), flushFrame)
+    if tag in ("ol", "ul"):
+        _autoCloseFrameTop(frames, ("li",), flushFrame, ("ol", "ul"))
+    elif tag == "dl":
+        _autoCloseFrameTop(frames, ("dt", "dd"), flushFrame, ("dl",))
+    elif tag == "tr":
+        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
+    elif tag in ("thead", "tbody", "tfoot"):
+        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
+    elif tag == "table":
+        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
+        _autoCloseFrameTop(frames, ("thead", "tbody", "tfoot", "caption", "colgroup"), flushFrame, ("table",))
+    elif tag == "rtc":
+        _autoCloseFrameTop(frames, ("rt",), flushFrame, ("ruby",))
+    elif tag == "ruby":
+        _autoCloseFrameTop(frames, ("rt", "rb", "rp"), flushFrame, ("ruby",))
+        _autoCloseFrameTop(frames, ("rtc",), flushFrame, ("ruby",))
+    elif tag == "optgroup":
+        _autoCloseFrameTop(frames, ("option",), flushFrame)
+    elif tag == "select":
+        _autoCloseFrameTop(frames, ("option",), flushFrame)
+        _autoCloseFrameTop(frames, ("optgroup",), flushFrame)
+
+
+def resolveEmphasis(nodes: list[ParserNode], blockElements: t.Collection[str] = ()) -> list[ParserNode]:
+    """Resolve `EmphDelim` nodes in `nodes` into balanced `<em>`/`<strong>` tags using CommonMark rules scoped per HTML element."""
+    if not any(isinstance(node, EmphDelim) for node in nodes):
+        return nodes
+
+    openTagsAfter: dict[int, list[StartTag]] = {}
+    closeTagsBefore: dict[int, list[EndTag]] = {}
+    remaining: dict[int, tuple[int, int]] = {}
+
+    def flushFrame(frame: _EmphFrame) -> None:
+        """Resolve all accumulated delimiters in `frame` and clear its delimiter list."""
+        if frame.delims:
+            _resolveDelimFrame(frame.delims, openTagsAfter, closeTagsBefore, remaining)
+            frame.delims.clear()
+
+    frames: list[_EmphFrame] = [_EmphFrame(tag=None)]
+    trailingNewline = False
+
+    for idx, node in enumerate(nodes):
+        if isinstance(node, EmphDelim):
+            count = len(node.text)
+            frames[-1].delims.append(
+                _DelimEntry(
+                    pos=0,
+                    nodeIdx=idx,
+                    delim=node,
+                    count=count,
+                    origCount=count,
+                    canOpen=node.canOpen,
+                    canClose=node.canClose,
+                    leftPos=node.start,
+                    rightPos=node.end,
+                ),
+            )
+            trailingNewline = False
+        elif isinstance(node, (RawText, SafeText)):
+            text = node.text
+            if "\n" in text:
+                if _BLANK_LINE_RE.search(text) or (trailingNewline and text.split("\n", 1)[0].strip(" \t") == ""):
+                    flushFrame(frames[-1])
+                trailingNewline = text.rsplit("\n", 1)[1].strip(" \t") == ""
+            elif text.strip(" \t") != "":
+                trailingNewline = False
+        elif isinstance(node, StartTag):
+            _autoCloseEmphFramesForStart(node.tag, frames, flushFrame)
+            if not _isInlineEmphTag(node, blockElements):
+                flushFrame(frames[-1])
+            frames.append(_EmphFrame(tag=node.tag))
+            trailingNewline = False
+        elif isinstance(node, EndTag):
+            _autoCloseEmphFramesForEnd(node.tag, frames, flushFrame)
+            for matchIdx in range(len(frames) - 1, 0, -1):
+                if frames[matchIdx].tag == node.tag:
+                    while len(frames) > matchIdx:
+                        flushFrame(frames.pop())
+                    break
+            if not _isInlineEmphTag(node, blockElements):
+                flushFrame(frames[-1])
+            trailingNewline = False
+        elif isinstance(node, (SelfClosedTag, RawElement, SafeElement)):
+            _autoCloseEmphFramesForStart(node.tag, frames, flushFrame)
+            if not _isInlineEmphTag(node, blockElements):
+                flushFrame(frames[-1])
+            trailingNewline = False
+
+    while frames:
+        flushFrame(frames.pop())
+
+    out: list[ParserNode] = []
+    justClosedEmph: EndTag | None = None
+    for idx, node in enumerate(nodes):
+        if isinstance(node, EmphDelim):
+            closes = closeTagsBefore.get(idx)
+            if closes:
+                out.extend(closes)
+            leftPos, rightPos = remaining[idx]
+            opens = openTagsAfter.get(idx)
+            if rightPos > leftPos:
+                assert node.s is not None
+                out.append(RawText.fromStream(node.s, leftPos, rightPos))
+                justClosedEmph = None
+            elif closes and not opens:
+                justClosedEmph = closes[-1]
+            else:
+                justClosedEmph = None
+            if opens:
+                out.extend(reversed(opens))
+                justClosedEmph = None
+        else:
+            if justClosedEmph is not None and isinstance(node, RawText) and node.text.startswith("'"):
+                node.curlifyApostrophes(justClosedEmph)
+            justClosedEmph = None
+            out.append(node)
+    return out
 
 
 def parseCodeSpan(s: Stream, start: int) -> ResultT[list[ParserNode]]:
@@ -426,7 +791,7 @@ def parseMarkdownEscape(s: Stream, start: int) -> ResultT[str]:
 
 
 def isMarkdownEscape(s: Stream, start: int) -> bool:
-    """Return True if `s[start:start+2]` is a handled Markdown backslash escape (leaving `\\*` and `\\_` for later emphasis parsing)."""
+    """Return True if `s[start:start+2]` is a handled Markdown backslash escape."""
     return s[start] == "\\" and s[start + 1] in (
         "\\",
         "!",
@@ -438,7 +803,7 @@ def isMarkdownEscape(s: Stream, start: int) -> bool:
         "'",
         "(",
         ")",
-        # "*",
+        "*",
         "+",
         ",",
         "-",
@@ -454,7 +819,7 @@ def isMarkdownEscape(s: Stream, start: int) -> bool:
         "[",
         "]",
         "^",
-        # "_",
+        "_",
         "`",
         "{",
         "|",
