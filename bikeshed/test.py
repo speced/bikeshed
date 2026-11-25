@@ -259,7 +259,7 @@ def processTest(
         doc = None
         doc = Spec(inputFilename=path, fileRequester=fileRequester, testing=True)
         if md is not None:
-            doc.mdCommandLine = md
+            doc.mdCommandLine = metadata.join(md)
         addTestMetadata(doc)
         doc.preprocess()
     except Exception as e:
@@ -289,11 +289,13 @@ def addTestMetadata(doc: t.SpecT) -> None:
     assert doc.mdCommandLine is not None
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
     doc.mdBaseline.addData("Repository", "test/test")
-    md = metadata.parse(lines=doc.inputContent.lines)
-    if "Date" not in md.manuallySetKeys:
-        doc.mdCommandLine.addData("Date", "1970-01-01")
-    if "Inline Github Issue" not in md.manuallySetKeys:
+    doc.mdBaseline.addData("Date", "1970-01-01")
+    if "Inline Github Issues" not in doc.mdCommandLine.manuallySetKeys:
         doc.mdCommandLine.addData("Inline Github Issues", "no")
+    with m.messagesSilent():
+        md = metadata.parse(lines=doc.inputContent.lines)
+    if "Date" not in doc.mdCommandLine.manuallySetKeys and md.allData.get("Date") and md.allData["Date"][-1] == "now":
+        doc.mdCommandLine.addData("Date", "1970-01-01")
 
 
 def replaceExtension(path: str, newExt: str) -> str:
