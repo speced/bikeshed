@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import io
 import re
 
 from ... import messages as m
@@ -20,7 +22,7 @@ from .nodes import (
     escapeAttr,
 )
 from .result import Err, Ok, isOk
-from .stream import Stream
+from .stream import ParseConfig, Stream
 
 if t.TYPE_CHECKING:
     from .result import OkT, ResultT
@@ -50,6 +52,111 @@ _EMPH_LINE_STOP_RE = re.compile(f"[\n{re.escape(_EMPH_NODE_START_CHARS)}]")
 _EMPH_POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(POSSIBLE_NODE_START_CHARS + '*')}]")
 _RAW_HTML_START_RE = re.compile(r"[&<]")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
+
+_METADATA_SCAN_RE = re.compile(
+    r"<!--|<(?P<tag>pre|xmp|script|style|h1)(?=[\t\n\x0c />])|^[ \t]*(?:`{3,}|~{3,})",
+    re.I | re.M,
+)
+_H1_LINE_RE = re.compile(r"<h1[^>]*>(.*?)</h1>")
+
+
+@dataclasses.dataclass
+class ExtractedMetadata:
+    """Metadata blocks and optional fallback `<h1>` title extracted from near the start of a document."""
+
+    blocks: list[RawElement] = dataclasses.field(default_factory=list)
+    spans: dict[int, int] = dataclasses.field(default_factory=dict)
+    h1Title: str | None = None
+    h1Line: int | None = None
+
+
+def extractMetadata(text: str, config: ParseConfig | None = None) -> ExtractedMetadata:
+    """Scan near the start of `text` using the HTML/Markdown parser primitives to extract metadata blocks.
+
+    Skips comments, `<script>`, `<style>`, non-metadata `<xmp>`, other `<pre>` datablocks, and fenced code
+    blocks so embedded `<pre class=metadata>` examples are ignored. Only scans up to `config.metadataScanLimit`
+    non-metadata characters from the start of the document; any metadata block further down is flagged during
+    the main parse.
+    """
+    result = ExtractedMetadata()
+    rawConfig = ParseConfig(rawHtml=True) if config is None else dataclasses.replace(config, rawHtml=True)
+    s = Stream(text, config=rawConfig)
+    chars = s.chars
+    length = s.length
+    limit = s.config.metadataScanLimit
+    i = 0
+
+    savedState = m.state
+    silentState = savedState.replace(fh=io.StringIO(), dieOn="nothing", silent=True)
+    m.state = silentState
+    try:
+        while i < length and i < limit:
+            match = _METADATA_SCAN_RE.search(chars, i)
+            if match is None or match.start() >= limit:
+                break
+            pos = match.start()
+            tag = match.group("tag")
+
+            if tag is None:
+                if chars.startswith("<!--", pos):
+                    comment, nextI, _ = html.parseComment(s, pos)
+                    i = nextI if comment is not None else match.end()
+                else:
+                    fenceStart = pos
+                    while fenceStart < length and chars[fenceStart] in (" ", "\t"):
+                        fenceStart += 1
+                    fence, nextI, _ = markdown.parseFencedCodeBlock(s, fenceStart)
+                    i = nextI if fence is not None else match.end()
+                continue
+
+            tagLower = tag.lower()
+            if tagLower == "h1":
+                if result.h1Title is None and s.precedingTextOnLine(pos).strip() == "":
+                    lineEnd = chars.find("\n", pos)
+                    if lineEnd == -1:
+                        lineEnd = length
+                    h1Match = _H1_LINE_RE.match(chars, pos, lineEnd)
+                    if h1Match is not None:
+                        result.h1Title = h1Match.group(1)
+                        result.h1Line = s.line(pos)
+                        i = h1Match.end()
+                        continue
+                i = match.end()
+                continue
+
+            startTag, tagEnd, _ = html.parseStartTag(s, pos)
+            if not isinstance(startTag, StartTag):
+                i = tagEnd if startTag is not None else match.end()
+                continue
+
+            if tagLower in ("pre", "xmp") and html.isMetadataBlock(startTag) and pos == s.currentLineStart(pos):
+                m.state = savedState
+                try:
+                    el, nextI, _ = html.parseMetadataBlockToEnd(s, pos, startTag, tagEnd)
+                finally:
+                    m.state = silentState
+                if el is not None:
+                    result.blocks.append(el)
+                    result.spans[el.start] = el.end
+                    limit += el.end - el.start
+                    i = nextI
+                    continue
+
+            if tagLower == "script":
+                _, i, _ = html.parseScriptToEnd(s, tagEnd)
+            elif tagLower == "style":
+                _, i, _ = html.parseStyleToEnd(s, tagEnd)
+            elif tagLower == "xmp":
+                _, i, _ = html.parseXmpToEnd(s, tagEnd)
+            elif tagLower == "pre" and html.isDatablock(startTag, s.loc(tagEnd)):
+                _, nextI, _ = html.parseDatablockPreToEnd(s, tagEnd)
+                i = nextI if nextI > tagEnd else tagEnd
+            else:
+                i = tagEnd
+    finally:
+        m.state = savedState
+
+    return result
 
 
 def _stripIndentAfterNewlines(text: str, indent: int, numIndents: int) -> str:
@@ -752,6 +859,8 @@ def parseNode(
 
 def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
     """Dispatch constructs starting with `<`: doctypes, comments, tags, raw elements, metadata blocks, and repo links."""
+    if s.metadataSpans and (metaEnd := s.metadataSpans.get(start)) is not None:
+        return Ok(RawText.fromStream(s, start, metaEnd, ""), metaEnd)
     i = start + 1
     if s[i] == "!":
         dtRes = html.parseDoctype(s, start)
@@ -821,9 +930,19 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 # parseTitleToEnd() already emitted an error message.
                 els = [startTag, EndTag.fromStream(s, i, i, startTag)]
                 return Ok(els, i)
-        elif html.isMetadataBlock(startTag):
+        elif (
+            html.isMetadataBlock(startTag)
+            and not s.inOpaqueElement()
+            and start == s.currentLineStart(start)
+            and s.col(start) == 1
+        ):
             el, endI, _ = html.parseMetadataBlockToEnd(s, start, startTag, i)
             if el is not None:
+                if s.metadataSpans is not None:
+                    m.die(
+                        "Found a metadata block too far down in the document; please move all metadata blocks near the top of the document.",
+                        lineNum=s.loc(start),
+                    )
                 # Just remove it from the doc.
                 rawText = RawText.fromStream(s, start, endI, "")
                 return Ok(rawText, endI)

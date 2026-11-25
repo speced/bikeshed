@@ -824,7 +824,7 @@ def isMetadataBlock(startTag: StartTag) -> bool:
 
 def parseMetadataBlockToEnd(s: Stream, start: int, startTag: StartTag, i: int) -> ResultT[RawElement]:
     """Consume an unindented `<pre/xmp class=metadata>` block through its closing tag."""
-    if start != s.currentLineStart(start):
+    if start != s.currentLineStart(start) or s.col(start) != 1:
         # Metadata blocks must have their start/end tags
         # on the left margin, completely unindented.
         return Err(start)
@@ -847,13 +847,11 @@ def parseMetadataBlockToEnd(s: Stream, start: int, startTag: StartTag, i: int) -
         # Hit the end tag
         # Back up one char so we're actually ending at the end
         # of the construct, rather than on the next line.
-        i -= 1
+        if line.endswith("\n"):
+            i -= 1
         if match.group(1).strip() != "":
             m.die("Significant text on the same line as the metadata end tag isn't allowed.", lineNum=s.loc(i))
         break
 
-    # Since the internals aren't parsed, call it an <xmp>
-    # so it'll survive later parses if necessary.
-    startTag.tag = "xmp"
     el = RawElement.fromStream(s, start, i, startTag, contents)
     return Ok(el, i)
