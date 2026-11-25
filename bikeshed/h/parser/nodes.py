@@ -468,10 +468,13 @@ class TagStack:
     # O(1) counters kept in sync by pushEntry/popEntry to avoid linear scans on hot parser paths.
     _opaqueCount: int = 0
     _tagCounts: Counter[str] = field(default_factory=Counter)
+    # Tracks enclosing Markdown-synthesized block elements as `(len(tags), tagName)` without
+    # polluting `self.tags` for HTML end-tag matching or error messages.
+    _blockParents: list[tuple[int, str]] = field(default_factory=list)
 
     def printOpenTags(self) -> list[str]:
         """Format all currently open tags with their source locations for error messages."""
-        return [f"{x.name} at {x.startTag.loc}" for x in self.tags]
+        return [f"{x.name} at {x.startTag.loc}" for x in self.tags if not isinstance(x, TagStackSyntheticEntry)]
 
     def inOpaqueElement(self) -> bool:
         """Return True if any currently open element is opaque."""
@@ -514,6 +517,47 @@ class TagStack:
         self._tagCounts[entry.startTag.tag] -= 1
         return entry
 
+    def pushSynthetic(self, startTag: StartTag) -> TagStackSyntheticEntry:
+        """Push a synthetic container entry (e.g. a Markdown-generated `<ul>`/`<ol>`/`<dl>`) onto the stack."""
+        entry = TagStackSyntheticEntry(startTag, self.opaqueTags)
+        self.pushEntry(entry)
+        return entry
+
+    def popSynthetic(self, entry: TagStackSyntheticEntry) -> None:
+        """Remove a previously pushed synthetic container `entry` from the stack, preserving any unclosed inner tags."""
+        if self.tags and self.tags[-1] is entry:
+            self.popEntry()
+            return
+        for idx in range(len(self.tags) - 1, -1, -1):
+            if self.tags[idx] is entry:
+                removed = self.tags.pop(idx)
+                if removed.isOpaque:
+                    self._opaqueCount -= 1
+                self._tagCounts[removed.startTag.tag] -= 1
+                return
+
+    def pushBlockParent(self, tagName: str, tagDepth: int | None = None) -> None:
+        """Record an active Markdown-synthesized block element (`<li>`, `<dt>`, `<dd>`, `<blockquote>`, `<p>`, heading) at `tagDepth`."""
+        self._blockParents.append((len(self.tags) if tagDepth is None else tagDepth, tagName))
+
+    def popBlockParent(self) -> None:
+        """Pop the innermost Markdown-synthesized block element recorded by `pushBlockParent()`."""
+        self._blockParents.pop()
+
+    def directParentContext(self) -> tuple[str | None, str | None]:
+        """Return `(parentTag, grandparentTag)` for the innermost open element (HTML or Markdown block)."""
+        n = len(self.tags)
+        if self._blockParents and self._blockParents[-1][0] >= n:
+            return self._blockParents[-1][1], None
+        if n == 0:
+            return None, None
+        parentTag = self.tags[-1].startTag.tag
+        if n >= 2 and not (self._blockParents and self._blockParents[-1][0] >= n - 1):
+            grandparentTag = self.tags[-2].startTag.tag
+        else:
+            grandparentTag = None
+        return parentTag, grandparentTag
+
     def undo(self, startTag: StartTag) -> None:
         """Roll back the stack through an experimentally pushed `startTag`."""
         while entry := self.popEntry():
@@ -529,6 +573,7 @@ class TagStack:
         node = t.cast(ParserNodeT, node)
         if isinstance(node, StartTag):
             self.autoCloseStart(node.tag, node)
+            self.verifyDirectParent(node.tag, node.loc)
             self.pushEntry(TagStackEntry(node, self.opaqueTags))
             self.verifyTagContext(node)
             return
@@ -537,7 +582,7 @@ class TagStack:
             if (
                 self.tags
                 and self.tags[-1].startTag.tag == node.tag
-                and not isinstance(self.tags[-1], TagStackShorthandEntry)
+                and not isinstance(self.tags[-1], (TagStackShorthandEntry, TagStackSyntheticEntry))
             ):
                 self.popEntry()
             else:
@@ -561,7 +606,7 @@ class TagStack:
                 for entry in reversed(self.tags):
                     # If the corresponding start tag exists on the stack, just further
                     # away, close everything between you and the start tag.
-                    if entry.startTag.tag == node.tag:
+                    if entry.startTag.tag == node.tag and not isinstance(entry, TagStackSyntheticEntry):
                         m.die(
                             f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (at {entry.startTag.loc}).\nOpen tags: {', '.join(self.printOpenTags())}",
                             lineNum=node.loc,
@@ -571,13 +616,16 @@ class TagStack:
                 else:
                     # Didn't encounter the corresponding start tag, so this is just
                     # a markup error to report.
-                    openTagsMsg = f"\nOpen tags: {', '.join(self.printOpenTags())}" if self.tags else ""
+                    openTags = self.printOpenTags()
+                    openTagsMsg = f"\nOpen tags: {', '.join(openTags)}" if openTags else ""
                     m.die(
                         f"Saw an end tag {node}, but there's no open element corresponding to it.{openTagsMsg}",
                         lineNum=node.loc,
                     )
         elif isinstance(node, (SelfClosedTag, RawElement, SafeElement)):
             self.autoCloseStart(node.tag, node)
+            if isinstance(node, SelfClosedTag) or node.startTag.attrs.get("bs-datablock-type") != "include":
+                self.verifyDirectParent(node.tag, node.loc)
         elif isinstance(node, (Text, Comment, Doctype)):
             pass
         else:
@@ -777,15 +825,27 @@ class TagStack:
                 return entry
         return None
 
+    def verifyDirectParent(
+        self,
+        tag: str,
+        loc: str | int,
+        parentContext: tuple[str | None, str | None] | None = None,
+    ) -> None:
+        """Log a fatal error if `tag` is an invalid direct child of an open `<ul>`, `<ol>`, `<dl>`, or `<dl> > <div>`."""
+        parentTag, grandparentTag = self.directParentContext() if parentContext is None else parentContext
+        if parentTag in ("ol", "ul") and tag not in ("li", "script", "template"):
+            m.die(f"Saw a <{tag}> that's a direct child of a <{parentTag}>", lineNum=loc)
+        elif parentTag == "dl" and tag not in ("dt", "dd", "div", "script", "template"):
+            m.die(f"Saw a <{tag}> that's a direct child of a <dl>", lineNum=loc)
+        elif parentTag == "div" and grandparentTag == "dl" and tag not in ("dt", "dd", "script", "template"):
+            m.die(f"Saw a <{tag}> that's a direct child of a <dl>'s <div>", lineNum=loc)
+
     def verifyTagContext(self, node: StartTag) -> None:
         """Log an error if `node` requires an enclosing ancestor element (e.g. `<td>` in `<tr>`/`<table>`) that is missing."""
         if reqParents := _TAG_CONTEXT_REQS.get(node.tag):
             for parentTag in reqParents:
                 if not self.inTagContext(parentTag):
                     m.die(f"Saw a <{node.tag}> that wasn't in a <{parentTag}>", lineNum=node.loc)
-        # Note: direct-child checks on <ol>/<ul>/<dl> aren't enforced here because Markdown
-        # lists inside explicit HTML <ul>/<dl> wrappers emit synthetic `bs-md-list` items
-        # without pushing them onto TagStack (they are unwrapped later during cleanup).
 
 
 @dataclass
@@ -823,3 +883,12 @@ class TagStackShorthandEntry(TagStackEntry):
     def name(self) -> str:
         """Return a human-readable `open...close` shorthand label for error messages."""
         return self.sigils[0] + "..." + self.sigils[1]
+
+
+@dataclass
+class TagStackSyntheticEntry(TagStackEntry):
+    """A `TagStackEntry` representing a synthetic block container (e.g. Markdown `<ul>`/`<ol>`/`<dl>`).
+
+    Provides ancestor context (such as `<dl>` for mixed HTML `<dt>`/`<dd>` items) and HTML
+    auto-close scoping without being closable by stray HTML end tags.
+    """
