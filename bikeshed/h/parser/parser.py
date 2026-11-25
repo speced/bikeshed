@@ -749,6 +749,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 startTag.tag = "span"
                 if "data-link-type" in startTag.attrs:
                     startTag.attrs["bs-link-type"] = startTag.attrs.pop("data-link-type")
+        if startTag.tag == "bs-macro" and not s.inOpaqueElement():
+            return parseBsMacro(s, startTag, i)
         el: ParserNode | None
         if startTag.tag == "title" and not s.openEls.inTagContext("svg"):
             # Stash the HTML `<title>` text in an attribute so later pipeline stages can inspect it cleanly.
@@ -897,3 +899,16 @@ def parseLToEnd(s: Stream, start: int, lTag: StartTag) -> ResultT[ParserNode | l
 
     # Now just return the autolink, but with cursor set past the </l>
     return Ok(nodes, i)
+
+
+def parseBsMacro(s: Stream, startTag: StartTag, bodyStart: int) -> ResultT[list[ParserNode]]:
+    """Consume a `<bs-macro>` body through `</bs-macro>` and expand the macro or its fallback into nodes."""
+    fallbackText, endI, _ = html.parseBsMacroToEnd(s, bodyStart, startTag)
+    if fallbackText is None:
+        return Ok([], s.length)
+    resolved = macros.resolveBsMacro(s, startTag, fallbackText, bodyStart)
+    if resolved.stream is None:
+        return Ok([], endI)
+    if s.config.markdownBlock and s.blockParser is not None:
+        return Ok(s.blockParser(resolved.stream), endI)
+    return Ok(list(nodesFromStream(resolved.stream, 0)), endI)

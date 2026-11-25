@@ -34,7 +34,7 @@ def nodesFromHtml(
     blockMarkdown: bool = False,
 ) -> t.Generator[ParserNode, None, None]:
     """Parse `data` into a stream of `ParserNode`s, optionally running block Markdown and closing open elements."""
-    s = Stream(data, startLine=startLine, config=config)
+    s = Stream(data, startLine=startLine, config=config, blockParser=parseBlockStream)
     if blockMarkdown and config.markdownBlock:
         yield from parseBlockStream(s)
     else:
@@ -60,7 +60,7 @@ def initialDocumentParse(
     # records mixed-indentation lints when `indentChecker` is provided,
     # and logs errors for any elements left open at EOF.
 
-    s = Stream(text, startLine=startLine, config=config)
+    s = Stream(text, startLine=startLine, config=config, blockParser=parseBlockStream)
     if config.markdownBlock:
         nodes = parseBlockStream(s, indentChecker=indentChecker)
         nodes.extend(closeOpenElements(s, start=None, context=None))

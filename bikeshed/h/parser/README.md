@@ -5,13 +5,13 @@ This package implements Bikeshed's unified single-pass parser, turning raw spec 
 ## Module Overview
 
 - [`main.py`](main.py) — Top-level public entrypoints (`initialDocumentParse`, `nodesFromHtml`, `parseText`, `parseTitle`, `parseLines`, `strFromNodes`, `linesFromNodes`, `debugNodes`).
-- [`blocks.py`](blocks.py) — Block-level Markdown parser (`parseBlockStream`, `parseBlocks`, `parseList`, `parseBlockquote`, `parseParagraph`) and `IndentChecker`.
-- [`parser.py`](parser.py) — Core inline stream driver (`parseInlineNodes`, `_parseRawHtmlNodes`, `nodesFromStream`, `parseAnything`, `generateResults`, `generateExperimentalNodes`), top-level syntax dispatchers (`parseNode`, `parseAngleStart`, `parseLToEnd`), and `closeOpenElements`.
-- [`html.py`](html.py) — HTML lexical and tag-level parsing: tags, attributes, Bikeshed attribute shortcut canonicalization, character references, whitespace, comments, doctypes, raw-text elements (`<script>`, `<style>`, `<xmp>`, `<title>`, datablock `<pre>`), datablocks, and metadata blocks.
+- [`blocks.py`](blocks.py) — Block-level Markdown parser (`parseBlockStream`, `parseBlocks`, `parseList`, `parseBlockquote`, `parseBlockBsMacro`, `parseParagraph`) and `IndentChecker`.
+- [`parser.py`](parser.py) — Core inline stream driver (`parseInlineNodes`, `_parseRawHtmlNodes`, `nodesFromStream`, `parseAnything`, `generateResults`, `generateExperimentalNodes`), top-level syntax dispatchers (`parseNode`, `parseAngleStart`, `parseLToEnd`, `parseBsMacro`), and `closeOpenElements`.
+- [`html.py`](html.py) — HTML lexical and tag-level parsing: tags, attributes, Bikeshed attribute shortcut canonicalization, character references, whitespace, comments, doctypes, raw-text elements (`<script>`, `<style>`, `<xmp>`, `<title>`, datablock `<pre>`), `<bs-macro>` balanced body scanning, datablocks, and metadata blocks.
 - [`autolinks.py`](autolinks.py) — Non-CSS Bikeshed autolinks and shorthands (`[=dfn=]`, `[$abstract$]`, `[:Header:]`, `{{idl}}`, `{^cddl^}`, `<{element}>`, `|var|`, `[[biblio]]` / `[[#section]]`, `<#123>` / `<org/repo#123>`), plus shared `LinkData`, `parseLinkInfo`, and `parseLinkText`.
 - [`css.py`](css.py) — CSS autolink shorthands (`<<production>>`, `''maybe''` declarations/values, `'propdesc'`).
 - [`markdown.py`](markdown.py) — Inline Markdown constructs and fenced code blocks (backtick code spans, fenced code blocks, `[text](dest "title")` links, backslash escapes).
-- [`macros.py`](macros.py) — `[MACRO]` / `[MACRO?]` lookup and expansion in node, attribute-list, and plain-text contexts.
+- [`macros.py`](macros.py) — `[MACRO]` / `[MACRO?]` and `<bs-macro>` lookup and expansion in node, block, attribute-list, and plain-text contexts.
 - [`nodes.py`](nodes.py) — `ParserNode` AST types (`RawText`, `SafeText`, `StartTag`, `EndTag`, `SelfClosedTag`, `Comment`, `Doctype`, `RawElement`, `SafeElement`), HTML/attribute escaping, and `TagStack`.
 - [`stream.py`](stream.py) — `ParseConfig` and `Stream` (character buffer, O(log N) line/column mapping, `subStream`, and open-element delegation).
 - [`treebuilder.py`](treebuilder.py) — LXML SAX `TreeBuilder` (`buildDocument`, `buildFragment`, `consumeNodes`).
@@ -59,7 +59,8 @@ When `config.markdownBlock` is enabled, `initialDocumentParse()` runs **`parseBl
    - `***` / `---` horizontal rule → `SelfClosedTag("hr")`.
    - `*` / `1.` / `:` / `::` list item → **`parseList()`**, which inspects `s.openEls` (`matchHtmlListParent()`) to merge directly into an enclosing matching HTML `<ul>`/`<ol>`/`<dl>` (or `<dl> > <div>`) when present, otherwise opens a synthetic container pushed onto `s.openEls` as a `TagStackSyntheticEntry`, emits `<li>`/`<dt>`/`<dd>` (also supporting interleaved HTML list items via `parseHtmlListItem()`), and recurses into **`parseBlocks()`** with `minIndent = baseIndent + 1`, `minTagDepth = len(s.openEls.tags)`, `firstLineTrimmed=True`, and a chained `ListStop`.
    - `>` blockquote → **`parseBlockquote()`**, which collects consecutive `>` lines (plus CommonMark §5.1 lazy continuations via `bqLineAllowsLazyContinuation()` / `matchFenceAt()`), strips prefixes while recording per-line `colOffsets`, and recurses into **`parseBlocks()`** on a child `Stream` sharing `s.openEls`.
-4. **Everything else (HTML, paragraphs, Setext headings)**:
+4. **Block-level `<bs-macro>`** (`parseBlockBsMacro()`): Expands `<bs-macro name="...">fallback</bs-macro>` (always requiring a closing tag) in block Markdown mode via `parseBlocks()` sharing `s.openEls` (supporting HTML/Markdown list merging and direct-child checks, with optional fallback content parsed only when the macro is absent/empty).
+5. **Everything else (HTML, paragraphs, Setext headings)**:
    - Parses one logical line via **`parseInlineNodes(..., stopAtNewline=True)`**.
    - Empty results (stripped `<pre class=metadata>` blocks or empty optional macros) behave like blank lines; block-level HTML tags (`not isInlineStart()`) are emitted directly.
    - Inline text checks **`peekSetextUnderline()`** (`===` / `---` → **`buildMultiLineHeading()`**); otherwise, if `canStartParagraph` is true, enters **`parseParagraph()`**.
@@ -86,7 +87,7 @@ Both `parseBlocks()` (with `stopAtNewline=True`) and `nodesFromStream()` (whole 
   - `<!` → `html.parseDoctype()` / `html.parseComment()`.
   - `</` → `html.parseEndTag()`.
   - `<tag...` → **`html.parseStartTag()`** (`parseTagName()` → `parseAttributeList()` → `canonicalizeShortcuts()`; also delegates `<org/` to `autolinks.parseRepositoryLink()`).
-    - Special elements consume their bodies immediately: `<l>` → **`parseLToEnd()`** (dispatches any autolink + `</l>`), `<title>` → `html.parseTitleToEnd()`, `<pre/xmp class=metadata>` → `html.parseMetadataBlockToEnd()` (stripped from output), datablock `<pre>` → `html.parseDatablockPreToEnd()`, and `<script>`/`<style>`/`<xmp>` → `html.parseScriptToEnd()`/`parseStyleToEnd()`/`parseXmpToEnd()` (with optional `bs-macros` expansion via `macros.replaceMacrosInText()`).
+    - Special elements consume their bodies immediately: `<l>` → **`parseLToEnd()`** (dispatches any autolink + `</l>`), `<bs-macro>` → **`parseBsMacro()`** (reads balanced body via `html.parseBsMacroToEnd()`, resolves macro or fallback via `macros.resolveBsMacro()`, and parses via `s.blockParser` when `markdownBlock` is enabled), `<title>` → `html.parseTitleToEnd()`, `<pre/xmp class=metadata>` → `html.parseMetadataBlockToEnd()` (stripped from output), datablock `<pre>` → `html.parseDatablockPreToEnd()`, and `<script>`/`<style>`/`<xmp>` → `html.parseScriptToEnd()`/`parseStyleToEnd()`/`parseXmpToEnd()` (with optional `bs-macros` expansion via `macros.replaceMacrosInText()`).
   - Fallback `<#123>` → `autolinks.parseRepositoryLink()`; `<<` and `<{` fall through to CSS/markup shorthands below; any other unrecognized `<` is emitted as escaped `SafeText`.
 - **`` ` `` / `~`**: **`markdown.parseFencedCodeBlock()`** and **`markdown.parseCodeSpan()`**.
 - **`''` / `'` / `<<`**: **`css.parseCSSMaybe()`** (`parseMaybeDecl()` / `parseMaybeValue()`), **`css.parseCSSPropdesc()`**, and **`css.parseCSSProduction()`**.

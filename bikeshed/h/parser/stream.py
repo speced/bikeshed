@@ -34,6 +34,12 @@ if t.TYPE_CHECKING:
         ) -> t.Generator[int, None, None]:
             """Collect experimental nodes from `s` into `coll`, yielding each stream index."""
 
+    class BlockParserFn(t.Protocol):
+        """Callable matching `parseBlockStream(s)`."""
+
+        def __call__(self, s: Stream) -> list[ParserNode]:
+            """Parse block-level Markdown and inline markup from `s`."""
+
 
 @dataclass
 class ParseConfig:
@@ -127,6 +133,7 @@ class Stream:
     config: ParseConfig
     depth: int = 1
     openEls: TagStack = field(default_factory=TagStack)
+    blockParser: BlockParserFn | None = None
 
     def __init__(
         self,
@@ -137,6 +144,7 @@ class Stream:
         *,
         colOffsets: list[int] | None = None,
         openEls: TagStack | None = None,
+        blockParser: BlockParserFn | None = None,
     ) -> None:
         """Initialize a stream over `chars`, pre-indexing newline positions for line/column lookups."""
         if depth > 10:
@@ -157,6 +165,7 @@ class Stream:
         self.config = config
         self.depth = depth
         self.openEls = openEls if openEls is not None else TagStack(opaqueTags=config.opaqueElements)
+        self.blockParser = blockParser
 
     def subStream(
         self,
@@ -177,6 +186,7 @@ class Stream:
             depth=self.depth + 1 if depth is None else depth,
             colOffsets=colOffsets,
             openEls=openEls,
+            blockParser=self.blockParser,
         )
 
     def __getitem__(self, key: int) -> str:
