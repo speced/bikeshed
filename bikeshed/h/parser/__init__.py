@@ -1,7 +1,9 @@
 from . import result
 from .blocks import IndentChecker
 from .main import (
+    ExtractedMetadata,
     debugNodes,
+    extractMetadata,
     initialDocumentParse,
     linesFromNodes,
     nodesFromHtml,

@@ -1658,6 +1658,12 @@ def parseBlocks(
                     continue
         else:
             lineStart = i
+            if s.metadataSpans and (metaEnd := s.metadataSpans.get(lineStart)) is not None:
+                if not s.inOpaqueElement():
+                    nodes.append(RawText(text="\n"))
+                canStartParagraph = True
+                i = metaEnd + 1 if metaEnd < length and chars[metaEnd] == "\n" else metaEnd
+                continue
             if checkIndents and state.indentChecker is not None:
                 state.indentChecker.checkLine(s, lineStart)
             lineEnd = findLineEnd(s, lineStart)

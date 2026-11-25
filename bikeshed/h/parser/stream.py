@@ -90,6 +90,8 @@ class ParseConfig:
     rawHtml: bool = False
     # Parse CSS production grammar symbols (active inside <pre class=prod> and propdef/descdef Value cells).
     inProd: bool = False
+    # Maximum number of non-metadata characters to scan from the start of a document when extracting metadata blocks.
+    metadataScanLimit: int = 16_384
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
@@ -136,6 +138,7 @@ class Stream:
     depth: int = 1
     openEls: TagStack = field(default_factory=TagStack)
     blockParser: BlockParserFn | None = None
+    metadataSpans: dict[int, int] | None = None
 
     def __init__(
         self,
@@ -147,6 +150,7 @@ class Stream:
         colOffsets: list[int] | None = None,
         openEls: TagStack | None = None,
         blockParser: BlockParserFn | None = None,
+        metadataSpans: dict[int, int] | None = None,
     ) -> None:
         """Initialize a stream over `chars`, pre-indexing newline positions for line/column lookups."""
         if depth > 10:
@@ -168,6 +172,7 @@ class Stream:
         self.depth = depth
         self.openEls = openEls if openEls is not None else TagStack(opaqueTags=config.opaqueElements)
         self.blockParser = blockParser
+        self.metadataSpans = metadataSpans
 
     def subStream(
         self,

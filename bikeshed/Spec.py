@@ -137,6 +137,7 @@ class Spec:
         self.mdCommandLine: metadata.MetadataManager | None = metadata.MetadataManager()
         self.mdDefaults: metadata.MetadataManager | None = None
         self.mdOverridingDefaults: metadata.MetadataManager | None = None
+        self.metadataSpans: dict[int, int] | None = None
 
         self.typeExpansions: dict[str, str | None] = {}
 
@@ -179,12 +180,10 @@ class Spec:
         # mdDefault is already set up
         # and cli() inited the mdCommandLine
 
-        # Get the md from the doc itself
-        # TODO: currently I just leave the node in,
-        #       I should do something about that
-        # TODO: Pure textual hack, no way to, say, put a block
-        #       in a markdown code span or an <xmp> to show off.
-        self.mdDocument = metadata.parse(lines=inputContent.lines)
+        # Extract and parse metadata blocks near the start of the document.
+        extracted = h.extractMetadata(inputContent.content)
+        self.metadataSpans = extracted.spans
+        self.mdDocument = metadata.parse(inputContent.content, extracted=extracted)
 
         # Combine the data so far, and compute the doctype
         # (the other md sources need the doctype in order to be found)
@@ -233,9 +232,10 @@ class Spec:
         indentChecker: h.IndentChecker | None = None,
     ) -> list[h.ParserNode]:
         nodes = h.initialDocumentParse(
-            "".join(inputContent.rawLines),
+            inputContent.content,
             h.ParseConfig.fromSpec(self),
             indentChecker=indentChecker,
+            metadataSpans=self.metadataSpans,
         )
         if self.debugPrint == "early-parse":
             h.debugNodes(nodes)

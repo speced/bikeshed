@@ -16,7 +16,6 @@ from ..translate import _t
 from . import keys, parsers
 
 if t.TYPE_CHECKING:
-    from ..line import Line
 
     class DurationT:
         pass
@@ -455,62 +454,49 @@ def parsedTextFromRawLines(lines: list[str], doc: t.SpecT, context: str) -> str:
     return h.strFromNodes(nodes)
 
 
-def parse(lines: t.Sequence[Line]) -> MetadataManager:
-    # Given HTML document text, in the form of an array of text lines,
-    # extracts all <pre class=metadata> lines and parses their contents.
-    # Returns a filled MetadataManager object
+def parse(text: str, *, extracted: h.ExtractedMetadata | None = None) -> MetadataManager:
+    # Extracts all <pre/xmp class=metadata> blocks near the start of the document
+    # using the HTML parser and parses their key: value lines.
+    # Returns a filled MetadataManager object.
+    if extracted is None:
+        extracted = h.extractMetadata(text)
 
-    inMetadata = False
-    lastKey = None
-    multilineVal = False
-    endTag = None
     md = MetadataManager()
-    for line in lines:
-        if not inMetadata and ("<pre" in line.text or "<xmp" in line.text) and "metadata" in line.text:
-            match = re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text)
-            if match:
-                inMetadata = True
-                md.hasMetadata = True
-                if line.text.startswith("<pre"):
-                    endTag = r"</pre>\s*"
-                else:
-                    endTag = r"</xmp>\s*"
-                continue
-        if inMetadata and re.match(t.cast(str, endTag), line.text):
-            inMetadata = False
-            continue
-        if inMetadata:
+    for block in extracted.blocks:
+        md.hasMetadata = True
+        lastKey: str | None = None
+        multilineVal = False
+        startLine = block.startTag.endLine
+        for offset, lineText in enumerate(block.data.splitlines(keepends=True)):
+            lineNum = startLine + offset
             # Skip newlines except for multiline blocks
-            if line.text.strip() == "" and not multilineVal:
+            if lineText.strip() == "" and not multilineVal:
                 continue
-            if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
+            if lastKey and (lineText.strip() == "" or re.match(r"\s+", lineText)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
-                md.addData(lastKey, line.text, lineNum=line.i)
+                md.addData(lastKey, lineText, lineNum=lineNum)
             else:
-                match = re.match(r"([^:]+):(.*)", line.text)
+                match = re.match(r"([^:]+):(.*)", lineText)
                 if match:
                     key = match[1].strip()
                     val = match[2].strip()
                     if key in keys.KNOWN_KEYS and keys.KNOWN_KEYS[key].multiline:
                         multilineVal = True
-                    elif key[0] == "!":
+                    elif key.startswith("!"):
                         multilineVal = True
                     else:
                         multilineVal = False
-                    md.addData(key, val, lineNum=line.i)
+                    md.addData(key, val, lineNum=lineNum)
                     lastKey = match[1]
                 else:
                     m.die(
-                        f"Incorrectly formatted metadata line:\n{line.text}",
-                        lineNum=line.i,
+                        f"Incorrectly formatted metadata line:\n{lineText}",
+                        lineNum=lineNum,
                     )
                     continue
-        elif "<h1" in line.text and md.title is None:
-            match = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text)
-            if match:
-                title = match[1]
-                md.addData("Title", title, lineNum=line.i)
-    indentInfo = inferIndent(lines)
+    if extracted.h1Title is not None and md.title is None:
+        md.addData("Title", extracted.h1Title, lineNum=extracted.h1Line)
+    indentInfo = inferIndent(text.splitlines(keepends=True))
     md.indentInfo = indentInfo
     if "Indent" not in md.manuallySetKeys and indentInfo.size:
         md.indent = indentInfo.size
@@ -529,7 +515,7 @@ class IndentInfo:
         return (self.spaceLines + self.tabLines) < 20
 
 
-def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
+def inferIndent(lines: t.Sequence[str]) -> IndentInfo:
     # Infer what indent character the document is using.
     # If the document uses space indentation,
     # infer what the indent size is by seeing what % of indents
@@ -542,11 +528,11 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
         # Purposely require at least two spaces; I don't
         # auto-detect single-space indents. Get help.
 
-        spaceCount = spaceIndentFromLine(line.text)
+        spaceCount = spaceIndentFromLine(line)
         if spaceCount >= 2:
             indentSizes[spaceCount] += 1
             info.spaceLines += 1
-        elif line.text[0:1] == "\t":
+        elif line[0:1] == "\t":
             info.tabLines += 1
         else:
             info.neitherLines += 1
@@ -581,7 +567,7 @@ def inferIndent(lines: t.Sequence[Line]) -> IndentInfo:
 
 def spaceIndentFromLine(line: str) -> int:
     # Returns just the whitespace prefix of a line
-    if line[0] != " ":
+    if not line or line[0] != " ":
         return 0
     for i, ch in enumerate(line):
         if ch == " ":

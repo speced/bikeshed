@@ -20,7 +20,14 @@ from .nodes import (
     StartTag,
     Text,
 )
-from .parser import POSSIBLE_NODE_START_CHARS, closeOpenElements, debugNode, nodesFromStream
+from .parser import (
+    POSSIBLE_NODE_START_CHARS,
+    ExtractedMetadata,
+    closeOpenElements,
+    debugNode,
+    extractMetadata,
+    nodesFromStream,
+)
 from .stream import ParseConfig, Stream
 
 
@@ -53,14 +60,22 @@ def initialDocumentParse(
     config: ParseConfig,
     startLine: int = 1,
     indentChecker: IndentChecker | None = None,
+    metadataSpans: dict[int, int] | None = None,
 ) -> list[ParserNode]:
     """Run the full single-pass document parse, expanding block/inline syntax, checking indentation, and closing tags."""
     # Adds `bs-line-number` / `bs-parse-context` via the emitted StartTags,
     # converts block Markdown (when enabled) and inline Bikeshed-isms into HTML,
     # records mixed-indentation lints when `indentChecker` is provided,
+    # auto-skips pre-extracted metadata block spans (flagging any late metadata blocks as fatal errors),
     # and logs errors for any elements left open at EOF.
 
-    s = Stream(text, startLine=startLine, config=config, blockParser=parseBlockStream)
+    s = Stream(
+        text,
+        startLine=startLine,
+        config=config,
+        blockParser=parseBlockStream,
+        metadataSpans=metadataSpans,
+    )
     if config.markdownBlock:
         nodes = parseBlockStream(s, indentChecker=indentChecker)
         nodes.extend(closeOpenElements(s, start=None, context=None))

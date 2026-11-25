@@ -293,7 +293,7 @@ def addTestMetadata(doc: t.SpecT) -> None:
     if "Inline Github Issues" not in doc.mdCommandLine.manuallySetKeys:
         doc.mdCommandLine.addData("Inline Github Issues", "no")
     with m.messagesSilent():
-        md = metadata.parse(lines=doc.inputContent.lines)
+        md = metadata.parse(doc.inputContent.content)
     if "Date" not in doc.mdCommandLine.manuallySetKeys and md.allData.get("Date") and md.allData["Date"][-1] == "now":
         doc.mdCommandLine.addData("Date", "1970-01-01")
 
