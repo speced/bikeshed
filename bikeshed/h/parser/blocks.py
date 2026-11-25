@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from ... import messages as m
 from ... import t
 from .. import elements
+from . import macros
 from .html import parseDoctype
 from .markdown import fencedStartRe
 from .nodes import (
@@ -44,6 +45,26 @@ _ISSUE_PAREN_START_RE = re.compile(r"issue\(([^)]+)\):(.*)", re.I)
 _MIXED_INDENT_TAB_AFTER_SPACE_RE = re.compile(r"(?:\t+ +\t)|( +\t)")
 _HTML_TAG_PEEK_RE = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9._-]*)")
 _BLOCK_MATH_DISPLAY_RE = re.compile(r"""(?<![\w._:-])display\s*=\s*(?:"block"|'block'|block(?:\s|>|/|$))""", re.I)
+# HTML elements whose end tag is optional when their enclosing parent closes.
+_AUTO_CLOSABLE_CHILD: dict[str, tuple[str, ...]] = {
+    "li": ("ul", "ol"),
+    "dt": ("dl",),
+    "dd": ("dl",),
+    "td": ("tr", "table"),
+    "th": ("tr", "table"),
+    "tr": ("thead", "tbody", "tfoot", "table"),
+    "thead": ("table",),
+    "tbody": ("table",),
+    "tfoot": ("table",),
+    "colgroup": ("table",),
+    "caption": ("table",),
+    "option": ("optgroup", "select"),
+    "optgroup": ("select",),
+    "rt": ("rtc", "ruby"),
+    "rp": ("ruby",),
+    "rb": ("ruby",),
+    "rtc": ("ruby",),
+}
 
 
 @dataclass(slots=True)
@@ -130,6 +151,11 @@ class ListStop:
 
     baseIndent: int
     itemTypes: tuple[str, ...]
+    htmlItemTags: tuple[str, ...] = ()
+    htmlExitTags: tuple[tuple[bool, str], ...] = ()
+    htmlCloseTag: str | None = None
+    hasHtmlContainer: bool = False
+    tagDepth: int = 0
     parent: ListStop | None = None
 
 
@@ -406,31 +432,41 @@ def isFencedCodeStart(s: Stream, cStart: int, lineEnd: int) -> bool:
     return "`" not in chars[match.end() : lineEnd]
 
 
-def isBlockHtmlStart(s: Stream, cStart: int, lineEnd: int, blockElements: set[str]) -> bool:
-    """Read-only peek: returns whether `cStart` begins with a block-level HTML tag (used for blockquote lazy continuation)."""
+def peekHtmlTagAt(s: Stream, cStart: int, lineEnd: int) -> tuple[bool, str, int] | None:
+    """Read-only peek returning `(isClose, lowerTagName, afterName)` if `cStart` begins an HTML tag, else `None`."""
     chars = s.chars
     if cStart >= lineEnd or chars[cStart] != "<":
-        return False
+        return None
     match = _HTML_TAG_PEEK_RE.match(chars, cStart)
     if match is None:
-        return False
+        return None
     afterName = match.end()
     if afterName >= s.length:
-        return False
+        return None
     isClose = bool(match.group(1))
     nextCh = chars[afterName]
     if isClose:
-        if nextCh != ">":
-            return False
+        closePos = skipHws(chars, afterName, lineEnd)
+        if closePos >= lineEnd or chars[closePos] != ">":
+            return None
     else:
         if nextCh not in (" ", "\t", "\n", "\x0c", ">", "/", "["):
-            return False
+            return None
         # Avoid mistaking <org/repo#123> repository links for HTML tags.
         if nextCh == "/":
             gt = chars.find(">", afterName, lineEnd)
             if gt != -1 and "#" in chars[afterName:gt]:
-                return False
-    tagname = match.group(2).lower()
+                return None
+    return isClose, match.group(2).lower(), afterName
+
+
+def isBlockHtmlStart(s: Stream, cStart: int, lineEnd: int, blockElements: set[str]) -> bool:
+    """Read-only peek: returns whether `cStart` begins with a block-level HTML tag (used for blockquote lazy continuation)."""
+    peek = peekHtmlTagAt(s, cStart, lineEnd)
+    if peek is None:
+        return False
+    isClose, tagname, afterName = peek
+    chars = s.chars
     if tagname == "l":
         return False
     if tagname == "math":
@@ -454,12 +490,33 @@ def isBlockHtmlStart(s: Stream, cStart: int, lineEnd: int, blockElements: set[st
 def shouldStopForList(s: Stream, lineStart: int, lineEnd: int, absIndent: int, stopAt: ListStop | None) -> bool:
     """Return True if a line at `absIndent` exits any active enclosing list frame in `stopAt`."""
     stop = stopAt
+    htmlTag: tuple[bool, str] | None = None
+    htmlChecked = False
     while stop is not None:
         if absIndent < stop.baseIndent:
             return True
         if absIndent == stop.baseIndent:
+            openSlice = s.openEls.tags[stop.tagDepth :]
+            inNestedList = any(e.startTag.tag in ("ul", "ol", "dl") for e in openSlice)
             if matchLineItemType(s, lineStart, lineEnd, s.config) in stop.itemTypes:
-                return True
+                if stop.htmlCloseTag is None or not inNestedList:
+                    return True
+            if stop.htmlItemTags or stop.htmlExitTags:
+                if not htmlChecked:
+                    htmlChecked = True
+                    cStart = skipHws(s.chars, lineStart, lineEnd)
+                    peek = peekHtmlTagAt(s, cStart, lineEnd)
+                    htmlTag = (peek[0], peek[1]) if peek is not None else None
+                if htmlTag is not None:
+                    isClose, tagName = htmlTag
+                    if not isClose and tagName in stop.htmlItemTags and not inNestedList:
+                        return True
+                    if htmlTag in stop.htmlExitTags:
+                        if isClose:
+                            if not any(e.startTag.tag == tagName for e in openSlice):
+                                return True
+                        elif not openSlice:
+                            return True
         stop = stop.parent
     return False
 
@@ -474,7 +531,8 @@ def blankEndsList(s: Stream, blankLineEnd: int, stopAt: ListStop) -> tuple[bool,
             j = nextAfterComment
             continue
         jEnd = findLineEnd(s, j)
-        if skipHws(chars, j, jEnd) == jEnd:
+        jCStart = skipHws(chars, j, jEnd)
+        if jCStart == jEnd:
             j = jEnd + 1 if jEnd < length else length
             continue
         nextAbsIndent = prefixCountAt(s, j, s.config.indent)
@@ -482,8 +540,17 @@ def blankEndsList(s: Stream, blankLineEnd: int, stopAt: ListStop) -> tuple[bool,
             return True, j
         if nextAbsIndent > stopAt.baseIndent:
             return False, j
-        itemType = matchLineItemType(s, j, jEnd, s.config)
-        return itemType not in stopAt.itemTypes, j
+        if matchLineItemType(s, j, jEnd, s.config) in stopAt.itemTypes:
+            return False, j
+        if (peek := peekHtmlTagAt(s, jCStart, jEnd)) is not None:
+            isClose, tagName, _ = peek
+            if stopAt.htmlCloseTag is not None and isClose and tagName == stopAt.htmlCloseTag:
+                return False, j
+            if isClose and any(e.startTag.tag == tagName for e in s.openEls.tags[stopAt.tagDepth :]):
+                return False, j
+            if not stopAt.hasHtmlContainer and not isClose and tagName in stopAt.htmlItemTags:
+                return False, j
+        return True, j
     return True, length
 
 
@@ -613,6 +680,7 @@ def parseParagraph(
     state: BlockState,
     minIndent: int,
     stopAt: ListStop | None,
+    stopAtTagDepth: int | None = None,
     checkIndents: bool,
 ) -> tuple[list[ParserNode], int, PendingLine | None]:
     """Builds a `<p>` block starting with `firstStrippedNodes` and consumes continuation lines."""
@@ -667,6 +735,8 @@ def parseParagraph(
     pending: PendingLine | None = None
 
     while i < length:
+        if stopAtTagDepth is not None and len(s.openEls.tags) <= stopAtTagDepth:
+            break
         if checkIndents and state.indentChecker is not None and not s.inOpaqueElement():
             state.indentChecker.checkLine(s, i)
         lineEnd = findLineEnd(s, i)
@@ -805,6 +875,7 @@ def parseBlockquote(
     length = s.length
     indent = s.config.indent
     lineNum = s.line(lineStart)
+    s.openEls.verifyDirectParent("blockquote", lineNum)
 
     if not state.blockquoteWarned and not s.config.markdownBlockquotesExplicit:
         state.blockquoteWarned = True
@@ -957,13 +1028,297 @@ def parseBlockquote(
         openEls=s.openEls,
         depth=s.depth,
     )
-    innerNodes, _ = parseBlocks(subStream, 0, state, checkIndents=False)
+    s.openEls.pushBlockParent("blockquote")
+    try:
+        innerNodes, _ = parseBlocks(
+            subStream,
+            0,
+            state,
+            minTagDepth=len(s.openEls.tags),
+            checkIndents=False,
+        )
+    finally:
+        s.openEls.popBlockParent()
     return [
         makeStartTag("blockquote", lineNum),
         *innerNodes,
         EndTag(tag="blockquote"),
         RawText(text="\n"),
     ], i
+
+
+def _lastNonWsNode(nodes: list[ParserNode]) -> ParserNode | None:
+    """Return the last node in `nodes` that is not pure whitespace text, Comment, or Doctype."""
+    for node in reversed(nodes):
+        if isinstance(node, (Comment, Doctype)):
+            continue
+        if isinstance(node, RawText) and not node.text.strip():
+            continue
+        return node
+    return None
+
+
+def matchHtmlListParent(
+    s: Stream,
+    minTagDepth: int,
+    listTag: str,
+    baseIndent: int,
+    prevNodes: list[ParserNode],
+) -> tuple[bool, tuple[tuple[bool, str], ...], list[EndTag]]:
+    """Checks if `s.openEls` has an open HTML list container matching `listTag` at `>= minTagDepth`.
+
+    Returns `(matched, htmlExitTags, autoCloseEndTags)`. For a direct container match, verifies
+    that the immediately preceding non-whitespace node in `prevNodes` is the container's start tag
+    or a valid sibling item end tag (so an unclosed list left open far earlier in the document
+    with intervening `<p>`/`<h4>` content does not swallow an unrelated Markdown list). If an
+    unclosed HTML list item (`<li>`, `<dt>`, `<dd>`, optionally containing an unclosed `<p>`) is
+    open at or past `baseIndent` directly inside a matching HTML list container, pops it from
+    `s.openEls` and returns the corresponding `EndTag`s so the Markdown item merges as a sibling
+    rather than nesting inside it.
+    """
+    tags = s.openEls.tags
+    n = len(tags)
+    if n <= minTagDepth:
+        return False, (), []
+
+    topEntry = tags[-1]
+    topTag = topEntry.startTag.tag
+
+    # Case 1: Direct enclosing explicit HTML list container (<ul>, <ol>, <dl>, or <dl> > <div>).
+    if topTag == listTag:
+        prev = _lastNonWsNode(prevNodes)
+        if listTag == "dl":
+            validPrev = (isinstance(prev, StartTag) and prev.tag == "dl") or (
+                isinstance(prev, EndTag) and prev.tag in ("dt", "dd", "div")
+            )
+            exitTags: tuple[tuple[bool, str], ...] = ((True, "dl"), (False, "div"))
+        else:
+            validPrev = (isinstance(prev, StartTag) and prev.tag == listTag) or (
+                isinstance(prev, EndTag) and prev.tag == "li"
+            )
+            exitTags = ((True, listTag),)
+        if validPrev:
+            return True, exitTags, []
+        return False, (), []
+    if listTag == "dl" and n >= minTagDepth + 2 and topTag == "div" and tags[-2].startTag.tag == "dl":
+        prev = _lastNonWsNode(prevNodes)
+        if (isinstance(prev, StartTag) and prev.tag == "div") or (
+            isinstance(prev, EndTag) and prev.tag in ("dt", "dd")
+        ):
+            return True, ((True, "div"), (True, "dl")), []
+        return False, (), []
+
+    # Case 2: Unclosed HTML list item directly inside a matching HTML list container.
+    # Only merge as a sibling when not indented deeper than the HTML item (deeper means a sublist).
+    itemIdx = n - 1
+    if topTag == "p" and itemIdx > minTagDepth:
+        itemIdx -= 1
+    itemEntry = tags[itemIdx]
+    itemTag = itemEntry.startTag.tag
+    validItemTags = ("dt", "dd") if listTag == "dl" else ("li",)
+    if itemTag not in validItemTags or itemIdx <= minTagDepth:
+        return False, (), []
+
+    parentIdx = itemIdx - 1
+    parentEntry = tags[parentIdx]
+    parentTag = parentEntry.startTag.tag
+    if parentTag == listTag:
+        exitTags = ((True, "dl"), (False, "div")) if listTag == "dl" else ((True, listTag),)
+    elif (
+        listTag == "dl" and parentIdx > minTagDepth and parentTag == "div" and tags[parentIdx - 1].startTag.tag == "dl"
+    ):
+        exitTags = ((True, "div"), (True, "dl"))
+    else:
+        return False, (), []
+
+    itemStart = itemEntry.startTag
+    if itemStart.s is not s:
+        return False, (), []
+    itemIndent = prefixCountAt(s, s.currentLineStart(itemStart.start), s.config.indent)
+    if baseIndent > itemIndent:
+        return False, (), []
+
+    endTags: list[EndTag] = []
+    while len(tags) > itemIdx:
+        entry = s.openEls.popEntry()
+        endTags.append(EndTag(tag=entry.startTag.tag))
+    return True, exitTags, endTags
+
+
+def skipBlanksToNextListItem(
+    s: Stream,
+    start: int,
+    *,
+    baseIndent: int,
+    itemTypes: tuple[str, ...],
+    htmlItemTags: tuple[str, ...],
+    state: BlockState,
+    checkIndents: bool,
+) -> tuple[list[ParserNode], int] | None:
+    """Skip blank/comment lines after a closed HTML item if another matching list item follows at `baseIndent`."""
+    chars = s.chars
+    length = s.length
+    j = start
+    while j < length:
+        if (nextAfterComment := trySkipCommentOrDoctypeLine(s, j, peekOnly=True)) is not None:
+            j = nextAfterComment
+            continue
+        jEnd = findLineEnd(s, j)
+        jCStart = skipHws(chars, j, jEnd)
+        if jCStart == jEnd:
+            j = jEnd + 1 if jEnd < length else length
+            continue
+        if prefixCountAt(s, j, s.config.indent) != baseIndent:
+            return None
+        if matchLineItemType(s, j, jEnd, s.config) in itemTypes:
+            break
+        peek = peekHtmlTagAt(s, jCStart, jEnd)
+        if peek is not None and not peek[0] and peek[1] in htmlItemTags:
+            break
+        return None
+    else:
+        return None
+
+    blankNodes: list[ParserNode] = []
+    pos = start
+    while pos < j:
+        if checkIndents and state.indentChecker is not None:
+            state.indentChecker.checkLine(s, pos)
+        if (nextAfterComment := trySkipCommentOrDoctypeLine(s, pos)) is not None:
+            pos = nextAfterComment
+            continue
+        posEnd = findLineEnd(s, pos)
+        if pos < posEnd:
+            blankNodes.append(RawText.fromStream(s, pos, posEnd))
+        blankNodes.append(RawText(text="\n"))
+        pos = posEnd + 1 if posEnd < length else length
+    return blankNodes, j
+
+
+def closeOpenElementsToDepth(
+    s: Stream,
+    endPos: int,
+    targetDepth: int,
+    itemTag: str,
+    itemLineNum: int,
+) -> list[EndTag]:
+    """Close any HTML elements left open on `s.openEls` above `targetDepth` when a Markdown list item ends.
+
+    Silently closes a trailing `<p>` and HTML optional-end-tag children whose unclosed parent is also
+    being closed, logging a single error for the unclosed element(s) instead of letting them leak
+    onto `s.openEls` across subsequent list items.
+    """
+    tags = s.openEls.tags
+    if len(tags) <= targetDepth:
+        return []
+
+    endTags: list[EndTag] = []
+    # A trailing unclosed <p> auto-closes cleanly when </li>, </dt>, or </dd> closes.
+    if tags[-1].startTag.tag == "p":
+        entry = s.openEls.popEntry()
+        endTags.append(EndTag.fromStream(s, endPos, endPos, entry.startTag))
+    if len(tags) <= targetDepth:
+        return endTags
+
+    leaked = list(tags[targetDepth:])
+    while len(tags) > targetDepth:
+        entry = s.openEls.popEntry()
+        endTags.append(EndTag.fromStream(s, endPos, endPos, entry.startTag))
+
+    # Only report elements that aren't validly auto-closed by an unclosed parent being closed here.
+    unclosed = []
+    for idx, entry in enumerate(leaked):
+        tag = entry.startTag.tag
+        if idx > 0 and tag in _AUTO_CLOSABLE_CHILD and leaked[idx - 1].startTag.tag in _AUTO_CLOSABLE_CHILD[tag]:
+            continue
+        unclosed.append(entry)
+
+    endLine = s.line(max(0, endPos - 1)) if endPos > 0 else itemLineNum
+    itemSpan = (
+        f"started on line {itemLineNum}, ended on line {endLine}" if endLine > itemLineNum else f"on line {itemLineNum}"
+    )
+    if len(unclosed) == 1:
+        entry = unclosed[0]
+        m.die(
+            f"<{entry.startTag.tag}> element was still open at the end of the markdown <{itemTag}> ({itemSpan})",
+            lineNum=entry.startTag.loc,
+        )
+    elif unclosed:
+        openList = [f"{x.name} at {x.startTag.loc}" for x in unclosed]
+        m.die(
+            f"{len(unclosed)} elements were still open at the end of the markdown <{itemTag}> ({itemSpan}).\nOpen tags: {', '.join(openList)}",
+            lineNum=unclosed[0].startTag.loc,
+        )
+    return endTags
+
+
+def parseHtmlListItem(
+    s: Stream,
+    lineStart: int,
+    *,
+    listStartTag: StartTag,
+    baseIndent: int,
+    itemTypes: tuple[str, ...],
+    htmlItemTags: tuple[str, ...],
+    state: BlockState,
+    outerStopAt: ListStop | None,
+    checkIndents: bool,
+) -> tuple[list[ParserNode], int]:
+    """Parses an explicit HTML `<li>`/`<dt>`/`<dd>` item mixed into a synthetic Markdown list."""
+    nodes: list[ParserNode] = []
+    # Auto-close a directly open HTML <p> (as HTML list containers do) before pushing the
+    # synthetic list container so verifyTagContext() and auto-close scoping work cleanly.
+    if s.openEls.tags and s.openEls.tags[-1].startTag.tag == "p":
+        s.openEls.popEntry()
+    syntheticEntry = s.openEls.pushSynthetic(listStartTag)
+    try:
+        tagDepthBefore = len(s.openEls.tags)
+        bodyStart = consumeIndentAt(s, lineStart, s.config.indent, baseIndent)
+        assert bodyStart is not None
+        lineNodes, i = parseInlineNodes(
+            s,
+            bodyStart,
+            stopAtNewline=True,
+            minIndent=baseIndent,
+            onMacroNodes=state.onMacroNodes,
+        )
+        nodes.extend(lineNodes)
+        if not s.inOpaqueElement():
+            nodes.append(RawText(text="\n"))
+
+        if len(s.openEls.tags) > tagDepthBefore:
+            openItemTag = s.openEls.tags[tagDepthBefore].startTag.tag
+            itemStop = ListStop(
+                baseIndent=baseIndent,
+                itemTypes=itemTypes,
+                htmlItemTags=htmlItemTags,
+                htmlCloseTag=openItemTag,
+                tagDepth=len(s.openEls.tags),
+                parent=outerStopAt,
+            )
+            bodyNodes, i = parseBlocks(
+                s,
+                i,
+                state,
+                minIndent=baseIndent,
+                minTagDepth=len(s.openEls.tags),
+                stopAt=itemStop,
+                stopAtTagDepth=tagDepthBefore,
+                initialCanStartParagraph=False,
+                checkIndents=checkIndents,
+            )
+            nodes.extend(bodyNodes)
+
+        # Close any inner unclosed tags and auto-close the HTML item itself if its end tag was omitted.
+        if len(s.openEls.tags) > tagDepthBefore and s.openEls.tags[tagDepthBefore].startTag.tag in htmlItemTags:
+            openItemTag = s.openEls.tags[tagDepthBefore].startTag.tag
+            nodes.extend(closeOpenElementsToDepth(s, i, tagDepthBefore + 1, openItemTag, s.line(lineStart)))
+            entry = s.openEls.popEntry()
+            nodes.append(EndTag(tag=entry.startTag.tag))
+    finally:
+        s.openEls.popSynthetic(syntheticEntry)
+
+    return nodes, i
 
 
 def parseList(
@@ -973,28 +1328,59 @@ def parseList(
     firstLineStart: int,
     *,
     baseIndent: int,
+    minTagDepth: int,
+    prevNodes: list[ParserNode],
     state: BlockState,
     outerStopAt: ListStop | None,
     checkIndents: bool,
 ) -> tuple[list[ParserNode], int]:
-    """Parses a bulleted, numbered, or definition list at `baseIndent` using streaming indentation frames."""
+    """Parses a bulleted, numbered, or definition list at `baseIndent` using streaming indentation frames.
+
+    If `s.openEls` already has a matching HTML list container (`<ul>`, `<ol>`, `<dl>`, or `<dl> > <div>`),
+    emits items directly into it without creating a synthetic wrapper. Inside a synthetic container,
+    also accepts interleaved HTML `<li>`/`<dt>`/`<dd>` items at `baseIndent`.
+    """
     if firstKind == "bulleted":
         itemTypes: tuple[str, ...] = ("bulleted",)
+        htmlItemTags: tuple[str, ...] = ("li",)
         listTag = "ul"
-        listAttrs: dict[str, str] = {"bs-md-list": ""}
+        listAttrs: dict[str, str] = {}
     elif firstKind == "numbered":
         itemTypes = ("numbered",)
+        htmlItemTags = ("li",)
         listTag = "ol"
         startNum = int(firstMatch.group(1))
-        listAttrs = {"bs-md-list": ""} if startNum == 1 else {"bs-md-list": "", "start": str(startNum)}
+        listAttrs = {} if startNum == 1 else {"start": str(startNum)}
     else:
         itemTypes = ("dt", "dd")
+        htmlItemTags = ("dt", "dd")
         listTag = "dl"
-        listAttrs = {"bs-md-list": ""}
+        listAttrs = {}
 
+    hasHtmlContainer, htmlExitTags, autoCloseEndTags = matchHtmlListParent(
+        s,
+        minTagDepth,
+        listTag,
+        baseIndent,
+        prevNodes,
+    )
     listLineNum = s.line(firstLineStart)
-    nodes: list[ParserNode] = [makeStartTag(listTag, listLineNum, listAttrs)]
-    listStop = ListStop(baseIndent=baseIndent, itemTypes=itemTypes, parent=outerStopAt)
+    nodes: list[ParserNode] = list(autoCloseEndTags)
+    listStartTag: StartTag | None = None
+    if not hasHtmlContainer:
+        s.openEls.verifyDirectParent(listTag, listLineNum)
+        listStartTag = makeStartTag(listTag, listLineNum, listAttrs)
+        nodes.append(listStartTag)
+
+    listStop = ListStop(
+        baseIndent=baseIndent,
+        itemTypes=itemTypes,
+        htmlItemTags=htmlItemTags,
+        htmlExitTags=htmlExitTags,
+        hasHtmlContainer=hasHtmlContainer,
+        tagDepth=len(s.openEls.tags),
+        parent=outerStopAt,
+    )
     itemMinIndent = baseIndent + 1
     chars = s.chars
     length = s.length
@@ -1002,25 +1388,61 @@ def parseList(
 
     curKind: str | None = firstKind
     curMatch: re.Match[str] | None = firstMatch
+    curHtmlTag: str | None = None
     curLineNum = listLineNum
     i = firstLineStart
 
     while True:
-        assert curKind is not None and curMatch is not None
-        itemTag = "li" if curKind in ("bulleted", "numbered") else curKind
-        nodes.append(makeStartTag(itemTag, curLineNum, {"data-md": ""}))
-        afterMarker = curMatch.end()
-        itemNodes, i = parseBlocks(
-            s,
-            afterMarker,
-            state,
-            minIndent=itemMinIndent,
-            firstLineTrimmed=True,
-            stopAt=listStop,
-            checkIndents=checkIndents,
-        )
-        nodes.extend(itemNodes)
-        nodes.append(EndTag(tag=itemTag))
+        if curHtmlTag is not None:
+            assert listStartTag is not None
+            htmlItemNodes, i = parseHtmlListItem(
+                s,
+                i,
+                listStartTag=listStartTag,
+                baseIndent=baseIndent,
+                itemTypes=itemTypes,
+                htmlItemTags=htmlItemTags,
+                state=state,
+                outerStopAt=outerStopAt,
+                checkIndents=checkIndents,
+            )
+            nodes.extend(htmlItemNodes)
+            skipped = skipBlanksToNextListItem(
+                s,
+                i,
+                baseIndent=baseIndent,
+                itemTypes=itemTypes,
+                htmlItemTags=htmlItemTags,
+                state=state,
+                checkIndents=checkIndents,
+            )
+            if skipped is None:
+                break
+            blankNodes, i = skipped
+            nodes.extend(blankNodes)
+        else:
+            assert curKind is not None and curMatch is not None
+            itemTag = "li" if curKind in ("bulleted", "numbered") else curKind
+            nodes.append(makeStartTag(itemTag, curLineNum, {"data-md": ""}))
+            afterMarker = curMatch.end()
+            itemTagDepth = len(s.openEls.tags)
+            s.openEls.pushBlockParent(itemTag)
+            try:
+                itemNodes, i = parseBlocks(
+                    s,
+                    afterMarker,
+                    state,
+                    minIndent=itemMinIndent,
+                    minTagDepth=itemTagDepth,
+                    firstLineTrimmed=True,
+                    stopAt=listStop,
+                    checkIndents=checkIndents,
+                )
+            finally:
+                s.openEls.popBlockParent()
+            nodes.extend(itemNodes)
+            nodes.extend(closeOpenElementsToDepth(s, i, itemTagDepth, itemTag, curLineNum))
+            nodes.append(EndTag(tag=itemTag))
 
         # `parseBlocks` returns only at EOF, a list-ending blank line, or a `shouldStopForList` line.
         if i >= length:
@@ -1033,13 +1455,23 @@ def parseList(
         if nextAbsIndent != baseIndent:
             break
         nextKind, nextMatch = matchRawBlockStart(s, nextCStart, nextEnd, s.config)
-        if nextKind not in itemTypes or nextMatch is None:
-            break
-        curKind = nextKind
-        curMatch = nextMatch
-        curLineNum = s.line(i)
+        if nextKind in itemTypes and nextMatch is not None:
+            curKind = nextKind
+            curMatch = nextMatch
+            curHtmlTag = None
+            curLineNum = s.line(i)
+            continue
+        if not hasHtmlContainer:
+            peek = peekHtmlTagAt(s, nextCStart, nextEnd)
+            if peek is not None and not peek[0] and peek[1] in htmlItemTags:
+                curKind = None
+                curMatch = None
+                curHtmlTag = peek[1]
+                continue
+        break
 
-    nodes.append(EndTag(tag=listTag))
+    if not hasHtmlContainer:
+        nodes.append(EndTag(tag=listTag))
     return nodes, i
 
 
@@ -1049,8 +1481,11 @@ def parseBlocks(
     state: BlockState,
     *,
     minIndent: int = 0,
+    minTagDepth: int = 0,
     firstLineTrimmed: bool = False,
     stopAt: ListStop | None = None,
+    stopAtTagDepth: int | None = None,
+    initialCanStartParagraph: bool = True,
     checkIndents: bool = False,
 ) -> tuple[list[ParserNode], int]:
     """Parses block-level Markdown + HTML/inline Bikeshed markup from `s` starting at `start`."""
@@ -1059,7 +1494,7 @@ def parseBlocks(
     chars = s.chars
     length = s.length
     indent = s.config.indent
-    canStartParagraph = True
+    canStartParagraph = initialCanStartParagraph
     pending: PendingLine | None = None
     # Tracks the first non-blank line after a verified non-ending blank run inside a list to avoid O(K^2) lookahead.
     listContinuesUntil = -1
@@ -1073,7 +1508,12 @@ def parseBlocks(
             if not s.inOpaqueElement():
                 nodes.append(RawText(text="\n"))
             canStartParagraph = p.kind == "blank"
+            if stopAtTagDepth is not None and len(s.openEls.tags) <= stopAtTagDepth:
+                break
             continue
+
+        if stopAtTagDepth is not None and len(s.openEls.tags) <= stopAtTagDepth:
+            break
 
         if s.inOpaqueElement():
             # An unclosed opaque element (e.g., opened inside a blockquote) must not
@@ -1167,17 +1607,24 @@ def parseBlocks(
         if rawKind == "heading":
             assert rawMatch is not None
             headingLineNum = s.line(lineStart)
-            headingContent, i = parseInlineNodes(
-                s,
-                rawMatch.end(),
-                stopAtNewline=True,
-                minIndent=minIndent,
-                onMacroNodes=state.onMacroNodes,
-            )
+            headingTag = f"h{len(rawMatch.group(1)) + 1}"
+            s.openEls.verifyDirectParent(headingTag, headingLineNum)
+            s.openEls.pushBlockParent(headingTag)
+            try:
+                headingContent, i = parseInlineNodes(
+                    s,
+                    rawMatch.end(),
+                    stopAtNewline=True,
+                    minIndent=minIndent,
+                    onMacroNodes=state.onMacroNodes,
+                )
+            finally:
+                s.openEls.popBlockParent()
             nodes.extend(buildSingleLineHeading(headingLineNum, rawMatch.group(1), headingContent))
             canStartParagraph = False
             continue
         if rawKind in ("rule", "dash-line"):
+            s.openEls.verifyDirectParent("hr", s.line(lineStart))
             nodes.append(SelfClosedTag(tag="hr"))
             nodes.append(RawText(text="\n"))
             canStartParagraph = False
@@ -1198,6 +1645,8 @@ def parseBlocks(
                 rawMatch,
                 lineStart,
                 baseIndent=absIndent,
+                minTagDepth=minTagDepth,
+                prevNodes=nodes,
                 state=state,
                 outerStopAt=stopAt,
                 checkIndents=checkIndents,
@@ -1221,14 +1670,31 @@ def parseBlocks(
             continue
 
         # Not a raw Markdown block opener: parse the logical line in HTML/inline mode.
-        lineNodes, nextI = parseInlineNodes(
-            s,
-            bodyStart,
-            stopAtNewline=True,
-            minIndent=minIndent,
-            onMacroNodes=state.onMacroNodes,
-            atLineStart=wasFirstLineTrimmed,
+        preLineTagDepth = len(s.openEls.tags)
+        preLineParentContext = s.openEls.directParentContext()
+        # When a line will be wrapped in a Markdown `<p>` or Setext heading, push a temporary
+        # `"p"` block parent so inline tags on line 1 (e.g. `<b>`, `<dfn>`) don't trigger
+        # duplicate direct-child errors on an enclosing `<ul>`/`<ol>`/`<dl>` alongside `<p>`.
+        willWrapLine = (
+            canStartParagraph
+            and not isBlockHtmlStart(s, cStart, lineEnd, state.blockElements)
+            and not isFencedCodeStart(s, cStart, lineEnd)
+            and not (chars[cStart] == "[" and macros.isMacroStart(s, cStart + 1))
         )
+        if willWrapLine:
+            s.openEls.pushBlockParent("p", tagDepth=preLineTagDepth)
+        try:
+            lineNodes, nextI = parseInlineNodes(
+                s,
+                bodyStart,
+                stopAtNewline=True,
+                minIndent=minIndent,
+                onMacroNodes=state.onMacroNodes,
+                atLineStart=wasFirstLineTrimmed,
+            )
+        finally:
+            if willWrapLine:
+                s.openEls.popBlockParent()
         stripped = stripWsNodes(lineNodes)
         if not stripped:
             # e.g. <pre class=metadata> stripped to empty, or empty optional macro.
@@ -1258,6 +1724,7 @@ def parseBlocks(
         # Plain text line: check Setext heading first, then paragraph vs bare text.
         if (setext := peekSetextUnderline(s, nextI, minIndent, stopAt)) is not None:
             headingTag, afterUnderline = setext
+            s.openEls.verifyDirectParent(headingTag, s.line(lineStart), parentContext=preLineParentContext)
             # Skip/validate any intervening comment/doctype lines and check indent on underline.
             scanI = nextI
             while scanI < afterUnderline:
@@ -1273,17 +1740,23 @@ def parseBlocks(
             continue
 
         if canStartParagraph:
-            paraNodes, i, pending = parseParagraph(
-                s,
-                s.line(lineStart),
-                stripped,
-                initialRelIndent=relIndent,
-                startAfterLine1=nextI,
-                state=state,
-                minIndent=minIndent,
-                stopAt=stopAt,
-                checkIndents=checkIndents,
-            )
+            s.openEls.verifyDirectParent("p", s.line(lineStart), parentContext=preLineParentContext)
+            s.openEls.pushBlockParent("p", tagDepth=preLineTagDepth)
+            try:
+                paraNodes, i, pending = parseParagraph(
+                    s,
+                    s.line(lineStart),
+                    stripped,
+                    initialRelIndent=relIndent,
+                    startAfterLine1=nextI,
+                    state=state,
+                    minIndent=minIndent,
+                    stopAt=stopAt,
+                    stopAtTagDepth=stopAtTagDepth,
+                    checkIndents=checkIndents,
+                )
+            finally:
+                s.openEls.popBlockParent()
             nodes.extend(paraNodes)
             canStartParagraph = False
         else:

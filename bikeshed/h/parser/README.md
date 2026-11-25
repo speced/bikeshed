@@ -57,7 +57,7 @@ When `config.markdownBlock` is enabled, `initialDocumentParse()` runs **`parseBl
 3. **Raw Markdown block openers** (`matchRawBlockStart()`):
    - `#` ATX heading → `parseInlineNodes()` for heading content → **`buildSingleLineHeading()`**.
    - `***` / `---` horizontal rule → `SelfClosedTag("hr")`.
-   - `*` / `1.` / `:` / `::` list item → **`parseList()`**, which emits `<ul>`/`<ol>`/`<dl>` + `<li>`/`<dt>`/`<dd>` and recurses into **`parseBlocks()`** with `minIndent = baseIndent + 1`, `firstLineTrimmed=True`, and a chained `ListStop`.
+   - `*` / `1.` / `:` / `::` list item → **`parseList()`**, which inspects `s.openEls` (`matchHtmlListParent()`) to merge directly into an enclosing matching HTML `<ul>`/`<ol>`/`<dl>` (or `<dl> > <div>`) when present, otherwise opens a synthetic container pushed onto `s.openEls` as a `TagStackSyntheticEntry`, emits `<li>`/`<dt>`/`<dd>` (also supporting interleaved HTML list items via `parseHtmlListItem()`), and recurses into **`parseBlocks()`** with `minIndent = baseIndent + 1`, `minTagDepth = len(s.openEls.tags)`, `firstLineTrimmed=True`, and a chained `ListStop`.
    - `>` blockquote → **`parseBlockquote()`**, which collects consecutive `>` lines (plus CommonMark §5.1 lazy continuations via `bqLineAllowsLazyContinuation()` / `matchFenceAt()`), strips prefixes while recording per-line `colOffsets`, and recurses into **`parseBlocks()`** on a child `Stream` sharing `s.openEls`.
 4. **Everything else (HTML, paragraphs, Setext headings)**:
    - Parses one logical line via **`parseInlineNodes(..., stopAtNewline=True)`**.

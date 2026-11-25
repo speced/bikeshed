@@ -15,7 +15,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
     inBody = False
     strayHeadEls = []
     styleScoped = []
-    nestedLists = []
     flattenEls = []
     for el in doc.document.iter():
         if head is None and el.tag == "head":
@@ -52,43 +51,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
         # Add .algorithm to [algorithm] elements, for styling
         if el.get("data-algorithm") is not None and not h.hasClass(doc, el, "algorithm"):
             h.addClass(doc, el, "algorithm")
-
-        # Allow MD-generated lists to be surrounded by HTML list containers,
-        # so you can add classes/etc without an extraneous wrapper.
-        if el.tag in ["ol", "ul", "dl"] and el.get("bs-md-list") is None:
-            if el.tag in ["ol", "ul"]:
-                onlyChild = h.hasOnlyChild(el)
-                if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("bs-md-list") is not None:
-                    # The md-generated list container is featureless,
-                    # so we can just throw it away and move its children into its parent.
-                    nestedLists.append(onlyChild)
-            else:
-                # dls can contain both dt/dds
-                # (which'll make an md-generated dl)
-                # and divs, so I need to account for multiple children
-                for child in h.childElements(el):
-                    if child.tag == "dl" and child.get("bs-md-list") is not None:
-                        nestedLists.append(child)
-                    elif child.tag == "div":
-                        pass
-                    elif child.tag in ["dt", "dd"]:
-                        pass
-                    else:
-                        # misnested element; leave alone for now
-                        pass
-
-        # HTML allows dt/dd to be grouped by a div, so recognize
-        # when a markdown-generated dl has a div parent and dl grandparent
-        # and remove it.
-        if (
-            h.tagName(el) == "dl"
-            and el.get("bs-md-list") is not None
-            and h.tagName(h.parentElement(el)) == "div"
-            and h.tagName(h.parentElement(el, 2)) == "dl"
-        ):
-            # Also featureless and can be safely thrown away
-            # with its children merged into the parent div
-            nestedLists.append(el)
 
         # Mark pre.idl blocks as .def, for styling
         if el.tag == "pre" and h.hasClass(doc, el, "idl") and not h.hasClass(doc, el, "def"):
@@ -186,8 +148,6 @@ def cleanupHTML(doc: t.SpecT) -> None:
         parent = h.parentElement(el)
         if parent is not None:
             h.prependChild(parent, el)
-    for el in nestedLists:
-        h.replaceWithContents(el)
     for el in flattenEls:
         h.moveContents(fromEl=el[0], toEl=el)
 
