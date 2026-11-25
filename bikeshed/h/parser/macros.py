@@ -1,4 +1,4 @@
-"""Bikeshed `[MACRO]` and `[MACRO?]` text macro parsing and expansion."""
+"""Bikeshed `[MACRO]`, `[MACRO?]`, and `<bs-macro>` text macro parsing and expansion."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from ... import constants, t
 from ... import messages as m
-from .nodes import ParserNode, RawText
+from .nodes import ParserNode, RawText, StartTag, TagStack, unescapeAttr
 from .result import Err, Ok
 from .stream import Stream
 
@@ -31,6 +31,68 @@ class _ResolvedMacro:
     text: str = ""
     streamContext: str = ""
     stream: Stream | None = None
+
+
+@dataclass(slots=True)
+class ResolvedBsMacro:
+    """Resolved `<bs-macro>` expansion target (`macro`, `fallback`, or `empty`)."""
+
+    kind: t.Literal["macro", "fallback", "empty"]
+    stream: Stream | None = None
+
+
+def resolveBsMacro(
+    s: Stream,
+    startTag: StartTag,
+    fallbackText: str,
+    fallbackStart: int,
+    *,
+    openEls: TagStack | None = None,
+) -> ResolvedBsMacro:
+    """Resolve `<bs-macro>` attributes and body into a child `Stream` for the macro value or fallback."""
+    rawName = unescapeAttr(startTag.attrs["name"]).strip() if "name" in startTag.attrs else ""
+    if not rawName:
+        m.die("<bs-macro> element requires a 'name' attribute.", lineNum=startTag.loc)
+        return ResolvedBsMacro(kind="empty")
+
+    macroName = rawName.lower()
+    macroText = s.config.macros.get(macroName)
+    if macroText:
+        streamContext = f'<bs-macro name="{rawName}"> (line {startTag.loc})'
+        try:
+            sub = s.subStream(context=streamContext, chars=macroText, openEls=openEls)
+        except RecursionError:
+            m.die(
+                f'Macro replacement for <bs-macro name="{rawName}"> recursed more than {s.depth} levels deep; probably your text macros are accidentally recursive.',
+                lineNum=startTag.loc,
+            )
+            return ResolvedBsMacro(kind="empty")
+        return ResolvedBsMacro(kind="macro", stream=sub)
+
+    if fallbackText.strip():
+        startLineIdx = s.lineIndex(fallbackStart)
+        startLine = s.line(fallbackStart, startLineIdx)
+        firstColOffset = (fallbackStart - s.currentLineStart(fallbackStart)) + s.colOffset(startLineIdx)
+        numLines = fallbackText.count("\n") + 1
+        colOffsets = [firstColOffset]
+        for offsetIdx in range(1, numLines):
+            colOffsets.append(s.colOffset(startLineIdx + offsetIdx))
+        sub = s.subStream(
+            context=s.config.context,
+            chars=fallbackText,
+            startLine=startLine,
+            colOffsets=colOffsets,
+            openEls=openEls,
+            depth=s.depth,
+        )
+        return ResolvedBsMacro(kind="fallback", stream=sub)
+
+    if macroText is None and "optional" not in startTag.attrs:
+        m.die(
+            f'Found unmatched <bs-macro name="{rawName}">. Correct the macro name, add fallback content, or add an `optional` attribute.',
+            lineNum=startTag.loc,
+        )
+    return ResolvedBsMacro(kind="empty")
 
 
 def isMacroStart(s: Stream, start: int) -> bool:

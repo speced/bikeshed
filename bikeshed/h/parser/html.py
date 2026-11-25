@@ -116,6 +116,7 @@ _WHITESPACE_RE = re.compile(r"[\t\n\x0c ]+")
 _UNQUOTED_ATTR_STOP_RE = re.compile(r"[\t\n\x0c >\"'<`&]")
 _SVG_DOCTYPE_RE = re.compile(r"\s+svg(?![\w-])", re.I)
 _DATABLOCK_PRE_STOP_RE = re.compile(r"</pre>|&")
+_BS_MACRO_SCAN_RE = re.compile(r"<!--|<bs-macro(?=[\t\n\x0c />])|</bs-macro>", re.I)
 metadataPreEndRe = re.compile(r"</pre>(.*)")
 metadataXmpEndRe = re.compile(r"</xmp>(.*)")
 
@@ -712,6 +713,47 @@ def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
         m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
         return Ok(s.slice(start, None), len(s))
     return Ok(s.slice(start, i), i + 6)
+
+
+def parseBsMacroToEnd(s: Stream, start: int, startTag: StartTag) -> ResultT[str]:
+    """Read a `<bs-macro>` body from `start` through its matching `</bs-macro>`, tracking nested `<bs-macro>` tags."""
+    chars = s.chars
+    length = s.length
+    depth = 1
+    pos = start
+    while True:
+        match = _BS_MACRO_SCAN_RE.search(chars, pos)
+        if match is None:
+            m.die("<bs-macro> element was never closed.", lineNum=startTag.loc)
+            return Err(start)
+        tok = match.group(0).lower()
+        if tok == "<!--":
+            endComment = chars.find("-->", match.end())
+            if endComment == -1:
+                m.die("<bs-macro> element was never closed.", lineNum=startTag.loc)
+                return Err(start)
+            pos = endComment + 3
+        elif tok == "</bs-macro>":
+            depth -= 1
+            if depth == 0:
+                return Ok(s.slice(start, match.start()), match.end())
+            pos = match.end()
+        else:
+            depth += 1
+            qPos = match.end()
+            quote: str | None = None
+            while qPos < length:
+                ch = chars[qPos]
+                if quote is not None:
+                    if ch == quote:
+                        quote = None
+                elif ch in ('"', "'"):
+                    quote = ch
+                elif ch == ">":
+                    qPos += 1
+                    break
+                qPos += 1
+            pos = qPos
 
 
 def parseTitleToEnd(s: Stream, start: int) -> ResultT[str]:

@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from ... import messages as m
 from ... import t
 from .. import elements
-from . import macros
-from .html import parseDoctype
+from . import html, macros
 from .markdown import fencedStartRe
 from .nodes import (
     Comment,
@@ -91,6 +90,9 @@ class IndentChecker:
     def checkLine(self, s: Stream, lineStart: int) -> None:
         """Check indentation on the physical line at `lineStart`, skipping lines already checked."""
         if lineStart >= s.length:
+            return
+        # We're in an already-indented substream, so bail.
+        if lineStart == 0 and s.colOffset(0) > 0:
             return
         # Deduplicate lines inspected by both parseParagraph() and parseBlocks() (e.g. after a break).
         if s is self._lastCheckedStream and lineStart <= self._lastCheckedStart:
@@ -181,8 +183,10 @@ class BlockState:
 def parseBlockStream(s: Stream, *, indentChecker: IndentChecker | None = None) -> list[ParserNode]:
     """Parses block-level Markdown and inline HTML/Bikeshed markup from `s` in one pass."""
     assert not s.config.rawHtml
+    if s.blockParser is None:
+        s.blockParser = parseBlockStream
     state = BlockState(
-        blockElements={*s.config.blockElements, "if-wrapper"},
+        blockElements={*s.config.blockElements, "if-wrapper", "bs-macro"},
         indentChecker=indentChecker,
         onMacroNodes=indentChecker.checkMacroNodes if indentChecker is not None else None,
     )
@@ -321,6 +325,11 @@ def isInlineStart(node: ParserNode, blockElements: set[str]) -> bool:
     return True
 
 
+def _lineLoc(s: Stream, lineNum: int) -> str | int:
+    """Format `lineNum` with `s.context` when present so errors inside macros identify their source."""
+    return f"{lineNum} of {s.context}" if s.context else lineNum
+
+
 def makeStartTag(tagName: str, lineNumber: int, attrs: dict[str, str] | None = None) -> StartTag:
     """Creates a StartTag with `bs-line-number` and escaped attributes."""
     safeAttrs: t.SafeAttrDict = {"bs-line-number": t.SafeAttrStr(str(lineNumber))}
@@ -362,7 +371,7 @@ def trySkipCommentOrDoctypeAt(
         afterLineEnd = findLineEnd(s, afterDt)
         if skipHws(chars, afterDt, afterLineEnd) == afterLineEnd:
             if not peekOnly:
-                parseDoctype(s, cStart)
+                html.parseDoctype(s, cStart)
             return afterLineEnd + 1 if afterLineEnd < length else length
     return None
 
@@ -778,6 +787,10 @@ def parseParagraph(
             if rawKind is not None:
                 break
 
+        peek = peekHtmlTagAt(s, cStart, lineEnd)
+        if peek is not None and not peek[0] and peek[1] == "bs-macro":
+            break
+
         lineNodes, nextI = parseInlineNodes(
             s,
             bodyStart,
@@ -875,7 +888,7 @@ def parseBlockquote(
     length = s.length
     indent = s.config.indent
     lineNum = s.line(lineStart)
-    s.openEls.verifyDirectParent("blockquote", lineNum)
+    s.openEls.verifyDirectParent("blockquote", _lineLoc(s, lineNum))
 
     if not state.blockquoteWarned and not s.config.markdownBlockquotesExplicit:
         state.blockquoteWarned = True
@@ -1368,7 +1381,7 @@ def parseList(
     nodes: list[ParserNode] = list(autoCloseEndTags)
     listStartTag: StartTag | None = None
     if not hasHtmlContainer:
-        s.openEls.verifyDirectParent(listTag, listLineNum)
+        s.openEls.verifyDirectParent(listTag, _lineLoc(s, listLineNum))
         listStartTag = makeStartTag(listTag, listLineNum, listAttrs)
         nodes.append(listStartTag)
 
@@ -1475,6 +1488,87 @@ def parseList(
     return nodes, i
 
 
+def parseBlockBsMacro(
+    s: Stream,
+    lineStart: int,
+    cStart: int,
+    lineEnd: int,
+    *,
+    state: BlockState,
+    minIndent: int,
+    minTagDepth: int,
+    prevNodes: list[ParserNode],
+    underIndented: bool,
+    checkIndents: bool,
+) -> tuple[list[ParserNode], int, bool]:
+    """Parse a block-level `<bs-macro>` starting at `cStart` and expand the macro or its fallback via `parseBlocks()`."""
+    startTag, afterStart, _ = html.parseStartTag(s, cStart)
+    if not isinstance(startTag, StartTag) or startTag.tag != "bs-macro":
+        restNodes, nextI = parseInlineNodes(
+            s,
+            cStart + 1,
+            stopAtNewline=True,
+            minIndent=minIndent,
+            onMacroNodes=state.onMacroNodes,
+        )
+        fallbackOut: list[ParserNode] = [RawText.fromStream(s, cStart, cStart + 1, "&#60;"), *restNodes]
+        if not s.inOpaqueElement():
+            fallbackOut.append(RawText(text="\n"))
+        return fallbackOut, nextI, True
+
+    fallbackText, afterClose, _ = html.parseBsMacroToEnd(s, afterStart, startTag)
+    if fallbackText is None:
+        return [], s.length, False
+
+    resolved = macros.resolveBsMacro(s, startTag, fallbackText, afterStart, openEls=s.openEls)
+    expandedNodes: list[ParserNode] = []
+    if resolved.stream is not None:
+        expandedNodes, _ = parseBlocks(
+            resolved.stream,
+            0,
+            state,
+            minTagDepth=minTagDepth,
+            inheritedPrevNodes=prevNodes,
+            checkIndents=checkIndents and resolved.kind == "fallback",
+        )
+        if resolved.kind == "macro" and state.onMacroNodes is not None and expandedNodes:
+            state.onMacroNodes(expandedNodes, True)
+
+    afterLineEnd = findLineEnd(s, afterClose)
+    if skipHws(s.chars, afterClose, afterLineEnd) == afterLineEnd:
+        nextI = afterLineEnd + 1 if afterLineEnd < s.length else s.length
+        tailNodes: list[ParserNode] = []
+    else:
+        tailNodes, nextI = parseInlineNodes(
+            s,
+            afterClose,
+            stopAtNewline=True,
+            minIndent=minIndent,
+            onMacroNodes=state.onMacroNodes,
+        )
+
+    producedContent = bool(stripWsNodes(expandedNodes)) or bool(stripWsNodes(tailNodes))
+    if underIndented and producedContent:
+        m.die(
+            f'Line {s.line(lineStart)} isn\'t indented enough (needs {minIndent} indent{"" if minIndent == 1 else "s"}) to be valid Markdown:\n"{s.chars[lineStart:lineEnd]}"',
+        )
+
+    outNodes: list[ParserNode] = []
+    if expandedNodes:
+        outNodes.extend(expandedNodes)
+        if not tailNodes and not s.inOpaqueElement():
+            last = outNodes[-1]
+            if not (isinstance(last, RawText) and last.text.endswith("\n")):
+                outNodes.append(RawText(text="\n"))
+    if tailNodes:
+        outNodes.extend(tailNodes)
+        if not s.inOpaqueElement():
+            outNodes.append(RawText(text="\n"))
+    elif not expandedNodes:
+        outNodes.append(RawText(text="\n"))
+    return outNodes, nextI, producedContent
+
+
 def parseBlocks(
     s: Stream,
     start: int,
@@ -1486,6 +1580,7 @@ def parseBlocks(
     stopAt: ListStop | None = None,
     stopAtTagDepth: int | None = None,
     initialCanStartParagraph: bool = True,
+    inheritedPrevNodes: list[ParserNode] | None = None,
     checkIndents: bool = False,
 ) -> tuple[list[ParserNode], int]:
     """Parses block-level Markdown + HTML/inline Bikeshed markup from `s` starting at `start`."""
@@ -1608,7 +1703,7 @@ def parseBlocks(
             assert rawMatch is not None
             headingLineNum = s.line(lineStart)
             headingTag = f"h{len(rawMatch.group(1)) + 1}"
-            s.openEls.verifyDirectParent(headingTag, headingLineNum)
+            s.openEls.verifyDirectParent(headingTag, _lineLoc(s, headingLineNum))
             s.openEls.pushBlockParent(headingTag)
             try:
                 headingContent, i = parseInlineNodes(
@@ -1624,7 +1719,7 @@ def parseBlocks(
             canStartParagraph = False
             continue
         if rawKind in ("rule", "dash-line"):
-            s.openEls.verifyDirectParent("hr", s.line(lineStart))
+            s.openEls.verifyDirectParent("hr", _lineLoc(s, s.line(lineStart)))
             nodes.append(SelfClosedTag(tag="hr"))
             nodes.append(RawText(text="\n"))
             canStartParagraph = False
@@ -1646,7 +1741,7 @@ def parseBlocks(
                 lineStart,
                 baseIndent=absIndent,
                 minTagDepth=minTagDepth,
-                prevNodes=nodes,
+                prevNodes=nodes if _lastNonWsNode(nodes) is not None else (inheritedPrevNodes or []),
                 state=state,
                 outerStopAt=stopAt,
                 checkIndents=checkIndents,
@@ -1667,6 +1762,24 @@ def parseBlocks(
             )
             nodes.extend(bqNodes)
             canStartParagraph = False
+            continue
+
+        peek = peekHtmlTagAt(s, cStart, lineEnd)
+        if peek is not None and not peek[0] and peek[1] == "bs-macro":
+            macroNodes, i, producedContent = parseBlockBsMacro(
+                s,
+                lineStart,
+                cStart,
+                lineEnd,
+                state=state,
+                minIndent=minIndent,
+                minTagDepth=minTagDepth,
+                prevNodes=nodes if _lastNonWsNode(nodes) is not None else (inheritedPrevNodes or []),
+                underIndented=underIndented,
+                checkIndents=checkIndents,
+            )
+            nodes.extend(macroNodes)
+            canStartParagraph = not producedContent
             continue
 
         # Not a raw Markdown block opener: parse the logical line in HTML/inline mode.
@@ -1724,7 +1837,7 @@ def parseBlocks(
         # Plain text line: check Setext heading first, then paragraph vs bare text.
         if (setext := peekSetextUnderline(s, nextI, minIndent, stopAt)) is not None:
             headingTag, afterUnderline = setext
-            s.openEls.verifyDirectParent(headingTag, s.line(lineStart), parentContext=preLineParentContext)
+            s.openEls.verifyDirectParent(headingTag, _lineLoc(s, s.line(lineStart)), parentContext=preLineParentContext)
             # Skip/validate any intervening comment/doctype lines and check indent on underline.
             scanI = nextI
             while scanI < afterUnderline:
@@ -1740,7 +1853,7 @@ def parseBlocks(
             continue
 
         if canStartParagraph:
-            s.openEls.verifyDirectParent("p", s.line(lineStart), parentContext=preLineParentContext)
+            s.openEls.verifyDirectParent("p", _lineLoc(s, s.line(lineStart)), parentContext=preLineParentContext)
             s.openEls.pushBlockParent("p", tagDepth=preLineTagDepth)
             try:
                 paraNodes, i, pending = parseParagraph(
