@@ -44,69 +44,6 @@ def transformMarkdownIB(doc: t.SpecT) -> None:
             addLineNumber(node)
 
 
-def transformProductionGrammars(doc: t.SpecT) -> None:
-    # Link up the various grammar symbols in CSS grammars to their definitions.
-    if "css" not in doc.md.markupShorthands:
-        return
-
-    hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
-
-    def hashMultReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a({"data-link-type": "grammar", "bs-lt": "#", "bs-link-for": ""}, match.group(0))
-
-    multRe = re.compile(r"{\s*\d+\s*}")
-
-    def multReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a({"data-link-type": "grammar", "bs-lt": "{A}", "bs-link-for": ""}, match.group(0))
-
-    multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
-
-    def multRangeReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a({"data-link-type": "grammar", "bs-lt": "{A,B}", "bs-link-for": ""}, match.group(0))
-
-    simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
-    # Note the negative-lookahead, to avoid matching delim tokens.
-
-    def simpleReplacer(match: t.Match) -> t.ElementT:
-        return h.E.a(
-            {"data-link-type": "grammar", "bs-lt": match.group(0), "bs-link-for": ""},
-            match.group(0),
-        )
-
-    addedNodes = []
-
-    def transformElement(parentEl: t.ElementT) -> None:
-        children = h.childNodes(parentEl, clear=True)
-        newChildren: list[t.NodeT] = []
-        for el in children:
-            if isinstance(el, str):
-                newChildren.extend(transformText(el))
-            elif h.isElement(el):
-                if el.tag != "a":
-                    # Transforms all add links, which aren't allowed in <a>...
-                    transformElement(el)
-                newChildren.append(el)
-        h.appendChild(parentEl, *newChildren, allowEmpty=True)
-
-    def transformText(text: str) -> list[t.NodeT]:
-        nodes: list[t.NodeT] = [text]
-        nodes = config.processTextNodes(nodes, hashMultRe, hashMultReplacer)
-        nodes = config.processTextNodes(nodes, multRe, multReplacer)
-        nodes = config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
-        nodes = config.processTextNodes(nodes, simpleRe, simpleReplacer)
-        for node in nodes:
-            if h.isElement(node):
-                addedNodes.append(node)
-        return nodes
-
-    for el in h.findAll(".prod", doc):
-        transformElement(el)
-
-    for node in addedNodes:
-        if h.isElement(node):
-            addLineNumber(node)
-
-
 strongRe = re.compile(
     r"""
                     # **, not escaped, followed by non-space

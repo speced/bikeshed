@@ -124,7 +124,7 @@ def parseFencedCodeBlock(s: Stream, start: int, *, atLineStart: bool = False) ->
     if infoString:
         tag.attrs["bs-infostring"] = escapeAttr(infoString)
         lang = infoString.split(" ")[0]
-        if isDatablockClass(lang):
+        if isDatablockClass(lang) or lang == "prod":
             tag.classes.add(lang)
         else:
             tag.classes.add(f"language-{lang}")

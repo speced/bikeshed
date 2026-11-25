@@ -88,6 +88,8 @@ class ParseConfig:
     # Parse strictly as plain HTML: disables shorthands, macros, attr shortcuts,
     # curly apostrophes, em-dashes, TagStack errors, and synthetic bs-line-number attrs.
     rawHtml: bool = False
+    # Parse CSS production grammar symbols (active inside <pre class=prod> and propdef/descdef Value cells).
+    inProd: bool = False
 
     @staticmethod
     def fromSpec(doc: t.SpecT, context: str | None = None) -> ParseConfig:
@@ -178,7 +180,10 @@ class Stream:
         depth: int | None = None,
     ) -> Stream:
         """Create a child stream inheriting this stream's config (with an updated `context` and incremented depth)."""
-        newConfig = dataclasses.replace(self.config, context=context)
+        inProd = self.config.inProd
+        if openEls is None and self.openEls.inProdElement() and not self.openEls.inTagContext("a"):
+            inProd = True
+        newConfig = dataclasses.replace(self.config, context=context, inProd=inProd)
         return Stream(
             chars,
             config=newConfig,
@@ -357,6 +362,10 @@ class Stream:
     def inOpaqueElement(self) -> bool:
         """Return True if the parser is currently inside an opaque element (e.g. `pre`, `script`, `bs-opaque`)."""
         return self.openEls.inOpaqueElement()
+
+    def inProdElement(self) -> bool:
+        """Return True if CSS production grammar parsing is active (`config.inProd` or inside `<pre class=prod>`)."""
+        return self.config.inProd or self.openEls.inProdElement()
 
     def inTagContext(self, tagName: str) -> bool:
         """Return True if an open `<tagName>` element is currently on the stack."""
