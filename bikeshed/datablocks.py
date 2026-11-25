@@ -616,6 +616,8 @@ def parseDefBlock(
                     )
             retVals[key] = newVal
         else:
+            if (type == "propdef" and key in ("Value", "New values")) or (type == "descdef" and key == "Value"):
+                valConfig.inProd = True
             retVals[key] = h.parseText(val, valConfig, startLine=lineNum, closeElements=True, context=el)
     return retVals
 

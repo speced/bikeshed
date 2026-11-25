@@ -36,6 +36,12 @@ ACTUAL_NODE_START_CHARS = "&<>`'~[{|\\—-"
 ACTUAL_NODE_START_SET = frozenset(ACTUAL_NODE_START_CHARS)
 _ACTUAL_NODE_START_RE = re.compile(f"[{re.escape(ACTUAL_NODE_START_CHARS)}]")
 _ACTUAL_LINE_STOP_RE = re.compile(f"[\n{re.escape(ACTUAL_NODE_START_CHARS)}]")
+_PROD_NODE_START_CHARS = "".join(dict.fromkeys(ACTUAL_NODE_START_CHARS + css.PROD_GRAMMAR_START_CHARS))
+_PROD_NODE_START_SET = frozenset(_PROD_NODE_START_CHARS)
+_PROD_NODE_START_RE = re.compile(f"[{re.escape(_PROD_NODE_START_CHARS)}]")
+_PROD_LINE_STOP_RE = re.compile(f"[\n{re.escape(_PROD_NODE_START_CHARS)}]")
+_PROD_POSSIBLE_NODE_START_CHARS = "".join(dict.fromkeys(POSSIBLE_NODE_START_CHARS + css.PROD_GRAMMAR_START_CHARS))
+_PROD_POSSIBLE_NODE_START_RE = re.compile(f"[{re.escape(_PROD_POSSIBLE_NODE_START_CHARS)}]")
 _RAW_HTML_START_RE = re.compile(r"[&<]")
 emdashRe = re.compile(r"(?:(?<!-)(—|--))\n\s*(?=\S)")
 
@@ -159,13 +165,15 @@ def parseInlineNodes(
     i = start
     openEls = s.openEls
     inOpaque = openEls.inOpaqueElement()
+    cssEnabled = s.config.css
+    inProd = cssEnabled and s.inProdElement()
     indent = s.config.indent
 
     while i < end:
         ch = chars[i]
         if stopAtNewline and ch == "\n" and not inOpaque:
             break
-        if ch in ACTUAL_NODE_START_SET:
+        if ch in (_PROD_NODE_START_SET if inProd else ACTUAL_NODE_START_SET):
             isAtLineStart = atLineStart and lastNode is None and (textStart == -1 or chars[textStart:i].strip() == "")
             res = parseNode(s, i, atLineStart=isAtLineStart)
             if isOk(res):
@@ -191,6 +199,7 @@ def parseInlineNodes(
                 wasOpaque = inOpaque
                 s.observeResult(res)
                 inOpaque = openEls.inOpaqueElement()
+                inProd = cssEnabled and s.inProdElement()
                 if isinstance(val, list):
                     # Macro expansions are parsed in a child Stream, so `val[0].s is not s` identifies them.
                     if (
@@ -247,9 +256,9 @@ def parseInlineNodes(
         if textStart == -1:
             textStart = i
         if stopAtNewline and not inOpaque:
-            match = _ACTUAL_LINE_STOP_RE.search(chars, i + 1)
+            match = (_PROD_LINE_STOP_RE if inProd else _ACTUAL_LINE_STOP_RE).search(chars, i + 1)
         else:
-            match = _ACTUAL_NODE_START_RE.search(chars, i + 1)
+            match = (_PROD_NODE_START_RE if inProd else _ACTUAL_NODE_START_RE).search(chars, i + 1)
         i = match.start() if match else end
 
     if textStart != -1:
@@ -414,14 +423,15 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
         i = match.start() if match else s.length
         node = RawText.fromStream(s, start, i)
         return Ok(node, i)
-    if s.chars[start] in ACTUAL_NODE_START_SET:
+    inProd = s.config.css and s.inProdElement()
+    if s.chars[start] in (_PROD_NODE_START_SET if inProd else ACTUAL_NODE_START_SET):
         res = parseNode(s, start)
         if isOk(res):
             val, i, err = res
             if not experimental:
                 s.observeResult(res)
             return (val, i, err)
-    match = POSSIBLE_NODE_START_RE.search(s.chars, start + 1)
+    match = (_PROD_POSSIBLE_NODE_START_RE if inProd else POSSIBLE_NODE_START_RE).search(s.chars, start + 1)
     i = match.start() if match else s.length
     node = RawText.fromStream(s, start, i)
     return Ok(node, i)
@@ -460,7 +470,8 @@ def parseNode(
             return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
         return Err(start)
 
-    if first1 not in ACTUAL_NODE_START_SET:
+    inProd = s.config.css and s.inProdElement()
+    if first1 not in (_PROD_NODE_START_SET if inProd else ACTUAL_NODE_START_SET):
         return Err(start)
 
     if first1 == "-":
@@ -480,6 +491,10 @@ def parseNode(
         return Err(start)
 
     if first1 == "&":
+        if inProd and not s.inTagContext("a"):
+            grammarRes = css.parseCSSProductionGrammar(s, start)
+            if isOk(grammarRes):
+                return grammarRes
         ch, i, _ = html.parseCharRef(s, start, context=html.CharRefContext.NonAttr)
         if ch is not None:
             if isinstance(ch, str):
@@ -511,6 +526,10 @@ def parseNode(
         if el is not None:
             if blockType := html.isDatablock(el.startTag, s.loc(i)):
                 el.startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
+                return Ok(el, i)
+            if s.config.css and "prod" in el.startTag.classes:
+                bodyNodes = css.parseCSSProductionGrammarInText(s, s.nextLineStart(start), el.data)
+                return Ok([el.startTag, *bodyNodes, EndTag.fromStream(s, i, i, el.startTag)], i)
             return Ok(el, i)
     if s.config.markdownInline:
         if first2 == r"\`":
@@ -567,6 +586,10 @@ def parseNode(
             prodRes = css.parseCSSProduction(s, start)
             if isOk(prodRes):
                 return prodRes
+    if inProd and not inA and first1 in css.PROD_GRAMMAR_START_SET:
+        grammarRes = css.parseCSSProductionGrammar(s, start)
+        if isOk(grammarRes):
+            return grammarRes
     if s.config.dfn and not inOpaque:
         if first3 in ("\\[=", "\\[$"):
             node = RawText.fromStream(s, start, start + 3, "[" + s[start + 2])
@@ -806,13 +829,18 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             # Rewrite deprecated `<xmp>` to `<pre bs-was-xmp>` with HTML-escaped body.
             startTag.tag = "pre"
             startTag.attrs["bs-was-xmp"] = ""
+            bodyStart = i
             text, i, _ = html.parseXmpToEnd(s, i)
             if text is None:
                 return Err(start)
-            if "bs-macros" in startTag.attrs:
+            hasMacros = "bs-macros" in startTag.attrs
+            if hasMacros:
                 text = macros.replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")
             if blockType := html.isDatablock(startTag, s.loc(i)):
                 startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
+            elif s.config.css and "prod" in startTag.classes:
+                bodyNodes = css.parseCSSProductionGrammarInText(s, bodyStart, text, exactOffsets=not hasMacros)
+                return Ok([startTag, *bodyNodes, EndTag.fromStream(s, i, i, startTag)], i)
             el = SafeElement.fromStream(s, start, i, startTag, text)
             return Ok(el, i)
         else:

@@ -1,4 +1,4 @@
-"""CSS autolink shorthand parsers: `<<production>>`, `''maybe''` declarations/values, and `'propdesc'`."""
+"""CSS autolink shorthand and production grammar parsers (`<<production>>`, `''maybe''`, `'propdesc'`, and `.prod` grammar symbols)."""
 
 from __future__ import annotations
 
@@ -52,6 +52,17 @@ AUTOLINK_PROPDESC_RE = re.compile(
     (?:!!([\w\[\]-]+))?
     """,
     flags=re.X,
+)
+
+PROD_GRAMMAR_START_CHARS = "#{?!*+|&,"
+PROD_GRAMMAR_START_SET = frozenset(PROD_GRAMMAR_START_CHARS)
+
+_PROD_HASH_MULT_RE = re.compile(r"#\{\s*\d+(?:\s*,(?:\s*\d+)?)?\s*\}")
+_PROD_MULT_RE = re.compile(r"\{\s*\d+\s*\}")
+_PROD_MULT_RANGE_RE = re.compile(r"\{\s*\d+\s*,(?:\s*\d+)?\s*\}")
+_PROD_DOUBLE_AMP_RE = re.compile(r"(?:&&|&amp;&amp;|&#38;&#38;|&#[xX]0*26;&#[xX]0*26;)(?!')")
+_PROD_GRAMMAR_TEXT_RE = re.compile(
+    r"#\{\s*\d+(?:\s*,(?:\s*\d+)?)?\s*\}|\{\s*\d+(?:\s*,(?:\s*\d+)?)?\s*\}|(?:&&|\|\||[?!#*+|,])(?!')",
 )
 
 
@@ -543,3 +554,91 @@ def parseCSSPropdesc(s: Stream, start: int) -> ResultT[SafeText | list[ParserNod
     middleText = SafeText.fromStream(s, innerStart, innerEnd, lt)
     endTag = EndTag.fromStream(s, innerEnd, nodeEnd, startTag)
     return Ok([startTag, middleText, endTag], nodeEnd)
+
+
+def _makeGrammarLink(s: Stream, start: int, end: int, lt: str, text: str) -> list[ParserNode]:
+    """Build `[StartTag('a'), SafeText, EndTag('a')]` for a CSS production grammar symbol link."""
+    startTag = StartTag.fromStream(
+        s,
+        start,
+        start,
+        "a",
+        {
+            "data-link-type": t.SafeAttrStr("grammar"),
+            "bs-lt": escapeAttr(lt),
+            "bs-link-for": t.SafeAttrStr(""),
+        },
+    )
+    content = SafeText.fromStream(s, start, end, text)
+    endTag = EndTag.fromStream(s, end, end, startTag)
+    return [startTag, content, endTag]
+
+
+def parseCSSProductionGrammar(s: Stream, start: int) -> ResultT[list[ParserNode]]:
+    """Parse a CSS production grammar combinator or multiplier at `start` (`?`, `!`, `#`, `*`, `+`, `|`, `||`, `&&`, `,`, `{A}`, `{A,B}`, `#{...}`)."""
+    ch = s[start]
+    if ch == "#":
+        match, end, _ = s.matchRe(start, _PROD_HASH_MULT_RE)
+        if match is not None:
+            return Ok(_makeGrammarLink(s, start, end, "#", match.group(0)), end)
+        if s[start + 1] != "'":
+            return Ok(_makeGrammarLink(s, start, start + 1, "#", "#"), start + 1)
+        return Err(start)
+    if ch == "{":
+        match, end, _ = s.matchRe(start, _PROD_MULT_RE)
+        if match is not None:
+            return Ok(_makeGrammarLink(s, start, end, "{A}", match.group(0)), end)
+        match, end, _ = s.matchRe(start, _PROD_MULT_RANGE_RE)
+        if match is not None:
+            return Ok(_makeGrammarLink(s, start, end, "{A,B}", match.group(0)), end)
+        return Err(start)
+    if ch == "|":
+        if s.slice(start, start + 2) == "||" and s[start + 2] != "'":
+            return Ok(_makeGrammarLink(s, start, start + 2, "||", "||"), start + 2)
+        if s[start + 1] != "'":
+            return Ok(_makeGrammarLink(s, start, start + 1, "|", "|"), start + 1)
+        return Err(start)
+    if ch == "&":
+        match, end, _ = s.matchRe(start, _PROD_DOUBLE_AMP_RE)
+        if match is not None:
+            return Ok(_makeGrammarLink(s, start, end, "&&", "&&"), end)
+        return Err(start)
+    if ch in ("?", "!", "*", "+", ","):
+        if s[start + 1] != "'":
+            return Ok(_makeGrammarLink(s, start, start + 1, ch, ch), start + 1)
+        return Err(start)
+    return Err(start)
+
+
+def parseCSSProductionGrammarInText(
+    s: Stream,
+    baseOffset: int,
+    text: str,
+    *,
+    exactOffsets: bool = True,
+) -> list[ParserNode]:
+    """Split raw `<xmp class=prod>` or fenced `prod` body text into `SafeText` and CSS grammar link nodes."""
+    nodes: list[ParserNode] = []
+    pos = 0
+    for match in _PROD_GRAMMAR_TEXT_RE.finditer(text):
+        mStart, mEnd = match.span()
+        if mStart > pos:
+            segStart = baseOffset + pos if exactOffsets else baseOffset
+            segEnd = baseOffset + mStart if exactOffsets else baseOffset
+            nodes.append(SafeText.fromStream(s, segStart, segEnd, text[pos:mStart]))
+        tok = match.group(0)
+        if tok.startswith("#{"):
+            lt = "#"
+        elif tok.startswith("{"):
+            lt = "{A,B}" if "," in tok else "{A}"
+        else:
+            lt = tok
+        tokStart = baseOffset + mStart if exactOffsets else baseOffset
+        tokEnd = baseOffset + mEnd if exactOffsets else baseOffset
+        nodes.extend(_makeGrammarLink(s, tokStart, tokEnd, lt, tok))
+        pos = mEnd
+    if pos < len(text):
+        segStart = baseOffset + pos if exactOffsets else baseOffset
+        segEnd = baseOffset + len(text) if exactOffsets else baseOffset
+        nodes.append(SafeText.fromStream(s, segStart, segEnd, text[pos:]))
+    return nodes

@@ -467,6 +467,7 @@ class TagStack:
     opaqueTags: set[str] = field(default_factory=lambda: set(elements.DEFAULT_OPAQUE_ELEMENTS))
     # O(1) counters kept in sync by pushEntry/popEntry to avoid linear scans on hot parser paths.
     _opaqueCount: int = 0
+    _prodCount: int = 0
     _tagCounts: Counter[str] = field(default_factory=Counter)
     # Tracks enclosing Markdown-synthesized block elements as `(len(tags), tagName)` without
     # polluting `self.tags` for HTML end-tag matching or error messages.
@@ -479,6 +480,10 @@ class TagStack:
     def inOpaqueElement(self) -> bool:
         """Return True if any currently open element is opaque."""
         return self._opaqueCount > 0
+
+    def inProdElement(self) -> bool:
+        """Return True if currently inside a `<pre class=prod>` CSS production element."""
+        return self._prodCount > 0
 
     def inTagContext(self, tagName: str, stopTags: list[str] | None = None) -> bool:
         """Return True if `<tagName>` is open (and appears above any `stopTags` scoping barrier)."""
@@ -503,17 +508,21 @@ class TagStack:
         return None
 
     def pushEntry(self, entry: TagStackEntry) -> None:
-        """Push `entry` onto the stack and update opacity and per-tag counters."""
+        """Push `entry` onto the stack and update opacity, prod, and per-tag counters."""
         self.tags.append(entry)
         if entry.isOpaque:
             self._opaqueCount += 1
+        if entry.isProd:
+            self._prodCount += 1
         self._tagCounts[entry.startTag.tag] += 1
 
     def popEntry(self) -> TagStackEntry:
-        """Pop the top entry from the stack and update opacity and per-tag counters."""
+        """Pop the top entry from the stack and update opacity, prod, and per-tag counters."""
         entry = self.tags.pop()
         if entry.isOpaque:
             self._opaqueCount -= 1
+        if entry.isProd:
+            self._prodCount -= 1
         self._tagCounts[entry.startTag.tag] -= 1
         return entry
 
@@ -533,6 +542,8 @@ class TagStack:
                 removed = self.tags.pop(idx)
                 if removed.isOpaque:
                     self._opaqueCount -= 1
+                if removed.isProd:
+                    self._prodCount -= 1
                 self._tagCounts[removed.startTag.tag] -= 1
                 return
 
@@ -850,14 +861,15 @@ class TagStack:
 
 @dataclass
 class TagStackEntry:
-    """An open element frame on `TagStack` with its cached opacity flag."""
+    """An open element frame on `TagStack` with its cached opacity and CSS-production flags."""
 
     startTag: StartTag
     opaqueTags: InitVar[set[str]]
     isOpaque: bool = field(init=False)
+    isProd: bool = field(init=False)
 
     def __post_init__(self, opaqueTags: set[str]) -> None:
-        """Compute `isOpaque` from the element's tag name and `bs-opaque` attribute."""
+        """Compute `isOpaque` and `isProd` from the element's tag name, classes, and attributes."""
         if (
             self.startTag.tag in opaqueTags
             or self.startTag.tag in elements.DEFAULT_OPAQUE_ELEMENTS
@@ -866,6 +878,10 @@ class TagStackEntry:
             self.isOpaque = True
         else:
             self.isOpaque = False
+        self.isProd = self.startTag.tag == "pre" and (
+            "prod" in self.startTag.classes
+            or ("class" in self.startTag.attrs and "prod" in unescapeAttr(self.startTag.attrs["class"]).split())
+        )
 
     @property
     def name(self) -> str:
