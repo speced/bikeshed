@@ -10,6 +10,10 @@ from .main import (
     parseTitle,
     strFromNodes,
 )
+from .metadata import (
+    ExtractedMetadata,
+    extractMetadata,
+)
 from .nodes import (
     Comment,
     Doctype,
@@ -27,9 +31,7 @@ from .nodes import (
     isTag,
 )
 from .parser import (
-    ExtractedMetadata,
     closeOpenElements,
-    extractMetadata,
     nodesFromStream,
 )
 from .stream import (

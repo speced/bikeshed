@@ -375,10 +375,22 @@ def errorAndExit() -> None:
 
 
 @contextlib.contextmanager
-def withMessageState(
+def usingMessageState(newState: MessagesState) -> t.Generator[MessagesState, None, None]:
+    """Temporarily replace `messages.state` with `newState`, yielding the previous state and restoring it on exit."""
+    global state
+    oldState = state
+    state = newState
+    try:
+        yield oldState
+    finally:
+        state = oldState
+
+
+@contextlib.contextmanager
+def newMessageState(
     fh: str | t.TextIO,
     **kwargs: t.Any,
-) -> t.Generator[t.TextIO, None, None]:
+) -> t.Generator[MessagesState, None, None]:
     if isinstance(fh, str):
         fhIsTemporary = True
         fh = open(fh, "w", encoding="utf-8")
@@ -389,7 +401,7 @@ def withMessageState(
     oldState = state
     state = oldState.replace(fh=fh, **kwargs)
     try:
-        yield fh
+        yield oldState
     finally:
         state = oldState
         if fhIsTemporary:
