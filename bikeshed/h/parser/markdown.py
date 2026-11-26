@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from ... import messages as m
 from ... import t
 from .. import elements
-from .html import CharRefContext, isDatablockClass, parseCharRef, printChAsCharRef
+from .html import CharRefContext, isDatablockClass, parseCharRef
 from .nodes import (
     EmphDelim,
     EndTag,
@@ -567,35 +567,33 @@ def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
     return Ok(s.slice(start, i), i)
 
 
+def _parseMarkdownLinkEscapeOrCharRef(s: Stream, start: int) -> ResultT[str]:
+    """Decode a Markdown backslash escape or HTML attribute character reference at `start`."""
+    if s.config.markdownEscapes and s[start] == "\\":
+        return parseMarkdownEscape(s, start)
+    if s[start] == "&":
+        ch, nextI, _ = parseCharRef(s, start, context=CharRefContext.Attr)
+        if ch is not None:
+            return Ok(ch.text if isinstance(ch, SafeText) else ch, nextI)
+    return Err(start)
+
+
 def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
     """Parse an angle-bracketed `<url>` Markdown link destination starting after `<`."""
     i = start
     val = ""
     startSeg = i
-    ch: str | SafeText | None
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start - 1))
             return Err(start)
-        elif s.config.markdownEscapes and s[i] == "\\":
-            startEscape = i
-            ch, i, _ = parseMarkdownEscape(s, i)
+        elif s[i] in ("\\", "&"):
+            ch, nextI, _ = _parseMarkdownLinkEscapeOrCharRef(s, i)
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + ch
-            startSeg = i
-            continue
-        elif s[i] == "&":
-            startRef = i
-            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
-            if ch is None:
-                i += 1
-                continue
-            if isinstance(ch, SafeText):
-                ch = ch.text
-            val += s.slice(startSeg, startRef) + ch
-            startSeg = i
+            val += s.slice(startSeg, i) + ch
+            i = startSeg = nextI
             continue
         elif s[i] == ">":
             break
@@ -611,8 +609,7 @@ def parseMarkdownLinkAngleDest(s: Stream, start: int) -> ResultT[str]:
         else:
             i += 1
     val += s.slice(startSeg, i)
-    i += 1
-    return Ok(val, i)
+    return Ok(val, i + 1)
 
 
 def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
@@ -621,30 +618,17 @@ def parseMarkdownLinkIdentDest(s: Stream, start: int) -> ResultT[str]:
     parenDepth = 0
     val = ""
     startSeg = i
-    ch: str | SafeText | None
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the destination of a markdown link", lineNum=s.loc(start))
             return Err(start)
-        elif s.config.markdownEscapes and s[i] == "\\":
-            startEscape = i
-            ch, i, _ = parseMarkdownEscape(s, i)
+        elif s[i] in ("\\", "&"):
+            ch, nextI, _ = _parseMarkdownLinkEscapeOrCharRef(s, i)
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + ch
-            startSeg = i
-            continue
-        elif s[i] == "&":
-            startRef = i
-            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
-            if ch is None:
-                i += 1
-                continue
-            if isinstance(ch, SafeText):
-                ch = ch.text
-            val += s.slice(startSeg, startRef) + ch
-            startSeg = i
+            val += s.slice(startSeg, i) + ch
+            i = startSeg = nextI
             continue
         elif isControl(s[i]):
             m.die(
@@ -683,28 +667,17 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
         assert False, "unreachable"
     val = ""
     startSeg = i
-    ch: str | SafeText | None
     while True:
         if s.eof(i):
             m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.loc(start))
             return Err(start)
-        elif s.config.markdownEscapes and s[i] == "\\":
-            startEscape = i
-            ch, i, _ = parseMarkdownEscape(s, i)
+        elif s[i] in ("\\", "&"):
+            ch, nextI, _ = _parseMarkdownLinkEscapeOrCharRef(s, i)
             if ch is None:
                 i += 1
                 continue
-            val += s.slice(startSeg, startEscape) + printChAsCharRef(ch)
-            startSeg = i
-            continue
-        elif s[i] == "&":
-            startRef = i
-            ch, i, _ = parseCharRef(s, i, context=CharRefContext.Attr)
-            if ch is None:
-                i += 1
-                continue
-            val += s.slice(startSeg, startRef) + printChAsCharRef(ch)
-            startSeg = i
+            val += s.slice(startSeg, i) + ch
+            i = startSeg = nextI
             continue
         elif s[i] == endChar:
             break
@@ -721,8 +694,7 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
         else:
             i += 1
     val += s.slice(startSeg, i)
-    i += 1
-    return Ok(val, i)
+    return Ok(val, i + 1)
 
 
 def parseMarkdownEscape(s: Stream, start: int) -> ResultT[str]:
