@@ -260,10 +260,31 @@ def dedentElement(
     return lineNumAdjustment
 
 
-def _defBlockContext(blockType: str, key: str, el: t.ElementT) -> str:
-    elLine = h.approximateLineNumber(el)
-    loc = f" (at line {elLine})" if elLine else ""
-    return f"'{key}' in {blockType} block{loc}"
+@dataclass(slots=True)
+class DefBlockEntry:
+    """A single parsed `key: value` row from a Bikeshed def block, holding DOM nodes directly."""
+
+    key: list[t.NodeT]
+    val: list[t.NodeT]
+
+
+def _parseToNodes(
+    text: str,
+    parseConfig: h.ParseConfig,
+    *,
+    startLine: int,
+    context: t.ElementT,
+) -> list[t.NodeT]:
+    """Parse `text` with `parseConfig` and build a detached list of DOM nodes without an HTML round-trip."""
+    frag = h.buildFragment(
+        h.nodesFromHtml(text, parseConfig, startLine=startLine, closeElements=True, context=context),
+    )
+    return h.childNodes(frag, clear=True)
+
+
+def _nodesText(nodes: t.Sequence[t.NodeT]) -> str:
+    """Return the concatenated text content of a sequence of DOM nodes."""
+    return "".join(n if isinstance(n, str) else h.textContent(n) for n in nodes)
 
 
 def transformSimpleDef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
@@ -271,12 +292,9 @@ def transformSimpleDef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | 
     table = h.transferAttributes(el, h.E.table())
     h.addClass(doc, table, "def")
     tbody = h.appendChild(table, h.E.tbody())
-    for key, val in rows.items():
-        ctx = _defBlockContext("simpledef", key, el)
-        th = h.E.th()
-        h.parseInto(th, key + ":", context=ctx)
-        td = h.E.td()
-        h.parseInto(td, val, context=ctx)
+    for entry in rows.values():
+        th = h.E.th({}, *entry.key, ":")
+        td = h.E.td({}, *entry.val)
         h.appendChild(tbody, h.E.tr({}, th, td))
     return table
 
@@ -295,7 +313,9 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
     tbody = h.appendChild(table, h.E.tbody())
 
     if "Name" in parsedAttrs:
-        table.set("bs-link-for-hint", h.escapeAttr(parsedAttrs["Name"].split(",")[0].strip()))
+        table.set(
+            "bs-link-for-hint", h.escapeAttr(_nodesText(parsedAttrs["Name"].val).split(",", maxsplit=1)[0].strip()),
+        )
     if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
@@ -323,14 +343,14 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
         attrs["Canonical order"] = "per grammar"
         attrs["Animation type"] = None
     if "Animatable" in parsedAttrs:
-        parsedAttrs["Animation type"] = parsedAttrs.pop("Animatable")
+        animEntry = parsedAttrs.pop("Animatable")
+        parsedAttrs["Animation type"] = DefBlockEntry(key=["Animation type"], val=animEntry.val)
 
     attrsToPrint = canonicalizeAttrs(parsedAttrs, attrs, "propdef", el)
-    for key, val in attrsToPrint:
-        ctx = _defBlockContext("propdef", key, el)
+    for key, entry in attrsToPrint:
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":", context=ctx)
-        td = h.parseInto(h.E.td(), val, context=ctx)
+        th = h.E.th({}, *entry.key, ":")
+        td = h.E.td({}, *entry.val)
         h.appendChild(tr, th, td)
 
         if key in ("Value", "New values"):
@@ -351,7 +371,7 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
             h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/cssom/#serializing-css-values"}))
         elif key == "Applies to":
             h.wrapContents(th, h.E.a({"href": "https://www.w3.org/TR/css-cascade/#applies-to"}))
-            if val and val.lower() == "all elements":
+            if len(td) == 0 and (td.text or "").lower() == "all elements":
                 h.wrapContents(
                     td,
                     h.E.a(
@@ -379,7 +399,7 @@ def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
     tbody = h.appendChild(table, h.E.tbody())
 
     if "For" in parsedAttrs:
-        table.set("data-dfn-for", h.escapeAttr(parsedAttrs["For"]))
+        table.set("data-dfn-for", h.escapeAttr(_nodesText(parsedAttrs["For"].val)))
     if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         requiredKeys = ["Name", "For"]
     elif h.hasClass(doc, table, "mq"):
@@ -388,28 +408,27 @@ def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
         requiredKeys = ["Name", "For", "Value", "Initial"]
 
     for key in requiredKeys:
-        ctx = _defBlockContext("descdef", key, el)
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":", context=ctx)
-        td = h.parseInto(h.E.td(), parsedAttrs.get(key, f"(no {key} specified)"), context=ctx)
+        entry = parsedAttrs.get(key)
+        th = h.E.th({}, *(entry.key if entry is not None else [key]), ":")
+        td = h.E.td({}, *(entry.val if entry is not None else [f"(no {key} specified)"]))
         h.appendChild(tr, th, td)
 
         if key == "For":
             h.wrapContents(td, h.E.a({"data-link-type": "at-rule"}))
         elif key == "Value":
             h.addClass(doc, td, "prod")
-        elif key in parsedAttrs:
+        elif entry is not None:
             pass
         else:
-            name = parsedAttrs.get("Name", "(no Name specified)")
+            name = _nodesText(parsedAttrs["Name"].val) if "Name" in parsedAttrs else "(no Name specified)"
             m.die(f"The descdef for '{name}' is missing a '{key}' line", el=el)
-    for key, val in parsedAttrs.items():
+    for key, entry in parsedAttrs.items():
         if key in requiredKeys:
             continue
-        ctx = _defBlockContext("descdef", key, el)
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":", context=ctx)
-        td = h.parseInto(h.E.td(), val, context=ctx)
+        th = h.E.th({}, *entry.key, ":")
+        td = h.E.td({}, *entry.val)
         h.appendChild(tr, th, td)
 
     return table
@@ -426,7 +445,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
         attributeList = h.E.ul()
         if "Attribute groups" in parsedAttrs:
-            groups = [x.strip() for x in parsedAttrs["Attribute groups"].split(",")]
+            groups = [x.strip() for x in _nodesText(parsedAttrs["Attribute groups"].val).split(",")]
             for group in groups:
                 h.appendChild(
                     attributeList,
@@ -437,11 +456,8 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
                 )
             del parsedAttrs["Attribute groups"]
         if "Attributes" in parsedAttrs:
-            atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
-            if "Name" in parsedAttrs:
-                dataFor = parsedAttrs.get("Name", "")
-            else:
-                dataFor = ""
+            atts = [x.strip() for x in _nodesText(parsedAttrs["Attributes"].val).split(",")]
+            dataFor = _nodesText(parsedAttrs["Name"].val) if "Name" in parsedAttrs else ""
             for att in atts:
                 h.appendChild(
                     attributeList,
@@ -451,7 +467,7 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
                     ),
                 )
         # Give a dummy value to signal that it was specified
-        parsedAttrs["Attributes"] = ""
+        parsedAttrs["Attributes"] = DefBlockEntry(key=["Attributes"], val=[])
 
     attrs: OrderedDict[str, str | None] = OrderedDict()
     attrs["Name"] = None
@@ -462,26 +478,25 @@ def transformElementdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
     attrs["Dom interfaces"] = None
 
     attrsToPrint = canonicalizeAttrs(parsedAttrs, attrs, "elementdef", el)
-    for key, val in attrsToPrint:
-        ctx = _defBlockContext("elementdef", key, el)
+    for key, entry in attrsToPrint:
         tr = h.appendChild(tbody, h.E.tr())
-        th = h.parseInto(h.E.th(), key + ":", context=ctx)
+        th = h.E.th({}, *entry.key, ":")
         if key == "Attributes":
             if attributeList is not None:
                 td = h.E.td({}, attributeList)
             else:
                 continue
         else:
-            td = h.parseInto(h.E.td(), val, context=ctx, allowEmpty=True)
+            td = h.E.td({}, *entry.val)
         h.appendChild(tr, th, td)
 
         if key == "Name":
-            h.replaceContents(td, wrapCommaList(val, "dfn", "element"))
+            h.replaceContents(td, wrapCommaList(h.textContent(td), "dfn", "element"))
         elif key == "Categories":
-            h.replaceContents(td, wrapCommaList(val, "a", "dfn"))
+            h.replaceContents(td, wrapCommaList(h.textContent(td), "a", "dfn"))
         elif key == "Dom interfaces":
             h.replaceContents(th, "DOM Interfaces:")
-            h.replaceContents(td, wrapCommaList(val, "a", "interface"))
+            h.replaceContents(td, wrapCommaList(h.textContent(td), "a", "interface"))
 
     return table
 
@@ -530,16 +545,15 @@ def transformArgumentdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT 
     )
     tbody = h.appendChild(table, h.E.tbody())
 
-    for param, desc in parsedAttrs.items():
-        ctx = _defBlockContext("argumentdef", param, el)
+    for entry in parsedAttrs.values():
         tr = h.appendChild(tbody, h.E.tr())
         h.appendChild(
             tr,
-            h.E.td({}, h.parseInto(h.E.dfn({"data-dfn-type": "argument"}), param, context=ctx)),
+            h.E.td({}, h.E.dfn({"data-dfn-type": "argument"}, *entry.key)),
             h.E.td(),
             h.E.td({"style": "text-align:center"}),
             h.E.td({"style": "text-align:center"}),
-            h.parseInto(h.E.td(), desc, context=ctx, allowEmpty=True),
+            h.E.td({}, *entry.val),
         )
     return table
 
@@ -550,9 +564,9 @@ def parseDefBlock(
     el: t.ElementT,
     doc: t.SpecT,
     capitalizeKeys: bool = True,
-) -> OrderedDict[str, str]:
+) -> OrderedDict[str, DefBlockEntry]:
     # Parses a 'def block' (lines of key:val pairs)
-    # Returns a dict of the (bs-parsed) key and value.
+    # Returns an OrderedDict mapping keys to parsed DOM node fragments.
     # Concatenates values (with a newline) from lines with the same key
     vals: OrderedDict[str, tuple[int, str]] = OrderedDict()
     startLine = h.parseLineNumber(el) or 1
@@ -585,7 +599,8 @@ def parseDefBlock(
                 key = lastKey
                 val = line.strip()
             else:
-                m.die(f"Incorrectly formatted {type} line for '{vals.get('Name', '???')}':\n{line}", lineNum=lineNum)
+                name = vals["Name"][1] if "Name" in vals else "???"
+                m.die(f"Incorrectly formatted {type} line for '{name}':\n{line}", lineNum=lineNum)
                 continue
         else:
             key = match.group(1).strip()
@@ -597,32 +612,39 @@ def parseDefBlock(
             vals[key] = (vals[key][0], vals[key][1] + "\n" + val)
         else:
             vals[key] = (lineNum, val)
-    retVals: OrderedDict[str, str] = OrderedDict()
+    retVals: OrderedDict[str, DefBlockEntry] = OrderedDict()
     keyConfig = h.ParseConfig.fromSpec(doc, "the line's key (before the colon)")
     valConfig = h.ParseConfig.fromSpec(doc, "the line's value (after the colon)")
     prodValConfig = replace(valConfig, inProd=True)
-    for key, (lineNum, val) in vals.items():
-        key = h.parseText(key, keyConfig, startLine=lineNum, closeElements=True, context=el)
-        if type in ("propdef", "descdef") and key == "Name":
-            newVal = ""
+    for rawKey, (lineNum, val) in vals.items():
+        keyNodes = _parseToNodes(rawKey, keyConfig, startLine=lineNum, context=el)
+        dictKey = (
+            keyNodes[0]
+            if len(keyNodes) == 1 and isinstance(keyNodes[0], str) and keyNodes[0] not in retVals
+            else rawKey
+        )
+        if type in ("propdef", "descdef") and dictKey == "Name":
+            nameNodes: list[h.ParserNode] = []
             for node in h.nodesFromHtml(val, valConfig, startLine=lineNum, closeElements=True, context=el):
                 if isinstance(node, h.parser.Text):
-                    newVal += str(node)
+                    nameNodes.append(node)
                 else:
                     m.die(
                         f"'Name' key should contain just the property/descriptor name, or a comma-separated list. Found markup:\n  {val}",
                         lineNum=lineNum,
                     )
-            retVals[key] = newVal
+            valNodes = h.childNodes(h.buildFragment(nameNodes), clear=True)
         else:
-            isProdVal = (type == "propdef" and key in ("Value", "New values")) or (type == "descdef" and key == "Value")
-            retVals[key] = h.parseText(
+            isProdVal = (type == "propdef" and dictKey in ("Value", "New values")) or (
+                type == "descdef" and dictKey == "Value"
+            )
+            valNodes = _parseToNodes(
                 val,
                 prodValConfig if isProdVal else valConfig,
                 startLine=lineNum,
-                closeElements=True,
                 context=el,
             )
+        retVals[dictKey] = DefBlockEntry(key=keyNodes, val=valNodes)
     return retVals
 
 
@@ -639,18 +661,18 @@ def wrapCommaList(text: str, tagName: str, type: str) -> list[t.NodeT]:
 
 
 def canonicalizeAttrs(
-    parsedAttrs: OrderedDict[str, str],
+    parsedAttrs: OrderedDict[str, DefBlockEntry],
     attrs: OrderedDict[str, str | None],
     type: str,
     el: t.ElementT,
-) -> list[tuple[str, str]]:
+) -> list[tuple[str, DefBlockEntry]]:
     # Processes and re-orders parsedAttrs.
     # attrs specifies the keys that are required (with a value of None)
     # and optional (with a non-None default value).
     # The order of attrs keys is also respected,
     # with any additional keys in parsedAttrs put at the end.
-    # Returns a list of (key, value) tuples, in the desired order.
-    attrsToPrint: list[tuple[str, str]] = []
+    # Returns a list of (key, DefBlockEntry) tuples, in the desired order.
+    attrsToPrint: list[tuple[str, DefBlockEntry]] = []
     for key, defaultVal in attrs.items():
         if key in parsedAttrs:
             # Key was provided
@@ -660,7 +682,7 @@ def canonicalizeAttrs(
             # Required key, not provided
             if "Name" in parsedAttrs:
                 m.die(
-                    f"The {type} block for '{parsedAttrs.get("Name")}' is missing a '{key}' line.",
+                    f"The {type} block for '{_nodesText(parsedAttrs['Name'].val)}' is missing a '{key}' line.",
                     el=el,
                 )
             else:
@@ -668,11 +690,11 @@ def canonicalizeAttrs(
             continue
         else:
             # Optional key, just use default
-            attrsToPrint.append((key, defaultVal))
-    for key, val in parsedAttrs.items():
+            attrsToPrint.append((key, DefBlockEntry(key=[key], val=[defaultVal] if defaultVal else [])))
+    for key, entry in parsedAttrs.items():
         # Find any "custom" provided keys
         if key not in attrs:
-            attrsToPrint.append((key, val))
+            attrsToPrint.append((key, entry))
     return attrsToPrint
 
 
