@@ -314,7 +314,8 @@ def transformPropdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
 
     if "Name" in parsedAttrs:
         table.set(
-            "bs-link-for-hint", h.escapeAttr(_nodesText(parsedAttrs["Name"].val).split(",", maxsplit=1)[0].strip()),
+            "bs-link-for-hint",
+            h.escapeAttr(_nodesText(parsedAttrs["Name"].val).split(",", maxsplit=1)[0].strip()),
         )
     if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         attrs["Name"] = None
