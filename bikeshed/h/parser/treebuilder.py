@@ -19,7 +19,6 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
-    populateTagAttrs,
     sortAttrs,
 )
 
@@ -75,11 +74,10 @@ def unescapeHtml(text: str) -> str:
 
 
 def prepareAttrs(node: StartTag | SelfClosedTag) -> dict[str, str]:
-    """Finalize, sort, normalize, and unescape a tag node's attributes for LXML SAX."""
+    """Sort, normalize, and unescape a tag node's attributes for LXML SAX."""
     addLineInfo = node.s is None or not node.s.config.rawHtml
-    populateTagAttrs(node, addLineInfo=addLineInfo)
     attrs: dict[str, str] = {}
-    for k, v in sortAttrs(node.attrs):
+    for k, v in sortAttrs(node, addLineInfo=addLineInfo):
         # LXML's SAX handler rejects undeclared XML namespace prefixes, so strip any `prefix:`.
         if ":" in k:
             _, _, k = k.partition(":")
