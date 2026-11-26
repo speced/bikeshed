@@ -23,47 +23,43 @@ _APOS_IN_WORD_RE = re.compile(r"(?<=\w)'(?=\w)")
 _APOS_START_SPACE_RE = re.compile(r"'\s")
 
 
-def startTagStr(tagName: str, attrs: t.SafeAttrDict) -> str:
-    """Serialize an HTML start tag with canonically sorted attributes."""
-    s = f"<{tagName}"
-    for k, v in sortAttrs(attrs):
-        s += f' {k}="{v}"'
-    s += ">"
-    return s
+def sortAttrs(node: StartTag | SelfClosedTag, *, addLineInfo: bool = True) -> t.Iterator[tuple[str, str]]:
+    """Yield `(name, value)` pairs lazily with `bs-line-number` first, `class` last, and others alphabetical."""
+    attrs = node.attrs
+    hasLineNum = "bs-line-number" in attrs
+    hasClass = "class" in attrs
 
-
-def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
-    """Yield `(name, value)` pairs with `bs-line-number` first, `class` last, and others alphabetical."""
-    # Fast-path common tags that only carry bs-line-number (and optionally class) to avoid sorting.
-    if "bs-line-number" in attrs:
+    if hasLineNum:
         yield "bs-line-number", attrs["bs-line-number"]
-        if len(attrs) == 1:
-            return
-        if len(attrs) == 2 and "class" in attrs:
-            yield "class", attrs["class"]
-            return
-    for k, v in sorted(attrs.items()):
-        if k in ("bs-line-number", "class"):
-            continue
-        yield k, v
-    if "class" in attrs:
+    elif addLineInfo and node.loc:
+        yield "bs-line-number", escapeAttr(node.loc)
+
+    context = node.context if addLineInfo and "bs-parse-context" not in attrs else None
+    otherCount = len(attrs) - (1 if hasLineNum else 0) - (1 if hasClass else 0)
+
+    if otherCount == 0:
+        if context:
+            yield "bs-parse-context", escapeAttr(context)
+    else:
+        if context:
+            attrs = {"bs-parse-context": escapeAttr(context), **attrs}
+        for k, v in sorted(attrs.items()):
+            if k not in ("bs-line-number", "class"):
+                yield k, v
+
+    if node.classes:
+        yield "class", escapeAttr(" ".join(sorted(node.classes)))
+    elif hasClass:
         yield "class", attrs["class"]
 
 
-def populateTagAttrs(node: StartTag | SelfClosedTag, *, addLineInfo: bool = True) -> None:
-    """Populate synthetic `bs-line-number`, `bs-parse-context`, and serialized `class` attributes on `node`."""
-    if addLineInfo and "bs-line-number" not in node.attrs and node.loc:
-        node.attrs["bs-line-number"] = escapeAttr(node.loc)
-    if addLineInfo and "bs-parse-context" not in node.attrs and node.context:
-        node.attrs["bs-parse-context"] = escapeAttr(node.context)
-    if node.classes:
-        node.attrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
-
-
 def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
-    """Populate synthetic line/context/class attributes on `node` and serialize its start tag."""
-    populateTagAttrs(node)
-    return startTagStr(node.tag, node.attrs)
+    """Serialize a tag node's opening tag with canonically sorted attributes."""
+    s = f"<{node.tag}"
+    for k, v in sortAttrs(node):
+        s += f' {k}="{v}"'
+    s += ">"
+    return s
 
 
 @dataclass
