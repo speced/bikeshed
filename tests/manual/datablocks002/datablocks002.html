@@ -1,0 +1,2356 @@
+<!doctype html><html lang="en">
+ <head>
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+  <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+  <title>Def Block Fragment Parsing</title>
+  <link href="http://example.com/datablocks002" rel="canonical">
+  <meta content="dark light" name="color-scheme">
+<style>/* Boilerplate: style-autolinks */
+.css.css, .property.property, .descriptor.descriptor {
+    color: var(--a-normal-text);
+    font-size: inherit;
+    font-family: inherit;
+}
+.css::before, .property::before, .descriptor::before {
+    content: "‘";
+}
+.css::after, .property::after, .descriptor::after {
+    content: "’";
+}
+.property, .descriptor {
+    /* Don't wrap property and descriptor names */
+    white-space: nowrap;
+}
+.type { /* CSS value <type> */
+    font-style: italic;
+}
+pre .property::before, pre .property::after {
+    content: "";
+}
+[data-link-type="property"]::before,
+[data-link-type="propdesc"]::before,
+[data-link-type="descriptor"]::before,
+[data-link-type="value"]::before,
+[data-link-type="function"]::before,
+[data-link-type="at-rule"]::before,
+[data-link-type="selector"]::before,
+[data-link-type="maybe"]::before {
+    content: "‘";
+}
+[data-link-type="property"]::after,
+[data-link-type="propdesc"]::after,
+[data-link-type="descriptor"]::after,
+[data-link-type="value"]::after,
+[data-link-type="function"]::after,
+[data-link-type="at-rule"]::after,
+[data-link-type="selector"]::after,
+[data-link-type="maybe"]::after {
+    content: "’";
+}
+
+[data-link-type].production::before,
+[data-link-type].production::after,
+.prod [data-link-type]::before,
+.prod [data-link-type]::after {
+    content: "";
+}
+
+[data-link-type=element],
+[data-link-type=element-attr] {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    font-size: .9em;
+}
+[data-link-type=element]::before { content: "<" }
+[data-link-type=element]::after  { content: ">" }
+
+[data-link-type=biblio] {
+    white-space: pre;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --selflink-text: black;
+        --selflink-bg: silver;
+        --selflink-hover-text: white;
+    }
+}
+</style>
+<style>/* Boilerplate: style-colors */
+/* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
+:root {
+    color-scheme: light dark;
+
+    --text: black;
+    --bg: white;
+
+    --unofficial-watermark: url(https://www.w3.org/StyleSheets/TR/2016/logos/UD-watermark);
+
+    --logo-bg: #1a5e9a;
+    --logo-active-bg: #c00;
+    --logo-text: white;
+
+    --tocnav-normal-text: #707070;
+    --tocnav-normal-bg: var(--bg);
+    --tocnav-hover-text: var(--tocnav-normal-text);
+    --tocnav-hover-bg: #f8f8f8;
+    --tocnav-active-text: #c00;
+    --tocnav-active-bg: var(--tocnav-normal-bg);
+
+    --tocsidebar-text: var(--text);
+    --tocsidebar-bg: #f7f8f9;
+    --tocsidebar-shadow: rgba(0,0,0,.1);
+    --tocsidebar-heading-text: hsla(203,20%,40%,.7);
+
+    --toclink-text: var(--text);
+    --toclink-underline: #3980b5;
+    --toclink-visited-text: var(--toclink-text);
+    --toclink-visited-underline: #054572;
+
+    --heading-text: #005a9c;
+
+    --hr-text: var(--text);
+
+    --algo-border: #def;
+
+    --del-text: red;
+    --del-bg: transparent;
+    --ins-text: #080;
+    --ins-bg: transparent;
+
+    --a-normal-text: #034575;
+    --a-normal-underline: #bbb;
+    --a-visited-text: var(--a-normal-text);
+    --a-visited-underline: #707070;
+    --a-hover-bg: rgba(75%, 75%, 75%, .25);
+    --a-active-text: #c00;
+    --a-active-underline: #c00;
+
+    --blockquote-border: silver;
+    --blockquote-bg: transparent;
+    --blockquote-text: currentcolor;
+
+    --issue-border: #e05252;
+    --issue-bg: #fbe9e9;
+    --issue-text: var(--text);
+    --issueheading-text: #831616;
+
+    --example-border: #e0cb52;
+    --example-bg: #fcfaee;
+    --example-text: var(--text);
+    --exampleheading-text: #574b0f;
+
+    --note-border: #52e052;
+    --note-bg: #e9fbe9;
+    --note-text: var(--text);
+    --noteheading-text: hsl(120, 70%, 30%);
+    --notesummary-underline: silver;
+
+    --assertion-border: #aaa;
+    --assertion-bg: #eee;
+    --assertion-text: black;
+
+    --advisement-border: orange;
+    --advisement-bg: #fec;
+    --advisement-text: var(--text);
+    --advisementheading-text: #b35f00;
+
+    --warning-border: red;
+    --warning-bg: hsla(40,100%,50%,0.95);
+    --warning-text: var(--text);
+
+    --amendment-border: #330099;
+    --amendment-bg: #F5F0FF;
+    --amendment-text: var(--text);
+    --amendmentheading-text: #220066;
+
+    --def-border: #8ccbf2;
+    --def-bg: #def;
+    --def-text: var(--text);
+    --defrow-border: #bbd7e9;
+
+    --datacell-border: silver;
+
+    --indexinfo-text: #707070;
+
+    --indextable-hover-text: black;
+    --indextable-hover-bg: #f7f8f9;
+
+    --outdatedspec-bg: rgba(0, 0, 0, .5);
+    --outdatedspec-text: black;
+    --outdated-bg: maroon;
+    --outdated-text: white;
+    --outdated-shadow: red;
+
+    --editedrec-bg: darkorange;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --text: #ddd;
+        --bg: black;
+
+        --unofficial-watermark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cg fill='%23100808' transform='translate(200 200) rotate(-45) translate(-200 -200)' stroke='%23100808' stroke-width='3'%3E%3Ctext x='50%25' y='220' style='font: bold 70px sans-serif; text-anchor: middle; letter-spacing: 6px;'%3EUNOFFICIAL%3C/text%3E%3Ctext x='50%25' y='305' style='font: bold 70px sans-serif; text-anchor: middle; letter-spacing: 6px;'%3EDRAFT%3C/text%3E%3C/g%3E%3C/svg%3E");
+
+        --logo-bg: #1a5e9a;
+        --logo-active-bg: #c00;
+        --logo-text: white;
+
+        --tocnav-normal-text: #999;
+        --tocnav-normal-bg: var(--bg);
+        --tocnav-hover-text: var(--tocnav-normal-text);
+        --tocnav-hover-bg: #080808;
+        --tocnav-active-text: #f44;
+        --tocnav-active-bg: var(--tocnav-normal-bg);
+
+        --tocsidebar-text: var(--text);
+        --tocsidebar-bg: #080808;
+        --tocsidebar-shadow: rgba(255,255,255,.1);
+        --tocsidebar-heading-text: hsla(203,20%,40%,.7);
+
+        --toclink-text: var(--text);
+        --toclink-underline: #6af;
+        --toclink-visited-text: var(--toclink-text);
+        --toclink-visited-underline: #054572;
+
+        --heading-text: #8af;
+
+        --hr-text: var(--text);
+
+        --algo-border: #456;
+
+        --del-text: #f44;
+        --del-bg: transparent;
+        --ins-text: #4a4;
+        --ins-bg: transparent;
+
+        --a-normal-text: #6af;
+        --a-normal-underline: #555;
+        --a-visited-text: var(--a-normal-text);
+        --a-visited-underline: var(--a-normal-underline);
+        --a-hover-bg: rgba(25%, 25%, 25%, .2);
+        --a-active-text: #f44;
+        --a-active-underline: var(--a-active-text);
+
+        --borderedblock-bg: rgba(255, 255, 255, .05);
+
+        --blockquote-border: silver;
+        --blockquote-bg: var(--borderedblock-bg);
+        --blockquote-text: currentcolor;
+
+        --issue-border: #e05252;
+        --issue-bg: var(--borderedblock-bg);
+        --issue-text: var(--text);
+        --issueheading-text: hsl(0deg, 70%, 70%);
+
+        --example-border: hsl(50deg, 90%, 60%);
+        --example-bg: var(--borderedblock-bg);
+        --example-text: var(--text);
+        --exampleheading-text: hsl(50deg, 70%, 70%);
+
+        --note-border: hsl(120deg, 100%, 35%);
+        --note-bg: var(--borderedblock-bg);
+        --note-text: var(--text);
+        --noteheading-text: hsl(120, 70%, 70%);
+        --notesummary-underline: silver;
+
+        --assertion-border: #444;
+        --assertion-bg: var(--borderedblock-bg);
+        --assertion-text: var(--text);
+
+        --advisement-border: orange;
+        --advisement-bg: #222218;
+        --advisement-text: var(--text);
+        --advisementheading-text: #f84;
+
+        --warning-border: red;
+        --warning-bg: hsla(40,100%,20%,0.95);
+        --warning-text: var(--text);
+
+        --amendment-border: #330099;
+        --amendment-bg: #080010;
+        --amendment-text: var(--text);
+        --amendmentheading-text: #cc00ff;
+
+        --def-border: #8ccbf2;
+        --def-bg: #080818;
+        --def-text: var(--text);
+        --defrow-border: #136;
+
+        --datacell-border: silver;
+
+        --indexinfo-text: #aaa;
+
+        --indextable-hover-text: var(--text);
+        --indextable-hover-bg: #181818;
+
+        --outdatedspec-bg: rgba(255, 255, 255, .5);
+        --outdatedspec-text: black;
+        --outdated-bg: maroon;
+        --outdated-text: white;
+        --outdated-shadow: red;
+
+        --editedrec-bg: darkorange;
+    }
+    /* In case a transparent-bg image doesn't expect to be on a dark bg,
+       which is quite common in practice... */
+    img { background: white; }
+}
+</style>
+<style>/* Boilerplate: style-counters */
+body {
+    counter-reset: example figure issue table;
+}
+.issue {
+    counter-increment: issue;
+}
+.issue:not(.no-marker)::before {
+    content: "Issue " counter(issue);
+}
+
+.example {
+    counter-increment: example;
+}
+.example:not(.no-marker)::before {
+    content: "Example " counter(example);
+}
+.invalid.example:not(.no-marker)::before,
+.illegal.example:not(.no-marker)::before {
+    content: "Invalid Example " counter(example);
+}
+
+figcaption {
+    counter-increment: figure;
+}
+figcaption:not(.no-marker)::before {
+    content: "Figure " counter(figure) " ";
+}
+
+figure.table figcaption {
+    counter-increment: table;
+}
+figure.table figcaption:not(.no-marker)::before {
+    content: "Table " counter(table) " ";
+}
+</style>
+<style>/* Boilerplate: style-dfn-panel */
+:root {
+    --dfnpanel-bg: #ddd;
+    --dfnpanel-text: var(--text);
+    --dfnpanel-target-bg: #ffc;
+    --dfnpanel-target-outline: orange;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --dfnpanel-bg: #222;
+        --dfnpanel-text: var(--text);
+        --dfnpanel-target-bg: #333;
+        --dfnpanel-target-outline: silver;
+    }
+}
+.dfn-panel {
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    margin: 0;
+    padding: 0.5em 0.75em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--dfnpanel-bg);
+    color: var(--dfnpanel-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+    inset: auto;
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+}
+.dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
+.dfn-panel > b { display: block; }
+.dfn-panel a { color: var(--dfnpanel-text); }
+.dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+.dfn-panel a:focus {
+    outline: 5px auto Highlight;
+    outline: 5px auto -webkit-focus-ring-color;
+}
+.dfn-panel > b + b { margin-top: 0.25em; }
+.dfn-panel ul { padding: 0 0 0 1em; list-style: none; }
+.dfn-panel li a {
+    max-width: calc(300px - 1.5em - 1em);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dfn-panel.activated {
+    display: inline-block;
+    position: fixed;
+    position-area: none;
+    top: auto;
+    right: auto;
+    left: 8px;
+    bottom: 2em;
+    margin: 0 auto;
+    max-width: calc(100vw - 1.5em - .4em - .5em);
+    max-height: 30vh;
+    transition: left 1s ease-out, bottom 1s ease-out;
+}
+
+.dfn-panel .link-item:hover {
+    text-decoration: underline;
+}
+.dfn-panel .link-item .copy-icon {
+    opacity: 0;
+}
+.dfn-panel .link-item:hover .copy-icon,
+.dfn-panel .link-item .copy-icon:focus {
+    opacity: 1;
+}
+
+.dfn-panel .copy-icon {
+    display: inline-block;
+    margin-right: 0.5em;
+    width: 0.85em;
+    height: 1em;
+    border-radius: 3px;
+    background-color: #ccc;
+    cursor: pointer;
+}
+
+.dfn-panel .copy-icon .icon {
+    width: 100%;
+    height: 100%;
+    background-color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.dfn-panel .copy-icon .icon::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 1px solid black;
+    background-color: #ccc;
+    opacity: 0.25;
+    transform: translate(3px, -3px);
+}
+
+.dfn-panel .copy-icon:active .icon::before {
+    opacity: 1;
+}
+
+.dfn-paneled { cursor: help; }
+.dfn-paneled > .dfn-panelbutton { all: unset; }
+
+.highlighted {
+    animation: target-fade 3s;
+}
+
+@keyframes target-fade {
+    from {
+        background-color: var(--dfnpanel-target-bg);
+        outline: 5px solid var(--dfnpanel-target-outline);
+    }
+    to {
+        color: var(--a-normal-text);
+        background-color: transparent;
+        outline: transparent;
+    }
+}
+</style>
+<style>/* Boilerplate: style-idl-highlighting */
+pre.idl.highlight {
+    background: var(--borderedblock-bg, var(--def-bg));
+}
+</style>
+<style>/* Boilerplate: style-issues */
+a[href].issue-return {
+    float: right;
+    float: inline-end;
+    color: var(--issueheading-text);
+    font-weight: bold;
+    text-decoration: none;
+}
+</style>
+<style>/* Boilerplate: style-md-lists */
+/* This is a weird hack for me not yet following the commonmark spec
+   regarding paragraph and lists. */
+[data-md] > :first-child {
+    margin-top: 0;
+}
+[data-md] > :last-child {
+    margin-bottom: 0;
+}
+</style>
+<style>/* Boilerplate: style-ref-hints */
+:root {
+    --ref-hint-bg: #ddd;
+    --ref-hint-text: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ref-hint-bg: #222;
+        --ref-hint-text: var(--text);
+    }
+}
+
+.ref-hint {
+    display: inline-block;
+    position: absolute;
+    z-index: 35;
+    width: 20em;
+    width: 300px;
+    height: auto;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.5em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: var(--ref-hint-bg);
+    color: var(--ref-hint-text);
+    border: outset 0.2em;
+    white-space: normal; /* in case it's moved into a pre */
+}
+
+.ref-hint * { margin: 0; padding: 0; text-indent: 0; }
+
+.ref-hint ul { padding: 0 0 0 1em; list-style: none; }
+</style>
+<style>/* Boilerplate: style-selflinks */
+:root {
+    --selflink-text: white;
+    --selflink-bg: gray;
+    --selflink-hover-text: black;
+}
+.heading, .issue, .note, .example, li, dt {
+    position: relative;
+}
+a.self-link {
+    position: absolute;
+    top: 0;
+    left: calc(-1 * (3.5rem - 26px));
+    width: calc(3.5rem - 26px);
+    height: 2em;
+    text-align: center;
+    border: none;
+    transition: opacity .2s;
+    opacity: .5;
+}
+a.self-link:hover {
+    opacity: 1;
+}
+.heading > a.self-link {
+    font-size: 83%;
+}
+.example > a.self-link,
+.note > a.self-link,
+.issue > a.self-link {
+    /* These blocks are overflow:auto, so positioning outside
+       doesn't work. */
+    left: auto;
+    right: 0;
+}
+li > a.self-link {
+    left: calc(-1 * (3.5rem - 26px) - 2em);
+}
+dfn > a.self-link {
+    top: auto;
+    left: auto;
+    opacity: 0;
+    width: 1.5em;
+    height: 1.5em;
+    background: var(--selflink-bg);
+    color: var(--selflink-text);
+    font-style: normal;
+    transition: opacity .2s, background-color .2s, color .2s;
+}
+dfn:hover > a.self-link {
+    opacity: 1;
+}
+dfn > a.self-link:hover {
+    color: var(--selflink-hover-text);
+}
+
+a.self-link::before            { content: "¶"; }
+.heading > a.self-link::before { content: "§"; }
+dfn > a.self-link::before      { content: "#"; }
+</style>
+<style>/* Boilerplate: style-syntax-theme-monokai */
+/* Reference: VS Code Monokai (MIT; Monokai by Wimer Hazenberg) — https://github.com/microsoft/vscode/blob/main/extensions/theme-monokai/themes/monokai-color-theme.json */
+:root {
+  --syntax-background: light-dark(#ffffff, #272822);
+  --syntax-foreground: light-dark(#272822, #f8f8f2);
+  --syntax-comment: light-dark(#75715e, #75715e);
+  --syntax-keyword: light-dark(#c6004f, #f92672);
+  --syntax-operator: light-dark(#c6004f, #f92672);
+  --syntax-string: light-dark(#8a7b00, #e6db74);
+  --syntax-constant: light-dark(#7040b0, #ae81ff);
+  --syntax-function: light-dark(#668900, #a6e22e);
+  --syntax-type: light-dark(#007f87, #66d9ef);
+  --syntax-variable: light-dark(#272822, #f8f8f2);
+  --syntax-property: light-dark(#668900, #a6e22e);
+  --syntax-tag: light-dark(#c6004f, #f92672);
+  --syntax-selector: light-dark(#668900, #a6e22e);
+  --syntax-inserted: light-dark(#8a7b00, #e6db74);
+  --syntax-deleted: light-dark(#c6004f, #f92672);
+
+  color-scheme: light dark;
+}
+
+pre[highlight], pre.highlight {
+  background-color: var(--syntax-background);
+  color: var(--syntax-foreground);
+}
+
+::highlight(comment),
+::highlight(quote) { color: var(--syntax-comment); }
+
+::highlight(keyword),
+::highlight(storage),
+::highlight(at-rule),
+::highlight(doctype),
+::highlight(important),
+::highlight(section) { color: var(--syntax-keyword); }
+
+::highlight(operator),
+::highlight(punctuation) { color: var(--syntax-operator); }
+
+::highlight(string),
+::highlight(regexp),
+::highlight(attribute-value),
+::highlight(link),
+::highlight(raw) { color: var(--syntax-string); }
+
+::highlight(numeric),
+::highlight(boolean),
+::highlight(constant),
+::highlight(symbol),
+::highlight(character-entity),
+::highlight(anchor),
+::highlight(entity) { color: var(--syntax-constant); }
+
+::highlight(function),
+::highlight(decorator),
+::highlight(animation) { color: var(--syntax-function); }
+
+::highlight(type),
+::highlight(support) { color: var(--syntax-type); }
+
+::highlight(variable),
+::highlight(interpolation) { color: var(--syntax-variable); }
+
+::highlight(property),
+::highlight(key),
+::highlight(attribute-name) { color: var(--syntax-property); }
+
+::highlight(tag) { color: var(--syntax-tag); }
+
+::highlight(selector) { color: var(--syntax-selector); }
+
+::highlight(inserted) { color: var(--syntax-inserted); }
+
+::highlight(deleted) { color: var(--syntax-deleted); }
+</style>
+ <body class="h-entry">
+  <div class="head">
+   <p data-fill-with="logo"></p>
+   <h1 class="no-ref p-name" id="title">Def Block Fragment Parsing</h1>
+   <p>Living Standard,
+    <time class="dt-updated" datetime="1970-01-01">1 January 1970</time></p>
+   <div data-fill-with="spec-metadata">
+    <dl>
+     <dt>This version:
+     <dd><a class="u-url" href="http://example.com/datablocks002">http://example.com/datablocks002</a>
+     <dt class="editor">Editor:
+     <dd class="editor h-card p-author vcard"><span class="fn p-name">Example Editor</span>
+    </dl>
+   </div>
+   <div data-fill-with="warning"></div>
+   <p class="copyright" data-fill-with="copyright">COPYRIGHT GOES HERE
+</p>
+   <hr title="Separator for header">
+  </div>
+  <div class="p-summary" data-fill-with="abstract">
+   <h2 class="heading no-num no-ref no-toc settled" id="abstract"><span class="content">Abstract</span></h2>
+   <p>Testing direct fragment building in parseDefBlock() without serialize/reparse double-parsing.</p>
+  </div>
+  <div data-fill-with="at-risk"></div>
+  <nav data-fill-with="table-of-contents" id="toc">
+   <h2 class="no-num no-ref no-toc" id="contents">Table of Contents</h2>
+   <ol class="toc">
+    <li>
+     <a href="#index"><span class="secno"></span> <span class="content">Index</span></a>
+     <ol class="toc">
+      <li><a href="#index-defined-here"><span class="secno"></span> <span class="content">Terms defined by this specification</span></a>
+      <li><a href="#index-defined-elsewhere"><span class="secno"></span> <span class="content">Terms defined by reference</span></a>
+     </ol>
+    <li>
+     <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
+     <ol class="toc">
+      <li><a href="#normative"><span class="secno"></span> <span class="content">Normative References</span></a>
+     </ol>
+    <li>
+     <a href="#property-index"><span class="secno"></span> <span class="content">Property Index</span></a>
+     <ol class="toc">
+      <li><a href="#test-rule-descriptor-table"><span class="secno"></span> <span class="content"><span>@test-rule</span> Descriptors</span></a>
+     </ol>
+    <li><a href="#idl-index"><span class="secno"></span> <span class="content">IDL Index</span></a>
+   </ol>
+  </nav>
+  <main>
+   <p><dfn class="css dfn-paneled" data-dfn-type="at-rule" data-export id="at-ruledef-test-rule">@test-rule</dfn>
+<dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="flow--phrasing">flow &amp; phrasing</dfn>
+<dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="metadata-content">metadata content</dfn>
+<dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="group--more">group &amp; more</dfn></p>
+   <ul>
+    <li data-md>
+     <p><dfn class="dfn-paneled" data-dfn-for="group &amp; more" data-dfn-type="element-attr" data-export id="element-attrdef-group--more-g1"><code>g1</code></dfn></p>
+   </ul>
+   <dl>
+    <dt data-md><dfn class="dfn-paneled" data-dfn-for="my-el" data-dfn-type="element-attr" data-export id="element-attrdef-my-el-attr1"><code>attr1</code></dfn>
+    <dd data-md>
+     <p>first attr</p>
+    <dt data-md><dfn class="dfn-paneled" data-dfn-for="my-el" data-dfn-type="element-attr" data-export id="element-attrdef-my-el-attr2"><code>attr2</code></dfn>
+    <dd data-md>
+     <p>second attr</p>
+   </dl>
+   
+<dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="myelinterface"><code>MyElInterface</code></dfn>
+
+
+   <table class="def simpledef">
+    <tbody>
+     <tr>
+      <th>prefix <code>mid</code> suffix:
+      <td>lead <em>mid</em> tail
+     <tr>
+      <th><code>only-key</code>:
+      <td><em>only-val</em>
+     <tr>
+      <th>empty-val:
+      <td>
+     <tr>
+      <th>escapes:
+      <td>&lt;b> &amp;lt;b&amp;gt; &lt;i> <code>&lt;span></code>
+     <tr>
+      <th>macro-val:
+      <td>&lt;b>not bold&lt;/b>
+     <tr>
+      <th><code>dup</code>:
+      <td>first
+     <tr>
+      <th><code>dup</code>:
+      <td>: second
+     <tr>
+      <th>unclosed <b>key</b>:
+      <td>unclosed <em>val</em>
+   </table>
+   <table class="def propdef">
+    <tbody>
+     <tr>
+      <th>Name:
+      <td><dfn class="css dfn-paneled" data-dfn-type="property" data-export id="propdef-test-prop">test-prop</dfn>
+     <tr class="value">
+      <th><a href="https://www.w3.org/TR/css-values/#value-defs">Value:</a>
+      <td class="prod"><a class="css production" data-link-type="type" href="https://drafts.csswg.org/css-values-4/#length-value" id="ref-for-length-value">&lt;length></a> <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one">|</a> auto
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#initial-values">Initial:</a>
+      <td>auto
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#applies-to">Applies to:</a>
+      <td><a href="https://www.w3.org/TR/css-pseudo/#generated-content" title="Includes ::before and ::after pseudo-elements.">all elements</a>
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#inherited-property">Inherited:</a>
+      <td>no
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-values/#percentages">Percentages:</a>
+      <td>n/a
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#computed">Computed value:</a>
+      <td>as specified
+     <tr>
+      <th><a href="https://www.w3.org/TR/cssom/#serializing-css-values">Canonical order:</a>
+      <td>per grammar
+     <tr>
+      <th><a href="https://www.w3.org/TR/web-animations/#animation-type">Animation type:</a>
+      <td>discrete
+     <tr>
+      <th>Custom <code>key</code>:
+      <td>lead <em>val</em> tail
+   </table>
+   <table class="def propdef">
+    <tbody>
+     <tr>
+      <th>Name:
+      <td><dfn class="css dfn-paneled" data-dfn-type="property" data-export id="propdef-test-prop-2">test-prop-2</dfn>
+     <tr class="value">
+      <th><a href="https://www.w3.org/TR/css-values/#value-defs">Value:</a>
+      <td class="prod">auto
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#initial-values">Initial:</a>
+      <td>auto
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#applies-to">Applies to:</a>
+      <td><span>all elements</span>
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#inherited-property">Inherited:</a>
+      <td>no
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-values/#percentages">Percentages:</a>
+      <td>n/a
+     <tr>
+      <th><a href="https://www.w3.org/TR/css-cascade/#computed">Computed value:</a>
+      <td>as specified
+     <tr>
+      <th><a href="https://www.w3.org/TR/cssom/#serializing-css-values">Canonical order:</a>
+      <td>per grammar
+     <tr>
+      <th><a href="https://www.w3.org/TR/web-animations/#animation-type">Animation type:</a>
+      <td>discrete
+   </table>
+   <table class="def descdef">
+    <tbody>
+     <tr>
+      <th>Name:
+      <td><dfn class="css dfn-paneled" data-dfn-for="@test-rule" data-dfn-type="descriptor" data-export id="descdef-test-rule-test-desc">test-desc</dfn>
+     <tr>
+      <th>For:
+      <td><a class="css" data-link-type="at-rule" href="#at-ruledef-test-rule" id="ref-for-at-ruledef-test-rule">@test-rule</a>
+     <tr>
+      <th>Value:
+      <td class="prod">auto <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one①">|</a> <a class="css production" data-link-type="type" href="https://drafts.csswg.org/css-values-4/#length-value" id="ref-for-length-value①">&lt;length></a>
+     <tr>
+      <th>Initial:
+      <td>auto
+   </table>
+   <table class="def descdef partial">
+    <tbody>
+     <tr>
+      <th>Name:
+      <td><a class="css" data-link-type="descriptor" href="#descdef-test-rule-test-desc" id="ref-for-descdef-test-rule-test-desc">test-desc</a>
+     <tr>
+      <th>For:
+      <td><a class="css" data-link-type="at-rule" href="#at-ruledef-test-rule" id="ref-for-at-ruledef-test-rule①">@test-rule</a>
+     <tr>
+      <th>New values:
+      <td>none
+   </table>
+   <table class="def descdef mq">
+    <tbody>
+     <tr>
+      <th>Name:
+      <td><dfn class="css dfn-paneled" data-dfn-for="@test-rule" data-dfn-type="descriptor" data-export id="descdef-test-rule-test-mq">test-mq</dfn>
+     <tr>
+      <th>For:
+      <td><a class="css" data-link-type="at-rule" href="#at-ruledef-test-rule" id="ref-for-at-ruledef-test-rule②">@test-rule</a>
+     <tr>
+      <th>Value:
+      <td class="prod">auto <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one②">|</a> none
+   </table>
+   <table class="def elementdef">
+    <tbody>
+     <tr>
+      <th>Name:
+      <td><dfn class="dfn-paneled" data-dfn-type="element" data-export id="elementdef-my-el"><code>my-el</code></dfn>
+     <tr>
+      <th>Categories:
+      <td><a data-link-type="dfn" href="#flow--phrasing" id="ref-for-flow--phrasing">flow &amp; phrasing</a>, <a data-link-type="dfn" href="#metadata-content" id="ref-for-metadata-content">metadata content</a>
+     <tr>
+      <th>Contexts:
+      <td>lead <code>ctx</code> tail
+     <tr>
+      <th>Content model:
+      <td>lead <em>model</em> tail
+     <tr>
+      <th>Attributes:
+      <td>
+       <ul>
+        <li>
+         <details>
+          <summary><a data-link-type="dfn" href="#group--more" id="ref-for-group--more">group &amp; more</a></summary>
+          <ul>
+           <li><dfn class="dfn-paneled" data-dfn-type="element-attr" for="my-el" id="element-attrdef-my-el-g1"><a data-link-type="element-attr" for="group &amp; more" href="#element-attrdef-group--more-g1" id="ref-for-element-attrdef-group--more-g1">g1</a></dfn>
+          </ul>
+         </details>
+        <li><a data-link-type="element-attr" href="#element-attrdef-my-el-attr1" id="ref-for-element-attrdef-my-el-attr1">attr1</a>
+        <li><a data-link-type="element-attr" href="#element-attrdef-my-el-attr2" id="ref-for-element-attrdef-my-el-attr2">attr2</a>
+       </ul>
+     <tr>
+      <th>DOM Interfaces:
+      <td><a class="idl-code" data-link-type="interface" href="#myelinterface" id="ref-for-myelinterface">MyElInterface</a>
+   </table>
+<pre class="def highlight idl" data-language="webidl">[<a class="idl-code" data-link-type="extended-attribute" href="https://webidl.spec.whatwg.org/#Exposed" id="ref-for-Exposed">Exposed</a>=Window]
+interface <dfn class="dfn-paneled idl-code" data-dfn-type="interface" data-export id="demo"><code>Demo</code></dfn> {
+  <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-undefined" id="ref-for-idl-undefined">undefined</a> <dfn class="dfn-paneled idl-code" data-dfn-for="Demo" data-dfn-type="method" data-export data-lt="doThing(first, second)|doThing(first)" id="dom-demo-dothing"><code>doThing</code></dfn>(<a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-DOMString" id="ref-for-idl-DOMString">DOMString</a> <a class="idl-code" data-link-type="argument" href="#dom-demo-dothing-first-second-first" id="ref-for-dom-demo-dothing-first-second-first">first</a>, optional <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-long" id="ref-for-idl-long">long</a> <a class="idl-code" data-link-type="argument" href="#dom-demo-dothing-first-second-second" id="ref-for-dom-demo-dothing-first-second-second">second</a>);
+};
+</pre>
+   <table class="argumentdef data">
+    <caption>Arguments for the <a data-link-type="idl" href="#dom-demo-dothing" id="ref-for-dom-demo-dothing">Demo.doThing(first, second)</a> method.</caption>
+    <thead>
+     <tr>
+      <th>Parameter
+      <th>Type
+      <th style="text-align:center">Nullable
+      <th style="text-align:center">Optional
+      <th>Description
+    <tbody>
+     <tr>
+      <td><dfn class="dfn-paneled idl-code" data-dfn-for="Demo/doThing(first, second)" data-dfn-type="argument" data-export id="dom-demo-dothing-first-second-first"><code>first</code></dfn>
+      <td><code class="idl"><a data-link-type="idl-name" href="https://webidl.spec.whatwg.org/#idl-DOMString" id="ref-for-idl-DOMString①">DOMString</a></code>
+      <td style="text-align:center"><span class="no">✘</span>
+      <td style="text-align:center"><span class="no">✘</span>
+      <td>lead &lt;arg> <em>mid</em> tail &amp; &lt;b>not bold&lt;/b>
+     <tr>
+      <td><dfn class="dfn-paneled idl-code" data-dfn-for="Demo/doThing(first, second)" data-dfn-type="argument" data-export id="dom-demo-dothing-first-second-second"><code>second</code></dfn>
+      <td><code class="idl"><a data-link-type="idl-name" href="https://webidl.spec.whatwg.org/#idl-long" id="ref-for-idl-long①">long</a></code>
+      <td style="text-align:center"><span class="no">✘</span>
+      <td style="text-align:center"><span class="yes">✔</span>
+      <td>
+   </table>
+  </main>
+  <h2 class="heading no-num no-ref settled" id="index"><span class="content">Index</span></h2>
+  <h3 class="heading no-num no-ref settled" id="index-defined-here"><span class="content">Terms defined by this specification</span></h3>
+  <ul class="index">
+   <li><a href="#element-attrdef-my-el-attr1">attr1</a><span>, in § Unnumbered section</span>
+   <li><a href="#element-attrdef-my-el-attr2">attr2</a><span>, in § Unnumbered section</span>
+   <li><a href="#demo">Demo</a><span>, in § Unnumbered section</span>
+   <li><a href="#dom-demo-dothing">doThing(first)</a><span>, in § Unnumbered section</span>
+   <li><a href="#dom-demo-dothing">doThing(first, second)</a><span>, in § Unnumbered section</span>
+   <li><a href="#flow--phrasing">flow &amp; phrasing</a><span>, in § Unnumbered section</span>
+   <li>
+    g1
+    <ul>
+     <li><a href="#element-attrdef-my-el-g1">(element-attr)</a><span>, in § Unnumbered section</span>
+     <li><a href="#element-attrdef-group--more-g1">element-attr for group &amp; more</a><span>, in § Unnumbered section</span>
+    </ul>
+   <li><a href="#group--more">group &amp; more</a><span>, in § Unnumbered section</span>
+   <li><a href="#metadata-content">metadata content</a><span>, in § Unnumbered section</span>
+   <li><a href="#elementdef-my-el">my-el</a><span>, in § Unnumbered section</span>
+   <li><a href="#myelinterface">MyElInterface</a><span>, in § Unnumbered section</span>
+   <li><a href="#descdef-test-rule-test-desc">test-desc</a><span>, in § Unnumbered section</span>
+   <li><a href="#descdef-test-rule-test-mq">test-mq</a><span>, in § Unnumbered section</span>
+   <li><a href="#propdef-test-prop">test-prop</a><span>, in § Unnumbered section</span>
+   <li><a href="#propdef-test-prop-2">test-prop-2</a><span>, in § Unnumbered section</span>
+   <li><a href="#at-ruledef-test-rule">@test-rule</a><span>, in § Unnumbered section</span>
+  </ul>
+  <h3 class="heading no-num no-ref settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span></h3>
+  <ul class="index">
+   <li>
+    <a data-link-type="biblio">[CSS-VALUES-4]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="fb030e6c">&lt;length></span>
+     <li><span class="dfn-paneled" id="6ec67710">|</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[WEBIDL]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="8855a9aa">DOMString</span>
+     <li><span class="dfn-paneled" id="889e932f">Exposed</span>
+     <li><span class="dfn-paneled" id="f8de33a3">long</span>
+     <li><span class="dfn-paneled" id="5f90bbfb">undefined</span>
+    </ul>
+  </ul>
+  <h2 class="heading no-num no-ref settled" id="references"><span class="content">References</span></h2>
+  <h3 class="heading no-num no-ref settled" id="normative"><span class="content">Normative References</span></h3>
+  <dl>
+   <dt id="biblio-css-values-4">[CSS-VALUES-4]
+   <dd>Tab Atkins Jr.; Elika Etemad. <a href="https://drafts.csswg.org/css-values-4/"><cite>CSS Values and Units Module Level 4</cite></a>. URL: <a href="https://drafts.csswg.org/css-values-4/">https://drafts.csswg.org/css-values-4/</a>
+   <dt id="biblio-webidl">[WEBIDL]
+   <dd>Edgar Chen; Timothy Gu. <a href="https://webidl.spec.whatwg.org/"><cite>Web IDL Standard</cite></a>. Living Standard. URL: <a href="https://webidl.spec.whatwg.org/">https://webidl.spec.whatwg.org/</a>
+  </dl>
+  <h2 class="heading no-num no-ref settled" id="property-index"><span class="content">Property Index</span></h2>
+  <div class="big-element-wrapper">
+   <table class="index">
+    <thead>
+     <tr>
+      <th scope="col">Name
+      <th scope="col">Value
+      <th scope="col">Initial
+      <th scope="col">Applies to
+      <th scope="col">Inh.
+      <th scope="col">%ages
+      <th scope="col">Anim­ation type
+      <th scope="col">Canonical order
+      <th scope="col">Com­puted value
+      <th scope="col">Custom key
+    <tbody>
+     <tr>
+      <th scope="row"><a class="css" data-link-type="property" href="#propdef-test-prop" id="ref-for-propdef-test-prop">test-prop</a>
+      <td>&lt;length> | auto
+      <td>auto
+      <td>all elements
+      <td>no
+      <td>n/a
+      <td>discrete
+      <td>per grammar
+      <td>as specified
+      <td>lead val tail
+     <tr>
+      <th scope="row"><a class="css" data-link-type="property" href="#propdef-test-prop-2" id="ref-for-propdef-test-prop-2">test-prop-2</a>
+      <td>auto
+      <td>auto
+      <td>all elements
+      <td>no
+      <td>n/a
+      <td>discrete
+      <td>per grammar
+      <td>as specified
+      <td>
+   </table>
+  </div>
+  <h3 class="heading no-num no-ref settled" id="test-rule-descriptor-table"><span class="content"><a class="css" data-link-type="at-rule" href="#at-ruledef-test-rule" id="ref-for-at-ruledef-test-rule③">@test-rule</a> Descriptors</span></h3>
+  <div class="big-element-wrapper">
+   <table class="index">
+    <thead>
+     <tr>
+      <th scope="col">Name
+      <th scope="col">Value
+      <th scope="col">Initial
+    <tbody>
+     <tr>
+      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-test-rule-test-desc" id="ref-for-descdef-test-rule-test-desc①">test-desc</a>
+      <td>auto | &lt;length>
+      <td>auto
+     <tr>
+      <th scope="row"><a class="css" data-link-type="descriptor" href="#descdef-test-rule-test-mq" id="ref-for-descdef-test-rule-test-mq">test-mq</a>
+      <td>auto | none
+      <td>
+   </table>
+  </div>
+  <h2 class="heading no-num no-ref settled" id="idl-index"><span class="content">IDL Index</span></h2>
+<pre class="def highlight idl" data-language="webidl">[<a class="idl-code" data-link-type="extended-attribute" href="https://webidl.spec.whatwg.org/#Exposed">Exposed</a>=Window]
+interface <a href="#demo"><code>Demo</code></a> {
+  <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-undefined">undefined</a> <a href="#dom-demo-dothing"><code>doThing</code></a>(<a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-DOMString">DOMString</a> <a class="idl-code" data-link-type="argument" href="#dom-demo-dothing-first-second-first">first</a>, optional <a class="idl-code" data-link-type="interface" href="https://webidl.spec.whatwg.org/#idl-long">long</a> <a class="idl-code" data-link-type="argument" href="#dom-demo-dothing-first-second-second">second</a>);
+};
+
+</pre>
+<script>/* Boilerplate: script-dom-helper */
+"use strict";
+function query(sel) { return document.querySelector(sel); }
+
+function queryAll(sel) { return [...document.querySelectorAll(sel)]; }
+
+function iter(obj) {
+	if(!obj) return [];
+	var it = obj[Symbol.iterator];
+	if(it) return it;
+	return Object.entries(obj);
+}
+
+function mk(tagname, attrs, ...children) {
+	const el = document.createElement(tagname);
+	for(const [k,v] of iter(attrs)) {
+		if(k.slice(0,3) == "_on") {
+			const eventName = k.slice(3);
+			el.addEventListener(eventName, v);
+		} else if(k[0] == "_") {
+			// property, not attribute
+			el[k.slice(1)] = v;
+		} else {
+			if(v === false || v == null) {
+        continue;
+      } else if(v === true) {
+        el.setAttribute(k, "");
+        continue;
+      } else {
+  			el.setAttribute(k, v);
+      }
+		}
+	}
+	append(el, children);
+	return el;
+}
+
+/* Create shortcuts for every known HTML element */
+[
+  "a",
+  "abbr",
+  "acronym",
+  "address",
+  "applet",
+  "area",
+  "article",
+  "aside",
+  "audio",
+  "b",
+  "base",
+  "basefont",
+  "bdo",
+  "big",
+  "blockquote",
+  "body",
+  "br",
+  "button",
+  "canvas",
+  "caption",
+  "center",
+  "cite",
+  "code",
+  "col",
+  "colgroup",
+  "datalist",
+  "dd",
+  "del",
+  "details",
+  "dfn",
+  "dialog",
+  "div",
+  "dl",
+  "dt",
+  "em",
+  "embed",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "font",
+  "footer",
+  "form",
+  "frame",
+  "frameset",
+  "head",
+  "header",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "hr",
+  "html",
+  "i",
+  "iframe",
+  "img",
+  "input",
+  "ins",
+  "kbd",
+  "label",
+  "legend",
+  "li",
+  "link",
+  "main",
+  "map",
+  "mark",
+  "meta",
+  "meter",
+  "nav",
+  "nobr",
+  "noscript",
+  "object",
+  "ol",
+  "optgroup",
+  "option",
+  "output",
+  "p",
+  "param",
+  "pre",
+  "progress",
+  "q",
+  "s",
+  "samp",
+  "script",
+  "section",
+  "select",
+  "small",
+  "source",
+  "span",
+  "strike",
+  "strong",
+  "style",
+  "sub",
+  "summary",
+  "sup",
+  "table",
+  "tbody",
+  "td",
+  "template",
+  "textarea",
+  "tfoot",
+  "th",
+  "thead",
+  "time",
+  "title",
+  "tr",
+  "u",
+  "ul",
+  "var",
+  "video",
+  "wbr",
+  "xmp",
+].forEach(tagname=>{
+	mk[tagname] = (...args) => mk(tagname, ...args);
+});
+
+function* nodesFromChildList(children) {
+	for(const child of children.flat(Infinity)) {
+		if(child instanceof Node) {
+			yield child;
+		} else {
+			yield new Text(child);
+		}
+	}
+}
+function append(el, ...children) {
+	for(const child of nodesFromChildList(children)) {
+		if(el instanceof Node) el.appendChild(child);
+		else el.push(child);
+	}
+	return el;
+}
+
+function insertAfter(el, ...children) {
+	for(const child of nodesFromChildList(children)) {
+		el.parentNode.insertBefore(child, el.nextSibling);
+	}
+	return el;
+}
+
+function clearContents(el) {
+	el.innerHTML = "";
+	return el;
+}
+
+function parseHTML(markup) {
+	if(markup.toLowerCase().trim().indexOf('<!doctype') === 0) {
+		const doc = document.implementation.createHTMLDocument("");
+		doc.documentElement.innerHTML = markup;
+		return doc;
+	} else {
+		const el = mk.template({});
+		el.innerHTML = markup;
+		return el.content;
+	}
+}</script>
+<script>/* Boilerplate: script-dfn-panel */
+"use strict";
+{
+let dfnPanelData = {
+"5f90bbfb": {"dfnID":"5f90bbfb","dfnText":"undefined","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-undefined"}],"title":"Unnamed section"}],"url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+"6ec67710": {"dfnID":"6ec67710","dfnText":"|","external":true,"refSections":[{"refs":[{"id":"ref-for-comb-one"},{"id":"ref-for-comb-one\u2460"},{"id":"ref-for-comb-one\u2461"}],"title":"Unnamed section"}],"url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"8855a9aa": {"dfnID":"8855a9aa","dfnText":"DOMString","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-DOMString"},{"id":"ref-for-idl-DOMString\u2460"}],"title":"Unnamed section"}],"url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"889e932f": {"dfnID":"889e932f","dfnText":"Exposed","external":true,"refSections":[{"refs":[{"id":"ref-for-Exposed"}],"title":"Unnamed section"}],"url":"https://webidl.spec.whatwg.org/#Exposed"},
+"at-ruledef-test-rule": {"dfnID":"at-ruledef-test-rule","dfnText":"@test-rule","external":false,"refSections":[{"refs":[{"id":"ref-for-at-ruledef-test-rule"},{"id":"ref-for-at-ruledef-test-rule\u2460"},{"id":"ref-for-at-ruledef-test-rule\u2461"}],"title":"Unnamed section"}],"url":"#at-ruledef-test-rule"},
+"demo": {"dfnID":"demo","dfnText":"Demo","external":false,"refSections":[],"url":"#demo"},
+"descdef-test-rule-test-desc": {"dfnID":"descdef-test-rule-test-desc","dfnText":"test-desc","external":false,"refSections":[{"refs":[{"id":"ref-for-descdef-test-rule-test-desc"}],"title":"Unnamed section"}],"url":"#descdef-test-rule-test-desc"},
+"descdef-test-rule-test-mq": {"dfnID":"descdef-test-rule-test-mq","dfnText":"test-mq","external":false,"refSections":[],"url":"#descdef-test-rule-test-mq"},
+"dom-demo-dothing": {"dfnID":"dom-demo-dothing","dfnText":"doThing","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-demo-dothing"}],"title":"Unnamed section"}],"url":"#dom-demo-dothing"},
+"dom-demo-dothing-first-second-first": {"dfnID":"dom-demo-dothing-first-second-first","dfnText":"first","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-demo-dothing-first-second-first"}],"title":"Unnamed section"}],"url":"#dom-demo-dothing-first-second-first"},
+"dom-demo-dothing-first-second-second": {"dfnID":"dom-demo-dothing-first-second-second","dfnText":"second","external":false,"refSections":[{"refs":[{"id":"ref-for-dom-demo-dothing-first-second-second"}],"title":"Unnamed section"}],"url":"#dom-demo-dothing-first-second-second"},
+"element-attrdef-group--more-g1": {"dfnID":"element-attrdef-group--more-g1","dfnText":"g1","external":false,"refSections":[{"refs":[{"id":"ref-for-element-attrdef-group--more-g1"}],"title":"Unnamed section"}],"url":"#element-attrdef-group--more-g1"},
+"element-attrdef-my-el-attr1": {"dfnID":"element-attrdef-my-el-attr1","dfnText":"attr1","external":false,"refSections":[{"refs":[{"id":"ref-for-element-attrdef-my-el-attr1"}],"title":"Unnamed section"}],"url":"#element-attrdef-my-el-attr1"},
+"element-attrdef-my-el-attr2": {"dfnID":"element-attrdef-my-el-attr2","dfnText":"attr2","external":false,"refSections":[{"refs":[{"id":"ref-for-element-attrdef-my-el-attr2"}],"title":"Unnamed section"}],"url":"#element-attrdef-my-el-attr2"},
+"element-attrdef-my-el-g1": {"dfnID":"element-attrdef-my-el-g1","dfnText":"g1","external":false,"refSections":[],"url":"#element-attrdef-my-el-g1"},
+"elementdef-my-el": {"dfnID":"elementdef-my-el","dfnText":"my-el","external":false,"refSections":[],"url":"#elementdef-my-el"},
+"f8de33a3": {"dfnID":"f8de33a3","dfnText":"long","external":true,"refSections":[{"refs":[{"id":"ref-for-idl-long"},{"id":"ref-for-idl-long\u2460"}],"title":"Unnamed section"}],"url":"https://webidl.spec.whatwg.org/#idl-long"},
+"fb030e6c": {"dfnID":"fb030e6c","dfnText":"<length>","external":true,"refSections":[{"refs":[{"id":"ref-for-length-value"},{"id":"ref-for-length-value\u2460"}],"title":"Unnamed section"}],"url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"flow--phrasing": {"dfnID":"flow--phrasing","dfnText":"flow & phrasing","external":false,"refSections":[{"refs":[{"id":"ref-for-flow--phrasing"}],"title":"Unnamed section"}],"url":"#flow--phrasing"},
+"group--more": {"dfnID":"group--more","dfnText":"group & more","external":false,"refSections":[{"refs":[{"id":"ref-for-group--more"}],"title":"Unnamed section"}],"url":"#group--more"},
+"metadata-content": {"dfnID":"metadata-content","dfnText":"metadata content","external":false,"refSections":[{"refs":[{"id":"ref-for-metadata-content"}],"title":"Unnamed section"}],"url":"#metadata-content"},
+"myelinterface": {"dfnID":"myelinterface","dfnText":"MyElInterface","external":false,"refSections":[{"refs":[{"id":"ref-for-myelinterface"}],"title":"Unnamed section"}],"url":"#myelinterface"},
+"propdef-test-prop": {"dfnID":"propdef-test-prop","dfnText":"test-prop","external":false,"refSections":[],"url":"#propdef-test-prop"},
+"propdef-test-prop-2": {"dfnID":"propdef-test-prop-2","dfnText":"test-prop-2","external":false,"refSections":[],"url":"#propdef-test-prop-2"},
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+    genAllDfnPanels();
+});
+
+function genAllDfnPanels() {
+    for(const panelData of Object.values(dfnPanelData)) {
+        const dfnID = panelData.dfnID;
+        const dfn = document.getElementById(dfnID);
+        if(!dfn) {
+            console.log(`Can't find dfn#${dfnID}.`, panelData);
+            continue;
+        }
+        dfn.panelData = panelData;
+        genDfnPanel(dfn, panelData);
+    }
+}
+
+function genDfnPanel(dfn, { dfnID, url, dfnText, refSections, external }) {
+    const dfnPanel = mk.dialog({
+        class: "dfn-panel",
+        id: `infopanel-for-${dfnID}`,
+        popover: "hint",
+        "data-for": dfnID,
+        "aria-labelledby": `infopaneltitle-for-${dfnID}`,
+        },
+        mk.span({id:`infopaneltitle-for-${dfnID}`, style:"display:none"},
+            `Info about the '${dfnText}' ${external?"external":""} reference.`),
+        mk.a({href:url, class:"dfn-link"}, url),
+        refSections.length == 0 ? [] :
+            mk.b({}, "Referenced in:"),
+            mk.ul({},
+                ...refSections.map(section=>
+                    mk.li({},
+                        ...section.refs.map((ref, refI)=>
+                            [
+                                mk.a({ href: `#${ref.id}` },
+                                    (refI == 0) ? section.title : `(${refI + 1})`
+                                ),
+                                " ",
+                            ]
+                        ),
+                    ),
+                ),
+            ),
+        genLinkingSyntaxes(dfn),
+    );
+
+    dfnPanel.addEventListener('click', (event) => {
+        if (event.target.nodeName == 'A') {
+            scrollToTargetAndHighlight(event);
+            pinDfnPanel(dfnPanel);
+        }
+        event.stopPropagation();
+        refocusOnTarget(event);
+    });
+
+    dfnPanel.addEventListener('toggle', event=>{
+        if(event.newState == "closed") {
+            unpinDfnPanel(dfnPanel);
+        }
+    });
+
+    dfnPanel.dfn = dfn;
+    dfn.dfnPanel = dfnPanel;
+    dfn.after(dfnPanel);
+    const button = mk.button(
+        {
+            class:"dfn-panelbutton",
+            "popovertarget":dfnPanel.id
+        },
+        ...dfn.childNodes
+    );
+    dfn.append(button);
+    return dfnPanel;
+}
+
+function pinDfnPanel(dfnPanel) {
+    // Switch it to "activated" state, which pins it.
+    dfnPanel.classList.add("activated");
+}
+
+function unpinDfnPanel(dfnPanel) {
+    dfnPanel.classList.remove("activated");
+}
+
+function refocusOnTarget(event) {
+    const target = event.target;
+    setTimeout(() => {
+        // Refocus on the event.target element.
+        // This is needed after browser scrolls to the destination.
+        target.focus();
+    });
+}
+
+function scrollToTargetAndHighlight(event) {
+    let hash = event.target.hash;
+    if (hash) {
+        hash = decodeURIComponent(hash.substring(1));
+        const dest = document.getElementById(hash);
+        if (dest) {
+            dest.classList.add('highlighted');
+            setTimeout(() => dest.classList.remove('highlighted'), 1000);
+        }
+    }
+}
+
+// Functions, divided by link type, that wrap an autolink's
+// contents with the appropriate outer syntax.
+// Alternately, a string naming another type they format
+// the same as.
+function needsFor(type) {
+    switch(type) {
+        case "descriptor":
+        case "value":
+        case "element-attr":
+        case "attr-value":
+        case "element-state":
+        case "method":
+        case "constructor":
+        case "argument":
+        case "attribute":
+        case "const":
+        case "dict-member":
+        case "event":
+        case "enum-value":
+        case "stringifier":
+        case "serializer":
+        case "iterator":
+        case "maplike":
+        case "setlike":
+        case "state":
+        case "mode":
+        case "context":
+        case "facet": return true;
+
+        default: return false;
+    }
+}
+function refusesFor(type) {
+    switch(type) {
+        case "property":
+        case "element":
+        case "interface":
+        case "namespace":
+        case "callback":
+        case "dictionary":
+        case "enum":
+        case "exception":
+        case "typedef":
+        case "http-header":
+        case "permission": return true;
+
+        default: return false;
+    }
+}
+function linkFormatterFromType(type) {
+    switch(type) {
+        case 'scheme':
+        case 'permission':
+        case 'dfn': return (text) => `[=${text}=]`;
+
+        case 'abstract-op': return (text) => `[\$${text}\$]`;
+
+        case 'function':
+        case 'at-rule':
+        case 'selector':
+        case 'value': return (text) => `''${text}''`;
+
+        case 'http-header': return (text) => `[:${text}:]`;
+
+        case 'interface':
+        case 'constructor':
+        case 'method':
+        case 'argument':
+        case 'attribute':
+        case 'callback':
+        case 'dictionary':
+        case 'dict-member':
+        case 'enum':
+        case 'enum-value':
+        case 'exception':
+        case 'const':
+        case 'typedef':
+        case 'stringifier':
+        case 'serializer':
+        case 'iterator':
+        case 'maplike':
+        case 'setlike':
+        case 'extended-attribute':
+        case 'event':
+        case 'idl': return (text) => `{{${text}}}`;
+
+        case 'element-state':
+        case 'element-attr':
+        case 'attr-value':
+        case 'element': return (element) => `<{${element}}>`;
+
+        case 'grammar': return (text) => `${text} (within a <pre class=prod>)`;
+
+        case 'type': return (text)=> `<<${text}>>`;
+
+        case 'descriptor':
+        case 'property': return (text) => `'${text}'`;
+
+        default: return;
+    };
+};
+
+function genLinkingSyntaxes(dfn) {
+    if(dfn.tagName != "DFN") return;
+
+    const type = dfn.getAttribute('data-dfn-type');
+    if(!type) {
+        console.log(`<dfn> doesn't have a data-dfn-type:`, dfn);
+        return [];
+    }
+
+    // Return a function that wraps link text based on the type
+    const linkFormatter = linkFormatterFromType(type);
+    if(!linkFormatter) {
+        console.log(`<dfn> has an unknown data-dfn-type:`, dfn);
+        return [];
+    }
+
+    let ltAlts;
+    if(dfn.hasAttribute('data-lt')) {
+        ltAlts = dfn.getAttribute('data-lt')
+            .split("|")
+            .map(x=>x.trim());
+    } else {
+        ltAlts = [dfn.textContent.trim()];
+    }
+    if(type == "type") {
+        // lt of "<foo>", but "foo" is the interior;
+        // <<foo/bar>> is how you write it with a for,
+        // not <foo/<bar>> or whatever.
+        for(var i = 0; i < ltAlts.length; i++) {
+            const lt = ltAlts[i];
+            const match = /<(.*)>/.exec(lt);
+            if(match) { ltAlts[i] = match[1]; }
+        }
+    }
+
+    let forAlts;
+    if(dfn.hasAttribute('data-dfn-for')) {
+        forAlts = dfn.getAttribute('data-dfn-for')
+            .split(",")
+            .map(x=>x.trim());
+    } else {
+        forAlts = [''];
+    }
+
+    let linkingSyntaxes = [];
+    if(!needsFor(type)) {
+        for(const lt of ltAlts) {
+            linkingSyntaxes.push(linkFormatter(lt));
+        }
+    }
+    if(!refusesFor(type)) {
+        for(const f of forAlts) {
+            linkingSyntaxes.push(linkFormatter(`${f}/${ltAlts[0]}`))
+        }
+    }
+    return [
+        mk.b({}, 'Possible linking syntaxes:'),
+        mk.ul({},
+            ...linkingSyntaxes.map(link => {
+                const copyLink = async () =>
+                    await navigator.clipboard.writeText(link);
+                return mk.li({},
+                    mk.div({ class: 'link-item' },
+                        mk.button({
+                            class: 'copy-icon', title: 'Copy',
+                            type: 'button',
+                            _onclick: copyLink,
+                            tabindex: 0,
+                        }, mk.span({ class: 'icon' }) ),
+                        mk.span({}, link)
+                    )
+                );
+            })
+        )
+    ];
+}
+}
+</script>
+<script>/* Boilerplate: script-link-titles */
+"use strict";
+{
+let linkTitleData = {
+"https://drafts.csswg.org/css-values-4/#length-value": "Expands to: advance measure | cap | ch | cm | dvb | dvh | dvi | dvmax | dvmin | dvw | em | ex | ic | in | lh | lvb | lvh | lvi | lvmax | lvmin | lvw | mm | pc | pt | px | rcap | rch | rem | rex | ric | rlh | svb | svh | svi | svmax | svmin | svw | vb | vh | vi | vmax | vmin | vw",
+};
+
+function setTypeTitles() {
+	for(let el of document.querySelectorAll("a[href]")) {
+		if(el.href in linkTitleData && !el.hasAttribute("title")) {
+			el.setAttribute("title", linkTitleData[el.href]);
+		}
+	}
+}
+
+document.addEventListener("DOMContentLoaded", setTypeTitles);
+}
+</script>
+<script>/* Boilerplate: script-microlighter */
+"use strict";
+{
+let highlightGrammars = {
+"webidl": {"patterns":[{"include":"#comments"},{"include":"#extended-attribute-list"},{"include":"#definitions"},{"include":"#members"},{"include":"#types"},{"include":"#literals"},{"include":"#punctuation"},{"include":"#identifier"}],"repository":{"argument":{"begin":"(?=\\s*(?:optional|\\.\\.\\.|\\(|[?A-Za-z_]))","end":"(?=,|\\))","name":"meta.argument.webidl","patterns":[{"match":"\\boptional\\b","name":"storage.modifier.optional.webidl"},{"match":"\\.\\.\\.","name":"keyword.operator.variadic.webidl"},{"include":"#types"},{"include":"#default-value"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"variable.parameter.webidl"}]},"argument-list":{"begin":"\\(","beginCaptures":{"0":{"name":"punctuation.definition.parameters.begin.webidl"}},"end":"\\)","endCaptures":{"0":{"name":"punctuation.definition.parameters.end.webidl"}},"name":"meta.arguments.webidl","patterns":[{"include":"#argument"},{"include":"#comments"},{"match":",","name":"punctuation.separator.comma.webidl"}]},"attribute-member":{"begin":"\\b(?:(readonly)\\s+)?(attribute)\\b","beginCaptures":{"1":{"name":"storage.modifier.readonly.webidl"},"2":{"name":"storage.type.attribute.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.attribute.webidl","patterns":[{"include":"#types"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"variable.other.member.attribute.webidl"}]},"buffer-type":{"match":"\\b(ArrayBuffer|DataView|Int8Array|Int16Array|Int32Array|Uint8Array|Uint16Array|Uint32Array|Uint8ClampedArray|BigInt64Array|BigUint64Array|Float16Array|Float32Array|Float64Array)\\b","name":"support.type.buffer.webidl"},"callback-function-definition":{"begin":"\\b(callback)\\s+([_A-Za-z][_A-Za-z0-9]*)\\s*(=)","beginCaptures":{"1":{"name":"storage.modifier.callback.webidl"},"2":{"name":"entity.name.function.callback.webidl"},"3":{"name":"keyword.operator.assignment.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.callback.function.webidl","patterns":[{"include":"#types"},{"include":"#argument-list"},{"include":"#comments"}]},"callback-interface-definition":{"begin":"\\b(callback)\\s+(interface)\\s+([_A-Za-z][_A-Za-z0-9]*)","beginCaptures":{"1":{"name":"storage.modifier.callback.webidl"},"2":{"name":"storage.type.interface.webidl"},"3":{"name":"entity.name.type.callback-interface.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.callback.interface.webidl","patterns":[{"include":"#inheritance"},{"include":"#definition-block"},{"include":"#comments"}]},"comments":{"patterns":[{"begin":"/\\*\\*","beginCaptures":{"0":{"name":"punctuation.definition.comment.begin.webidl"}},"end":"\\*/","endCaptures":{"0":{"name":"punctuation.definition.comment.end.webidl"}},"name":"comment.block.documentation.webidl"},{"begin":"/\\*","beginCaptures":{"0":{"name":"punctuation.definition.comment.begin.webidl"}},"end":"\\*/","endCaptures":{"0":{"name":"punctuation.definition.comment.end.webidl"}},"name":"comment.block.webidl"},{"match":"\\*/","name":"invalid.illegal.stray-comment-end.webidl"},{"begin":"//","beginCaptures":{"0":{"name":"punctuation.definition.comment.webidl"}},"end":"$\\n?","name":"comment.line.double-slash.webidl"}]},"const-member":{"begin":"\\b(const)\\b","beginCaptures":{"1":{"name":"storage.modifier.const.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.const.webidl","patterns":[{"include":"#types"},{"include":"#literals"},{"match":"=","name":"keyword.operator.assignment.webidl"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"variable.other.constant.webidl"}]},"constructor-member":{"begin":"\\b(constructor)\\s*(\\()","beginCaptures":{"1":{"name":"entity.name.function.constructor.webidl"},"2":{"name":"punctuation.definition.parameters.begin.webidl"}},"end":"\\)\\s*(;)","endCaptures":{"0":{"name":"punctuation.definition.parameters.end.webidl"},"1":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.constructor.webidl","patterns":[{"include":"#argument"},{"include":"#comments"},{"match":",","name":"punctuation.separator.comma.webidl"}]},"default-value":{"patterns":[{"match":"=","name":"keyword.operator.assignment.default.webidl"},{"include":"#literals"},{"match":"\\[\\s*\\]","name":"constant.language.empty-sequence.webidl"},{"match":"\\{\\s*\\}","name":"constant.language.empty-object.webidl"}]},"definition-block":{"begin":"\\{","beginCaptures":{"0":{"name":"punctuation.definition.block.begin.webidl"}},"end":"\\}","endCaptures":{"0":{"name":"punctuation.definition.block.end.webidl"}},"name":"meta.block.definition.webidl","patterns":[{"include":"#comments"},{"include":"#extended-attribute-list"},{"include":"#members"},{"include":"#types"},{"include":"#literals"},{"include":"#punctuation"}]},"definitions":{"patterns":[{"include":"#partial-definition"},{"include":"#callback-interface-definition"},{"include":"#callback-function-definition"},{"include":"#interface-mixin-definition"},{"include":"#interface-definition"},{"include":"#namespace-definition"},{"include":"#dictionary-definition"},{"include":"#enum-definition"},{"include":"#typedef-definition"},{"include":"#includes-statement"}]},"dictionary-block":{"begin":"\\{","beginCaptures":{"0":{"name":"punctuation.definition.block.begin.webidl"}},"end":"\\}","endCaptures":{"0":{"name":"punctuation.definition.block.end.webidl"}},"name":"meta.block.dictionary.webidl","patterns":[{"include":"#comments"},{"include":"#extended-attribute-list"},{"begin":"\\b(required)\\b","beginCaptures":{"1":{"name":"storage.modifier.required.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.dictionary.member.webidl","patterns":[{"include":"#types"},{"include":"#default-value"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"variable.other.member.dictionary.webidl"}]},{"begin":"(?=\\s*(?:\\(|[?A-Za-z_]))","end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.dictionary.member.webidl","patterns":[{"include":"#types"},{"include":"#default-value"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"variable.other.member.dictionary.webidl"}]}]},"dictionary-definition":{"begin":"\\b(dictionary)\\s+([_A-Za-z][_A-Za-z0-9]*)","beginCaptures":{"1":{"name":"storage.type.dictionary.webidl"},"2":{"name":"entity.name.type.dictionary.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.dictionary.webidl","patterns":[{"include":"#inheritance"},{"include":"#dictionary-block"},{"include":"#comments"}]},"enum-definition":{"begin":"\\b(enum)\\s+([_A-Za-z][_A-Za-z0-9]*)\\s*(\\{)","beginCaptures":{"1":{"name":"storage.type.enum.webidl"},"2":{"name":"entity.name.type.enum.webidl"},"3":{"name":"punctuation.definition.block.begin.webidl"}},"end":"\\}","endCaptures":{"0":{"name":"punctuation.definition.block.end.webidl"}},"name":"meta.definition.enum.webidl","patterns":[{"include":"#comments"},{"begin":"\"","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.webidl"}},"end":"\"","endCaptures":{"0":{"name":"punctuation.definition.string.end.webidl"}},"name":"string.quoted.double.enum.webidl","patterns":[{"include":"#string-escapes"}]},{"match":",","name":"punctuation.separator.comma.webidl"}]},"extended-attribute":{"patterns":[{"match":"\\b(CrossOriginIsolated|Exposed|Global|LegacyFactoryFunction|LegacyNoInterfaceObject|LegacyOverrideBuiltIns|LegacyWindowAlias|SecureContext|LegacyLenientSetter|LegacyLenientThis|LenientFloat|PutForwards|Replaceable|SameObject|Unforgeable|CEReactions|HTMLConstructor|NewObject|LegacyUnforgeable|LegacyNullToEmptyString|Clamp|EnforceRange|AllowShared|Serializable|Transferable|LegacyTreatNonObjectAsNull|LegacyNamespace|LegacyWindowAlias|LegacyDefaultToJSONOperation|LegacyArrayClass)\\b","name":"support.type.extended-attribute.known.webidl"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"entity.other.attribute-name.extended.webidl"},{"begin":"\\(","beginCaptures":{"0":{"name":"punctuation.definition.parameters.begin.webidl"}},"end":"\\)","endCaptures":{"0":{"name":"punctuation.definition.parameters.end.webidl"}},"name":"meta.extended-attribute.arguments.webidl","patterns":[{"include":"#argument"},{"include":"#types"},{"include":"#literals"},{"match":",","name":"punctuation.separator.comma.webidl"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"entity.other.attribute-name.extended.webidl"}]}]},"extended-attribute-list":{"begin":"\\[","beginCaptures":{"0":{"name":"punctuation.definition.metadata.begin.webidl"}},"end":"\\]","endCaptures":{"0":{"name":"punctuation.definition.metadata.end.webidl"}},"name":"meta.extended-attribute-list.webidl","patterns":[{"include":"#comments"},{"include":"#extended-attribute"},{"include":"#literals"},{"match":",","name":"punctuation.separator.comma.webidl"},{"match":"=","name":"keyword.operator.assignment.webidl"}]},"generic-type":{"patterns":[{"begin":"\\b(async_sequence|sequence|record|FrozenArray|ObservableArray|Promise)\\s*(<)","beginCaptures":{"1":{"name":"support.type.generic.webidl"},"2":{"name":"punctuation.definition.generic.begin.webidl"}},"end":">","endCaptures":{"0":{"name":"punctuation.definition.generic.end.webidl"}},"name":"meta.type.generic.webidl","patterns":[{"include":"#types"},{"match":",","name":"punctuation.separator.comma.webidl"},{"include":"#comments"}]}]},"identifier":{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"variable.other.identifier.webidl"},"identifier-type":{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"entity.name.type.identifier.webidl"},"includes-statement":{"captures":{"1":{"name":"entity.name.type.interface.webidl"},"2":{"name":"keyword.operator.includes.webidl"},"3":{"name":"entity.name.type.mixin.webidl"},"4":{"name":"punctuation.terminator.statement.webidl"}},"match":"\\b([_A-Za-z][_A-Za-z0-9]*)\\s+(includes)\\s+([_A-Za-z][_A-Za-z0-9]*)\\s*(;)","name":"meta.definition.includes.webidl"},"inheritance":{"captures":{"1":{"name":"punctuation.separator.inheritance.webidl"},"2":{"name":"entity.other.inherited-class.webidl"}},"match":"(:)\\s*([_A-Za-z][_A-Za-z0-9]*)","name":"meta.inheritance.webidl"},"interface-definition":{"begin":"\\b(interface)\\s+([_A-Za-z][_A-Za-z0-9]*)","beginCaptures":{"1":{"name":"storage.type.interface.webidl"},"2":{"name":"entity.name.type.interface.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.interface.webidl","patterns":[{"include":"#inheritance"},{"include":"#definition-block"},{"include":"#comments"}]},"interface-mixin-definition":{"begin":"\\b(interface)\\s+(mixin)\\s+([_A-Za-z][_A-Za-z0-9]*)","beginCaptures":{"1":{"name":"storage.type.interface.webidl"},"2":{"name":"storage.modifier.mixin.webidl"},"3":{"name":"entity.name.type.mixin.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.interface.mixin.webidl","patterns":[{"include":"#definition-block"},{"include":"#comments"}]},"iterable-member":{"begin":"\\b(?:(async)\\s+)?(iterable)\\s*(<)","beginCaptures":{"1":{"name":"storage.modifier.async.webidl"},"2":{"name":"storage.type.iterable.webidl"},"3":{"name":"punctuation.definition.generic.begin.webidl"}},"end":">\\s*(;)","endCaptures":{"0":{"name":"punctuation.definition.generic.end.webidl"},"1":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.iterable.webidl","patterns":[{"include":"#types"},{"match":",","name":"punctuation.separator.comma.webidl"}]},"literals":{"patterns":[{"include":"#string"},{"match":"\\b(true|false)\\b","name":"constant.language.boolean.webidl"},{"match":"\\bnull\\b","name":"constant.language.null.webidl"},{"match":"[-+]?\\bInfinity\\b","name":"constant.language.infinity.webidl"},{"match":"[-+]?\\bNaN\\b","name":"constant.language.nan.webidl"},{"match":"[-+]?0[xX][0-9a-fA-F]+","name":"constant.numeric.hex.webidl"},{"match":"[-+]?((?:[0-9]+\\.[0-9]*|\\.[0-9]+)(?:[eE][-+]?[0-9]+)?|[0-9]+[eE][-+]?[0-9]+)","name":"constant.numeric.float.webidl"},{"match":"[-+]?[0-9]+","name":"constant.numeric.integer.webidl"}]},"maplike-member":{"begin":"\\b(?:(readonly)\\s+)?(maplike)\\s*(<)","beginCaptures":{"1":{"name":"storage.modifier.readonly.webidl"},"2":{"name":"storage.type.maplike.webidl"},"3":{"name":"punctuation.definition.generic.begin.webidl"}},"end":">\\s*(;)","endCaptures":{"0":{"name":"punctuation.definition.generic.end.webidl"},"1":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.maplike.webidl","patterns":[{"include":"#types"},{"match":",","name":"punctuation.separator.comma.webidl"}]},"members":{"patterns":[{"include":"#const-member"},{"include":"#attribute-member"},{"include":"#constructor-member"},{"include":"#stringifier-member"},{"include":"#iterable-member"},{"include":"#maplike-member"},{"include":"#setlike-member"},{"include":"#operation-member"}]},"namespace-definition":{"begin":"\\b(namespace)\\s+([_A-Za-z][_A-Za-z0-9]*)","beginCaptures":{"1":{"name":"storage.type.namespace.webidl"},"2":{"name":"entity.name.type.namespace.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.namespace.webidl","patterns":[{"include":"#definition-block"},{"include":"#comments"}]},"operation-member":{"begin":"(?=\\b(?:getter|setter|deleter|static|legacycaller|stringifier|undefined|boolean|byte|octet|bigint|float|double|short|long|unsigned|unrestricted|object|symbol|any|void|DOMString|ByteString|USVString|sequence|record|FrozenArray|ObservableArray|Promise|ArrayBuffer|DataView|Int8Array|Int16Array|Int32Array|Uint8Array|Uint16Array|Uint32Array|Uint8ClampedArray|BigInt64Array|BigUint64Array|Float16Array|Float32Array|Float64Array|[_A-Za-z])|\\()","end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.operation.webidl","patterns":[{"include":"#operation-qualifiers"},{"include":"#operation-signature"},{"include":"#types"},{"include":"#comments"}]},"operation-qualifiers":{"patterns":[{"match":"\\b(getter|setter|deleter|static|legacycaller)\\b","name":"storage.modifier.operation.special.webidl"}]},"operation-signature":{"patterns":[{"begin":"\\b([_A-Za-z][_A-Za-z0-9]*)?\\s*(\\()","beginCaptures":{"1":{"name":"entity.name.function.operation.webidl"},"2":{"name":"punctuation.definition.parameters.begin.webidl"}},"end":"\\)","endCaptures":{"0":{"name":"punctuation.definition.parameters.end.webidl"}},"name":"meta.operation.signature.webidl","patterns":[{"include":"#argument"},{"include":"#comments"},{"match":",","name":"punctuation.separator.comma.webidl"}]}]},"partial-definition":{"begin":"\\b(partial)\\s+(?:(interface)\\s+(mixin)\\s+|(interface|dictionary|namespace)\\s+)([_A-Za-z][_A-Za-z0-9]*)","beginCaptures":{"1":{"name":"storage.modifier.partial.webidl"},"2":{"name":"storage.type.interface.webidl"},"3":{"name":"storage.modifier.mixin.webidl"},"4":{"name":"storage.type.definition.webidl"},"5":{"name":"entity.name.type.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.partial.webidl","patterns":[{"include":"#inheritance"},{"include":"#definition-block"},{"include":"#comments"}]},"primitive-type":{"patterns":[{"match":"\\bunsigned\\b","name":"storage.modifier.unsigned.webidl"},{"match":"\\bunrestricted\\b","name":"storage.modifier.unrestricted.webidl"},{"match":"\\b(undefined|boolean|byte|octet|bigint|float|double|short|long|object|symbol|any|void)\\b","name":"support.type.primitive.webidl"}]},"punctuation":{"patterns":[{"match":";","name":"punctuation.terminator.statement.webidl"},{"match":",","name":"punctuation.separator.comma.webidl"},{"match":"=","name":"keyword.operator.assignment.webidl"},{"match":"\\.\\.\\.","name":"keyword.operator.variadic.webidl"},{"match":"<","name":"punctuation.definition.generic.begin.webidl"},{"match":">","name":"punctuation.definition.generic.end.webidl"},{"match":"\\(","name":"punctuation.definition.parameters.begin.webidl"},{"match":"\\)","name":"punctuation.definition.parameters.end.webidl"},{"match":"\\{","name":"punctuation.definition.block.begin.webidl"},{"match":"\\}","name":"punctuation.definition.block.end.webidl"}]},"setlike-member":{"begin":"\\b(?:(readonly)\\s+)?(setlike)\\s*(<)","beginCaptures":{"1":{"name":"storage.modifier.readonly.webidl"},"2":{"name":"storage.type.setlike.webidl"},"3":{"name":"punctuation.definition.generic.begin.webidl"}},"end":">\\s*(;)","endCaptures":{"0":{"name":"punctuation.definition.generic.end.webidl"},"1":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.setlike.webidl","patterns":[{"include":"#types"}]},"special-type":{"match":"\\b(BufferSource|AllowSharedBufferSource|ArrayBufferView)\\b","name":"support.type.special.webidl"},"string":{"begin":"\"","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.webidl"}},"end":"\"","endCaptures":{"0":{"name":"punctuation.definition.string.end.webidl"}},"name":"string.quoted.double.webidl","patterns":[{"include":"#string-escapes"}]},"string-escapes":{"patterns":[{"match":"\\\\(?:[\"'\\\\bfnrtv]|0|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})","name":"constant.character.escape.webidl"},{"match":"\\\\.","name":"invalid.illegal.unknown-escape.webidl"}]},"string-type":{"match":"\\b(DOMString|ByteString|USVString)\\b","name":"support.type.string.webidl"},"stringifier-member":{"begin":"\\b(stringifier)\\b","beginCaptures":{"1":{"name":"storage.modifier.stringifier.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.member.stringifier.webidl","patterns":[{"include":"#attribute-member"},{"include":"#operation-signature"},{"include":"#types"}]},"typedef-definition":{"begin":"\\b(typedef)\\b","beginCaptures":{"1":{"name":"storage.type.typedef.webidl"}},"end":";","endCaptures":{"0":{"name":"punctuation.terminator.statement.webidl"}},"name":"meta.definition.typedef.webidl","patterns":[{"include":"#types"},{"match":"\\b[_A-Za-z][_A-Za-z0-9]*\\b","name":"entity.name.type.typedef.webidl"},{"include":"#comments"}]},"types":{"patterns":[{"include":"#union-type"},{"include":"#generic-type"},{"include":"#primitive-type"},{"include":"#string-type"},{"include":"#buffer-type"},{"include":"#special-type"},{"include":"#identifier-type"},{"match":"\\?","name":"keyword.operator.nullable.webidl"}]},"union-type":{"begin":"\\(","beginCaptures":{"0":{"name":"punctuation.definition.union.begin.webidl"}},"end":"\\)","endCaptures":{"0":{"name":"punctuation.definition.union.end.webidl"}},"name":"meta.type.union.webidl","patterns":[{"include":"#types"},{"match":"\\bor\\b","name":"keyword.operator.union.or.webidl"},{"include":"#comments"}]}},"scopeName":"source.webidl"},
+};
+
+/*
+Microlighter
+MIT License
+Copyright (c) 2026 Dave Rupert
+https://github.com/davatron5000/microlighter
+*/
+
+const languageAliases = {
+  "1c": "bsl",
+  "1c-query": "sdbl",
+  actionscript: "actionscript-3",
+  adoc: "asciidoc",
+  ahk1: "ahk",
+  as3: "actionscript-3",
+  asm: "assembly",
+  batch: "bat",
+  be: "berry",
+  bison: "yacc",
+  "c#": "csharp",
+  "c++": "cpp",
+  cdc: "cadence",
+  chpl: "chapel",
+  clj: "clojure",
+  "closure-templates": "soy",
+  cmd: "bat",
+  coffeescript: "coffee",
+  console: "shellsession",
+  cql: "cypher",
+  diff: "git-diff",
+  docker: "dockerfile",
+  elisp: "emacs-lisp",
+  erl: "erlang",
+  f: "fortran-fixed-form",
+  "f#": "fsharp",
+  f03: "fortran-free-form",
+  f08: "fortran-free-form",
+  f18: "fortran-free-form",
+  f77: "fortran-fixed-form",
+  f90: "fortran-free-form",
+  f95: "fortran-free-form",
+  flex: "lex",
+  for: "fortran-fixed-form",
+  fs: "fsharp",
+  fsl: "jssm",
+  ftl: "fluent",
+  gd: "gdscript",
+  gjs: "glimmer-js",
+  golang: "go",
+  gql: "graphql",
+  grm: "gold",
+  gts: "glimmer-ts",
+  hbs: "handlebars",
+  hs: "haskell",
+  idl: "webidl",
+  jade: "pug",
+  jl: "julia",
+  js: "javascript",
+  jsx: "javascript",
+  justfile: "just",
+  lean4: "lean",
+  lisp: "common-lisp",
+  makefile: "make",
+  markup: "html",
+  mbt: "moonbit",
+  mbti: "moonbit",
+  md: "markdown",
+  mediawiki: "wikitext",
+  mmd: "mermaid",
+  nar: "narrat",
+  nf: "nextflow",
+  nu: "nushell",
+  peggy: "pegjs",
+  perl6: "raku",
+  protobuf: "proto",
+  py: "python",
+  ql: "codeql",
+  rb: "ruby",
+  regex: "regexp",
+  "ruby-signature": "rbs",
+  sass: "scss",
+  scad: "openscad",
+  sh: "bash",
+  shader: "shaderlab",
+  shell: "bash",
+  shellscript: "bash",
+  spl: "splunk",
+  styl: "stylus",
+  surql: "surrealql",
+  svg: "html",
+  talon: "talonscript",
+  tres: "gdresource",
+  ts: "typescript",
+  tscn: "gdresource",
+  tsp: "typespec",
+  typ: "typst",
+  vim: "viml",
+  vimscript: "viml",
+  vy: "vyper",
+  wiki: "wikitext",
+  wl: "wolfram",
+  yml: "yaml",
+  zsh: "bash",
+  "文言": "wenyan"
+};
+
+const normalizeLanguage = (language, aliases = {}) =>
+  aliases[language] || languageAliases[language] || language;
+
+const getExternalLanguages = value => {
+  const languages = new Set();
+  const visit = item => {
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+    } else if (item && typeof item === "object") {
+      if (typeof item.include === "string" && !/^[#$]/.test(item.include)) {
+        const scope = item.include.split("#")[0];
+        const match = scope.match(/^(?:source|text)\.([a-z0-9_-]+)/);
+        if (match) languages.add(match[1]);
+      }
+      Object.values(item).forEach(visit);
+    }
+  };
+  visit(value);
+  return languages;
+};
+
+const inlinedGrammars = typeof highlightGrammars !== "undefined" ? highlightGrammars : {};
+
+const getGrammar = language => Promise.resolve(inlinedGrammars[language] || null);
+
+const createGrammarLoader = (importLanguage = getGrammar) => {
+  const loadingLanguages = new Map();
+  const grammars = {
+    languages: {},
+    scopes: new Map()
+  };
+
+  for (const [lang, grammar] of Object.entries(inlinedGrammars)) {
+    if (grammar && grammar.scopeName) {
+      grammars.languages[lang] = grammar;
+      grammars.scopes.set(grammar.scopeName, grammar);
+    }
+  }
+
+  const loadGrammar = language => {
+    if (!loadingLanguages.has(language)) {
+      const grammarModule = importLanguage(language).then(grammar => {
+        if (grammar) {
+          grammars.languages[language] = grammar;
+          grammars.scopes.set(grammar.scopeName, grammar);
+        }
+        return grammar;
+      });
+      loadingLanguages.set(language, grammarModule);
+    }
+
+    return loadingLanguages.get(language);
+  };
+
+  return async languages => {
+    const visited = new Set();
+    let pending = [...new Set(languages)]
+      .filter(language => /^[a-z0-9_-]+$/.test(language));
+
+    while (pending.length) {
+      pending.forEach(language => visited.add(language));
+      const loaded = (await Promise.all(pending.map(loadGrammar))).filter(Boolean);
+      pending = [...new Set(loaded.flatMap(grammar =>
+        grammar.dependencies || [...getExternalLanguages(grammar)]
+      ))].map(language => normalizeLanguage(language)).filter(language => !visited.has(language));
+    }
+
+    return grammars;
+  };
+};
+
+const getLanguageClass = element => [...element.classList]
+  .find(className => className.startsWith("language-") || className.startsWith("lang-"))
+  ?.replace(/^(?:language|lang)-/, "");
+
+const getLanguage = codeBlock => {
+  const pre = codeBlock.parentElement;
+  const language = codeBlock.dataset.language
+    || getLanguageClass(codeBlock)
+    || pre?.dataset.language
+    || (pre ? getLanguageClass(pre) : "")
+    || "";
+
+  return language.toLowerCase();
+};
+
+const loadGrammars = createGrammarLoader();
+const highlights = new Map();
+const noMatch = { indices: [[Infinity, Infinity]] };
+
+const themeCategories = new Set([
+  "anchor", "animation", "at-rule", "attribute-name", "attribute-value",
+  "boolean", "character-entity", "comment", "constant", "decorator",
+  "deleted", "doctype", "entity", "function", "important", "inserted",
+  "interpolation", "key", "keyword", "link", "numeric", "operator",
+  "property", "punctuation", "quote", "raw", "regexp", "section",
+  "selector", "storage", "string", "support", "symbol", "tag", "type",
+  "variable"
+]);
+
+const entityNameAliases = {
+  class: "type", struct: "type", interface: "type", enum: "type",
+  trait: "type", module: "type", namespace: "type", record: "type",
+  alias: "type", method: "function", macro: "function",
+  constructor: "function", command: "function", label: "constant",
+  "goto-label": "constant", filename: "string", field: "property",
+  member: "property"
+};
+
+const getScopeCategory = scope => {
+  const parts = scope.split(".");
+  const [first, second, third] = parts;
+
+  if (first === "markup") {
+    if (["quote", "inserted", "deleted", "raw"].includes(second)) return second;
+    if (second === "heading") return "section";
+    if (second === "code" || second === "inline") return "raw";
+    if (second === "underline" || second === "link") return "link";
+    if (second === "bold" || second === "italic") return "keyword";
+    if (second === "list") return "punctuation";
+  }
+  if (first === "entity" && second === "name") {
+    if (themeCategories.has(third)) return third;
+    return entityNameAliases[third] || "type";
+  }
+  if (first === "entity" && second === "other") {
+    if (third === "attribute-name") return "attribute-name";
+    if (third === "inherited-class") return "type";
+  }
+  if (scope.startsWith("constant.character.entity")) return "character-entity";
+  if (parts.includes("numeric")) return "numeric";
+  if (first === "support") {
+    if (second === "function") return "function";
+    if (second === "constant") return "constant";
+    if (second === "variable") return "variable";
+    if (scope.startsWith("support.type.property-name")) return "property";
+    return "support";
+  }
+  if (parts.includes("attribute-value")) return "attribute-value";
+  if (scope.startsWith("string.other.link")) return "link";
+  if (parts.includes("preprocessor")) return "keyword";
+
+  for (const part of [
+    "doctype", "at-rule", "important", "regexp", "boolean",
+    "symbol", "operator", "attribute-name"
+  ]) {
+    if (parts.includes(part)) return part;
+  }
+
+  if ([
+    "comment", "string", "constant", "storage", "keyword",
+    "variable", "punctuation", "entity", "support"
+  ].includes(first)) return first;
+};
+
+const getCategory = scope => {
+  if (!scope) return;
+  if (!scope.includes(" ")) return getScopeCategory(scope);
+  const tokens = scope.split(/\s+/);
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const cat = getScopeCategory(tokens[i]);
+    if (cat) return cat;
+  }
+};
+
+const findNode = (textNodes, offset, isEnd) => {
+  let low = 0;
+  let high = textNodes.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const item = textNodes[mid];
+    if (isEnd ? (offset > item.start && offset <= item.end) : (offset >= item.start && offset < item.end)) {
+      return [item.node, offset - item.start];
+    }
+    if (offset <= item.start) {
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+  const fallback = isEnd ? textNodes.at(-1) : textNodes[0];
+  return [fallback.node, isEnd ? fallback.node.data.length : 0];
+};
+
+const addRange = (textNodes, start, end, scope) => {
+  const category = getCategory(scope);
+  if (!category || start === end) return;
+
+  const [startNode, startOffset] = findNode(textNodes, start, false);
+  const [endNode, endOffset] = findNode(textNodes, end, true);
+
+  const range = new Range();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode, endOffset);
+
+  if (!highlights.has(category)) highlights.set(category, new Highlight());
+  highlights.get(category).add(range);
+};
+
+const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const expandEnd = (pattern, beginMatch) => pattern.replace(/\\(\d+)/g, (reference, index) => {
+  return beginMatch[index] === undefined ? reference : escapeRegex(beginMatch[index]);
+});
+
+const getRules = rule => {
+  if (!rule) return [];
+  if (Array.isArray(rule)) return rule;
+
+  if (rule.match || rule.begin || rule.include) return [rule];
+  return rule.patterns || [];
+};
+
+const compileRegex = (pattern, flags) => {
+  try {
+    return new RegExp(pattern, flags);
+  } catch {
+    return null;
+  }
+};
+
+const highlightAll = async ({
+  root = document,
+  selector = "[data-language], pre.highlight, code.highlight, pre > code",
+  languageAliases
+} = {}) => {
+  const elements = [...root.querySelectorAll(selector)];
+  const codeBlocks = elements.filter(el => {
+    if (el.tagName === "PRE" && el.querySelector(":scope > code")) return false;
+    const language = normalizeLanguage(getLanguage(el), languageAliases);
+    return language && language !== "none";
+  });
+  const languages = codeBlocks.map(codeBlock =>
+    normalizeLanguage(getLanguage(codeBlock), languageAliases)
+  );
+  const grammars = await loadGrammars(languages);
+  const regexes = new Map();
+  let matches = new Map();
+
+  highlights.forEach((ranges, category) => {
+    if (CSS.highlights.get(category) === ranges) CSS.highlights.delete(category);
+    ranges.clear();
+  });
+
+  const exec = (pattern, text, start, end, anchor = 0) => {
+    if (/(?:^|[^\\])(?:\\\\)*\\G/.test(pattern)) {
+      let entry = regexes.get(pattern);
+      if (!entry) {
+        const atPat = pattern
+          .replace(/((?:^|[^\\])(?:\\\\)*)\(\?(?:<!|!)\\G\)/g, "$1(?!)")
+          .replace(/((?:^|[^\\])(?:\\\\)*)\\G/g, "$1");
+        const afterPat = pattern.replace(/((?:^|[^\\])(?:\\\\)*)\\G/g, "$1(?!)");
+        entry = {
+          at: compileRegex(atPat, "dym"),
+          after: compileRegex(afterPat, "dgm")
+        };
+        regexes.set(pattern, entry);
+      }
+      if (start === anchor && entry.at) {
+        entry.at.lastIndex = anchor;
+        const m = entry.at.exec(text);
+        if (m && m.indices[0][0] < end && m.indices[0][1] <= end) return m;
+      }
+      if (entry.after) {
+        const searchStart = start <= anchor ? anchor + 1 : start;
+        if (searchStart < end) {
+          entry.after.lastIndex = searchStart;
+          const m = entry.after.exec(text);
+          if (m && m.indices[0][0] < end && m.indices[0][1] <= end) return m;
+        }
+      }
+      return null;
+    }
+
+    let match = matches.get(pattern);
+
+    if (!match || match.indices[0][0] < start) {
+      if (!regexes.has(pattern)) regexes.set(pattern, compileRegex(pattern, "dgm"));
+      const regex = regexes.get(pattern);
+      if (!regex) {
+        matches.set(pattern, noMatch);
+        return null;
+      }
+      regex.lastIndex = start;
+      match = regex.exec(text) || noMatch;
+      matches.set(pattern, match);
+    }
+
+    return match.indices[0][0] < end && match.indices[0][1] <= end
+      ? match
+      : null;
+  };
+
+  const resolveInclude = (include, grammar, baseGrammar) => {
+    if (include === "$self") return { grammar, rules: grammar.patterns };
+    if (include === "$base") return { grammar: baseGrammar, rules: baseGrammar.patterns };
+
+    if (include[0] === "#") {
+      return { grammar, rules: getRules(grammar.repository?.[include.slice(1)]) };
+    }
+
+    const [scopeName, repositoryName] = include.split("#");
+    const includedGrammar = grammars.scopes.get(scopeName);
+    if (!includedGrammar) return null;
+
+    return {
+      grammar: includedGrammar,
+      rules: repositoryName
+        ? getRules(includedGrammar.repository?.[repositoryName])
+        : includedGrammar.patterns
+    };
+  };
+
+  const expandRules = (rules, grammar, baseGrammar, activeIncludes = new Set()) => {
+    const expanded = [];
+
+    rules.forEach(rule => {
+      if (rule.include) {
+        const includeKey = `${grammar.scopeName}:${rule.include}`;
+        if (activeIncludes.has(includeKey)) return;
+
+        const included = resolveInclude(rule.include, grammar, baseGrammar);
+        if (!included) return;
+
+        const nestedIncludes = new Set(activeIncludes);
+        nestedIncludes.add(includeKey);
+        expanded.push(...expandRules(included.rules, included.grammar, baseGrammar, nestedIncludes));
+        return;
+      }
+
+      if (rule.match || (rule.begin && rule.end)) {
+        expanded.push({ grammar, rule });
+      } else if (rule.patterns) {
+        expanded.push(...expandRules(rule.patterns, grammar, baseGrammar, activeIncludes));
+      }
+    });
+
+    return expanded;
+  };
+
+  const nextRule = (text, contexts, start, end, anchor) => {
+    let winner = null;
+
+    contexts.forEach(context => {
+      const pattern = context.rule.match || context.rule.begin;
+      const match = exec(pattern, text, start, end, anchor);
+      if (!match) return;
+
+      if (!winner || match.indices[0][0] < winner.match.indices[0][0]) {
+        winner = { ...context, match };
+      }
+    });
+
+    return winner;
+  };
+
+  const addCaptures = (text, textNodes, match, captures, grammar, baseGrammar, depth) => {
+    if (!captures) return;
+    Object.entries(captures).forEach(([index, capture]) => {
+      const offsets = match.indices[+index];
+      if (!offsets) return;
+      if (capture.name) addRange(textNodes, ...offsets, capture.name);
+      if (capture.patterns && offsets[0] < offsets[1]) {
+        scanRegion(text, textNodes, capture.patterns, offsets[0], offsets[1], grammar, baseGrammar, null, depth + 1);
+      }
+    });
+  };
+
+  const scanRegion = (text, textNodes, rules, start, end, grammar, baseGrammar = grammar, closing = null, depth = 0) => {
+    if (depth > 64) return { contentEnd: end, end, match: null };
+    const contexts = expandRules(rules, grammar, baseGrammar);
+    let cursor = start;
+
+    while (cursor < end) {
+      const candidate = nextRule(text, contexts, cursor, end, start);
+      const endMatch = closing ? exec(closing.pattern, text, cursor, end, start) : null;
+      const candidateStart = candidate?.match.indices[0][0] ?? Infinity;
+      const endStart = endMatch?.indices[0][0] ?? Infinity;
+
+      if (endMatch && (endStart < candidateStart || (endStart === candidateStart && !closing?.applyEndPatternLast))) {
+        return { contentEnd: endStart, end: endMatch.indices[0][1], match: endMatch };
+      }
+
+      if (!candidate) return { contentEnd: end, end, match: null };
+
+      const { rule, match, grammar: ruleGrammar } = candidate;
+      if (rule.match) {
+        if (rule.name) addRange(textNodes, ...match.indices[0], rule.name);
+        addCaptures(text, textNodes, match, rule.captures, ruleGrammar, baseGrammar, depth);
+        cursor = match.indices[0][1] > cursor ? match.indices[0][1] : cursor + 1;
+        continue;
+      }
+
+      const nested = scanRegion(
+        text,
+        textNodes,
+        rule.patterns || [],
+        match.indices[0][1],
+        end,
+        ruleGrammar,
+        baseGrammar,
+        { pattern: expandEnd(rule.end, match), applyEndPatternLast: rule.applyEndPatternLast },
+        depth + 1
+      );
+
+      if (rule.name) addRange(textNodes, match.indices[0][0], nested.end, rule.name);
+      if (rule.contentName) addRange(textNodes, match.indices[0][1], nested.contentEnd, rule.contentName);
+      addCaptures(text, textNodes, match, rule.beginCaptures || rule.captures, ruleGrammar, baseGrammar, depth);
+      if (nested.match) addCaptures(text, textNodes, nested.match, rule.endCaptures || rule.captures, ruleGrammar, baseGrammar, depth);
+
+      cursor = nested.end > cursor ? nested.end : cursor + 1;
+    }
+
+    return { contentEnd: end, end, match: null };
+  };
+
+  codeBlocks.forEach((codeBlock, index) => {
+    const language = languages[index];
+    if (!language || language === "none") return;
+    const grammar = grammars.languages[language];
+    if (!grammar) return;
+
+    codeBlock.normalize();
+
+    const walker = document.createTreeWalker(codeBlock, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let text = "";
+    let n;
+    while ((n = walker.nextNode())) {
+      if (n.data.length === 0) continue;
+      textNodes.push({
+        node: n,
+        start: text.length,
+        end: text.length + n.data.length,
+      });
+      text += n.data;
+    }
+
+    if (!textNodes.length) return;
+
+    matches = new Map();
+
+    scanRegion(text, textNodes, grammar.patterns, 0, text.length, grammar);
+  });
+
+  highlights.forEach((ranges, category) => {
+    if (ranges.size) CSS.highlights.set(category, ranges);
+  });
+
+  return codeBlocks;
+};
+
+document.addEventListener("syntax-highlight", () => highlightAll());
+highlightAll();
+}
+</script>
+<script>/* Boilerplate: script-ref-hints */
+"use strict";
+{
+let refsData = {
+"#at-ruledef-test-rule": {"displayText":"@test-rule","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"@test-rule","type":"at-rule","url":"#at-ruledef-test-rule"},
+"#descdef-test-rule-test-desc": {"displayText":"test-desc","export":true,"for_":["@test-rule"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"test-desc","type":"descriptor","url":"#descdef-test-rule-test-desc"},
+"#descdef-test-rule-test-mq": {"displayText":"test-mq","export":true,"for_":["@test-rule"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"test-mq","type":"descriptor","url":"#descdef-test-rule-test-mq"},
+"#dom-demo-dothing": {"displayText":"doThing(first, second)","export":true,"for_":["Demo"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"doThing(first, second)","type":"method","url":"#dom-demo-dothing"},
+"#dom-demo-dothing-first-second-first": {"displayText":"first","export":true,"for_":["Demo/doThing(first, second)"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"first","type":"argument","url":"#dom-demo-dothing-first-second-first"},
+"#dom-demo-dothing-first-second-second": {"displayText":"second","export":true,"for_":["Demo/doThing(first, second)"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"second","type":"argument","url":"#dom-demo-dothing-first-second-second"},
+"#element-attrdef-group--more-g1": {"displayText":"g1","export":true,"for_":["group & more"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"g1","type":"element-attr","url":"#element-attrdef-group--more-g1"},
+"#element-attrdef-my-el-attr1": {"displayText":"attr1","export":true,"for_":["my-el"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"attr1","type":"element-attr","url":"#element-attrdef-my-el-attr1"},
+"#element-attrdef-my-el-attr2": {"displayText":"attr2","export":true,"for_":["my-el"],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"attr2","type":"element-attr","url":"#element-attrdef-my-el-attr2"},
+"#flow--phrasing": {"displayText":"flow & phrasing","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"flow & phrasing","type":"dfn","url":"#flow--phrasing"},
+"#group--more": {"displayText":"group & more","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"group & more","type":"dfn","url":"#group--more"},
+"#metadata-content": {"displayText":"metadata content","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"metadata content","type":"dfn","url":"#metadata-content"},
+"#myelinterface": {"displayText":"MyElInterface","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"MyElInterface","type":"interface","url":"#myelinterface"},
+"#propdef-test-prop": {"displayText":"test-prop","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"test-prop","type":"property","url":"#propdef-test-prop"},
+"#propdef-test-prop-2": {"displayText":"test-prop-2","export":true,"for_":[],"level":"1","normative":true,"shortname":"datablocks002","spec":"datablocks002-1","status":"local","text":"test-prop-2","type":"property","url":"#propdef-test-prop-2"},
+"https://drafts.csswg.org/css-values-4/#comb-one": {"displayText":"|","export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"|","type":"grammar","url":"https://drafts.csswg.org/css-values-4/#comb-one"},
+"https://drafts.csswg.org/css-values-4/#length-value": {"displayText":"<length>","export":true,"for_":[],"level":"4","normative":true,"shortname":"css-values","spec":"css-values-4","status":"current","text":"<length>","type":"type","url":"https://drafts.csswg.org/css-values-4/#length-value"},
+"https://webidl.spec.whatwg.org/#Exposed": {"displayText":"Exposed","export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"Exposed","type":"extended-attribute","url":"https://webidl.spec.whatwg.org/#Exposed"},
+"https://webidl.spec.whatwg.org/#idl-DOMString": {"displayText":"DOMString","export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"DOMString","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-DOMString"},
+"https://webidl.spec.whatwg.org/#idl-long": {"displayText":"long","export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"long","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-long"},
+"https://webidl.spec.whatwg.org/#idl-undefined": {"displayText":"undefined","export":true,"for_":[],"level":"1","normative":true,"shortname":"webidl","spec":"webidl","status":"current","text":"undefined","type":"interface","url":"https://webidl.spec.whatwg.org/#idl-undefined"},
+};
+
+function mkRefHint(link, ref) {
+    const linkText = link.textContent;
+    let dfnTextElements = '';
+    if (ref.displayText.toLowerCase() != linkText.toLowerCase()) {
+        // Give the original term if it's being displayed in a different way.
+        // But allow casing differences, they're insignificant.
+        dfnTextElements =
+            mk.li({},
+                mk.b({}, "Term: "),
+                mk.span({}, ref.displayText)
+            );
+    }
+    const forList = ref.for_;
+    let forListElements;
+    if(forList.length == 0) {
+        forListElements = [];
+    } else if(forList.length == 1) {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.span({}, forList[0]),
+        );
+    } else {
+        forListElements = mk.li({},
+            mk.b({}, "For: "),
+            mk.ul({},
+                ...forList.map(forItem =>
+                    mk.li({},
+                        mk.span({}, forItem)
+                    ),
+                ),
+            ),
+        );
+    }
+    const url = ref.url;
+    const safeUrl = encodeURIComponent(url);
+    const hintPanel = mk.aside({
+        class: "ref-hint",
+        id: `ref-hint-for-${safeUrl}`,
+        "data-for": url,
+        "aria-label": `Reference details for ${ref.displayText}`,
+    },
+        mk.ul({},
+            dfnTextElements,
+            mk.li({},
+                mk.b({}, "URL: "),
+                mk.a({ href: url, class: "ref" }, url),
+            ),
+            mk.li({},
+                mk.b({}, "Type: "),
+                mk.span({}, `${ref.type}`),
+            ),
+            mk.li({},
+                mk.b({}, "Spec: "),
+                mk.span({}, `${ref.spec ? ref.spec : ''}`),
+            ),
+            forListElements
+        ),
+    );
+    hintPanel.forLink = link;
+    setupRefHintEventListeners(link, hintPanel);
+    return hintPanel;
+}
+
+function hideAllRefHints() {
+    queryAll(".ref-hint").forEach(el=>hideRefHint(el));
+}
+
+function hideRefHint(refHint) {
+    const link = refHint.forLink;
+    link.setAttribute("aria-expanded", "false");
+    if(refHint.teardownEventListeners) {
+        refHint.teardownEventListeners();
+    }
+    refHint.remove();
+}
+
+function showRefHint(link) {
+    if(link.classList.contains("dfn-link")) return;
+    const url = link.getAttribute("href");
+    const refHintKey = link.getAttribute("data-refhint-key");
+    let key = url;
+    if(refHintKey) {
+        key = refHintKey + "_" + url;
+    }
+    const ref = refsData[key];
+    if(!ref) return;
+
+    hideAllRefHints(); // Only display one at this time.
+
+    const refHint = mkRefHint(link, ref);
+    append(document.body, refHint);
+    link.setAttribute("aria-expanded", "true");
+    positionRefHint(refHint);
+}
+
+function setupRefHintEventListeners(link, refHint) {
+    if (refHint.teardownEventListeners) return;
+    // Add event handlers to hide the refHint after the user moves away
+    // from both the link and refHint, if not hovering either within one second.
+    let timeout = null;
+    const startHidingRefHint = (event) => {
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(() => {
+            hideRefHint(refHint);
+        }, 1000);
+    }
+    const resetHidingRefHint = (event) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = null;
+    };
+    link.addEventListener("mouseleave", startHidingRefHint);
+    link.addEventListener("mouseenter", resetHidingRefHint);
+    link.addEventListener("blur", startHidingRefHint);
+    link.addEventListener("focus", resetHidingRefHint);
+    refHint.addEventListener("mouseleave", startHidingRefHint);
+    refHint.addEventListener("mouseenter", resetHidingRefHint);
+    refHint.addEventListener("blur", startHidingRefHint);
+    refHint.addEventListener("focus", resetHidingRefHint);
+
+    refHint.teardownEventListeners = () => {
+        // remove event listeners
+        resetHidingRefHint();
+        link.removeEventListener("mouseleave", startHidingRefHint);
+        link.removeEventListener("mouseenter", resetHidingRefHint);
+        link.removeEventListener("blur", startHidingRefHint);
+        link.removeEventListener("focus", resetHidingRefHint);
+        refHint.removeEventListener("mouseleave", startHidingRefHint);
+        refHint.removeEventListener("mouseenter", resetHidingRefHint);
+        refHint.removeEventListener("blur", startHidingRefHint);
+        refHint.removeEventListener("focus", resetHidingRefHint);
+    };
+}
+
+function positionRefHint(refHint) {
+    const link = refHint.forLink;
+    const linkPos = getBounds(link);
+    refHint.style.top = linkPos.bottom + "px";
+    refHint.style.left = linkPos.left + "px";
+
+    const panelPos = refHint.getBoundingClientRect();
+    const panelMargin = 8;
+    const maxRight = document.body.parentNode.clientWidth - panelMargin;
+    if (panelPos.right > maxRight) {
+        const overflowAmount = panelPos.right - maxRight;
+        const newLeft = Math.max(panelMargin, linkPos.left - overflowAmount);
+        refHint.style.left = newLeft + "px";
+    }
+}
+
+// TODO: shared util
+// Returns the root-level absolute position {left and top} of element.
+function getBounds(el, relativeTo=document.body) {
+    const relativeRect = relativeTo.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const top = elRect.top - relativeRect.top;
+    const left = elRect.left - relativeRect.left;
+    return {
+        top,
+        left,
+        bottom: top + elRect.height,
+        right: left + elRect.width,
+    }
+}
+
+function showRefHintListener(e) {
+    // If the target isn't in a link (or is a link),
+    // just ignore it.
+    let link = e.target.closest("a");
+    if(!link) return;
+
+    // If the target is in a ref-hint panel
+    // (aka a link in the already-open one),
+    // also just ignore it.
+    if(link.closest(".ref-hint")) return;
+
+    // Otherwise, show the panel for the link.
+    showRefHint(link);
+}
+
+function hideAllHintsListener(e) {
+    // If the click is inside a ref-hint panel, ignore it.
+    if(e.target.closest(".ref-hint")) return;
+    // Otherwise, close all the current panels.
+    hideAllRefHints();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("mousedown", showRefHintListener);
+    document.body.addEventListener("focus", showRefHintListener);
+
+    document.body.addEventListener("click", hideAllHintsListener);
+});
+
+window.addEventListener("resize", () => {
+    // Hide any open ref hint.
+    hideAllRefHints();
+});
+}
+</script>
