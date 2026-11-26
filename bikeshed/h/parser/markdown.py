@@ -554,9 +554,6 @@ def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
     seenLinebreak = False
     i = start
     while isWhitespace(s[i]):
-        if s.eof(i):
-            m.die("Hit EOF while parsing the destination/title of a markdown link", lineNum=s.loc(start))
-            return Err(start)
         if s[i] == "\n":
             if seenLinebreak:
                 m.die("The destination/title of a markdown link can't contain a blank line.", lineNum=s.loc(start))
@@ -564,6 +561,9 @@ def parseMarkdownLinkWhitespace(s: Stream, start: int) -> ResultT[str]:
             else:
                 seenLinebreak = True
         i += 1
+    if s.eof(i):
+        m.die("Hit EOF while parsing the destination/title of a markdown link", lineNum=s.loc(start))
+        return Err(start)
     return Ok(s.slice(start, i), i)
 
 
@@ -686,7 +686,7 @@ def parseMarkdownLinkTitle(s: Stream, start: int, startChar: str) -> ResultT[str
     ch: str | SafeText | None
     while True:
         if s.eof(i):
-            m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.line(start))
+            m.die("Hit EOF while parsing the title of a markdown link", lineNum=s.loc(start))
             return Err(start)
         elif s.config.markdownEscapes and s[i] == "\\":
             startEscape = i

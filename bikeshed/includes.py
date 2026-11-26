@@ -78,7 +78,7 @@ def handleBikeshedInclude(el: t.ElementT, doc: t.SpecT) -> None:
         )
         parseConfig.macros = {**parseConfig.macros, **macros}
         nodes = h.nodesFromHtml(content, parseConfig, context=el, blockMarkdown=True)
-        subtree = h.E.div({}, *h.buildFragment(nodes))
+        subtree = h.buildFragment(nodes)
         datablocks.transformDataBlocks(doc, subtree)
         for childInclude in h.findAll("pre.include", subtree):
             childInclude.set("bs-hash", hash)

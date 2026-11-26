@@ -138,6 +138,7 @@ class Spec:
         self.mdDefaults: metadata.MetadataManager | None = None
         self.mdOverridingDefaults: metadata.MetadataManager | None = None
         self.metadataSpans: dict[int, int] | None = None
+        self.indentInfo: metadata.IndentInfo | None = None
 
         self.typeExpansions: dict[str, str | None] = {}
 
@@ -183,6 +184,7 @@ class Spec:
         # Extract and parse metadata blocks near the start of the document.
         extracted = h.extractMetadata(inputContent.content)
         self.metadataSpans = extracted.spans
+        self.indentInfo = metadata.inferIndent(inputContent.content, excludeSpans=extracted.spans)
         self.mdDocument = metadata.parse(inputContent.content, extracted=extracted)
 
         # Combine the data so far, and compute the doctype
@@ -244,9 +246,9 @@ class Spec:
             self.recordDependencies(self.inputSource)
 
         indentChecker: h.IndentChecker | None = None
-        if "mixed-indents" in self.md.complainAbout and self.md.indentInfo and self.md.indentInfo.char:
+        if "mixed-indents" in self.md.complainAbout and self.indentInfo and self.indentInfo.char:
             indentChecker = h.IndentChecker(
-                indentChar=self.md.indentInfo.char,
+                indentChar=self.indentInfo.char,
                 opaqueTags=h.DEFAULT_OPAQUE_ELEMENTS | frozenset(self.md.opaqueElements),
             )
 

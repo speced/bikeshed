@@ -176,9 +176,7 @@ def parseMacroToAttrs(
             f"While parsing {res.display} (on {s.loc(start)}) as an attribute list, found non-attribute content: {res.stream.slice(attrsEnd, attrsEnd+10)}...",
             lineNum=res.stream.loc(attrsEnd),
         )
-    if attrs:
-        return Ok(attrs, res.end)
-    return Err(start)
+    return Ok(attrs or {}, res.end)
 
 
 def parseMacroToText(s: Stream, start: int) -> ResultT[str]:

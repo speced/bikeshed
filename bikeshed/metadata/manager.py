@@ -36,7 +36,6 @@ class MetadataManager:
 
     def __init__(self) -> None:
         self.hasMetadata: bool = False
-        self.indentInfo: IndentInfo | None = None
 
         # All metadata ever passed to .addData()
         self.allData: t.DefaultDict[str, list[str]] = defaultdict(list)
@@ -223,6 +222,9 @@ class MetadataManager:
 
         if self.displayShortname:
             self.shortname = self.displayShortname.lower()
+
+        if "Indent" not in self.manuallySetKeys and doc.indentInfo and doc.indentInfo.size:
+            self.indent = doc.indentInfo.size
 
         if self.dieOn:
             m.state.dieOn = self.dieOn
@@ -496,10 +498,6 @@ def parse(text: str, *, extracted: h.ExtractedMetadata | None = None) -> Metadat
                     continue
     if extracted.h1Title is not None and md.title is None:
         md.addData("Title", extracted.h1Title, lineNum=extracted.h1Line)
-    indentInfo = inferIndent(text.splitlines(keepends=True))
-    md.indentInfo = indentInfo
-    if "Indent" not in md.manuallySetKeys and indentInfo.size:
-        md.indent = indentInfo.size
     return md
 
 
@@ -515,16 +513,26 @@ class IndentInfo:
         return (self.spaceLines + self.tabLines) < 20
 
 
-def inferIndent(lines: t.Sequence[str]) -> IndentInfo:
+def inferIndent(text: str, excludeSpans: dict[int, int] | None = None) -> IndentInfo:
     # Infer what indent character the document is using.
     # If the document uses space indentation,
     # infer what the indent size is by seeing what % of indents
     # are divisible by various values.
     # A sufficiently short document, or one with too few indented lines,
     # will fail to infer anything.
+    if excludeSpans:
+        nonMetadataParts: list[str] = []
+        pos = 0
+        for spanStart, spanEnd in sorted(excludeSpans.items()):
+            nonMetadataParts.append(text[pos:spanStart])
+            pos = spanEnd
+        nonMetadataParts.append(text[pos:])
+        indentText = "".join(nonMetadataParts)
+    else:
+        indentText = text
     indentSizes: Counter[int] = Counter()
     info = IndentInfo()
-    for line in lines:
+    for line in indentText.splitlines():
         # Purposely require at least two spaces; I don't
         # auto-detect single-space indents. Get help.
 
@@ -552,7 +560,7 @@ def inferIndent(lines: t.Sequence[str]) -> IndentInfo:
     # Add some extra weight for being *exactly* the desired indent,
     # to counterbalance the fact that every 4-indent line
     # looks like a 2-indent line as well, etc.
-    if info.spaceLines >= 50:
+    if info.char == " " and info.spaceLines >= 50:
         evenDivisions: Counter[int] = Counter()
         for candidateIndent in range(8, 1, -1):
             for spaceCount, lineCount in indentSizes.items():
@@ -699,8 +707,6 @@ def join(*sources: MetadataManager | None) -> MetadataManager:
     for mdsource in sources:
         if mdsource is None:
             continue
-        if mdsource.indentInfo:
-            md.indentInfo = mdsource.indentInfo
         for k in mdsource.manuallySetKeys:
             mdentry = keys.KNOWN_KEYS[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))

@@ -382,7 +382,7 @@ def transformDescdef(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
         table.set("data-dfn-for", h.escapeAttr(parsedAttrs["For"]))
     if h.hasClass(doc, table, "partial") or "New values" in parsedAttrs:
         requiredKeys = ["Name", "For"]
-    if h.hasClass(doc, table, "mq"):
+    elif h.hasClass(doc, table, "mq"):
         requiredKeys = ["Name", "For", "Value"]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
@@ -605,7 +605,7 @@ def parseDefBlock(
         key = h.parseText(key, keyConfig, startLine=lineNum, closeElements=True, context=el)
         if type in ("propdef", "descdef") and key == "Name":
             newVal = ""
-            for node in h.nodesFromHtml(val, valConfig, startLine=1, closeElements=True, context=el):
+            for node in h.nodesFromHtml(val, valConfig, startLine=lineNum, closeElements=True, context=el):
                 if isinstance(node, h.parser.Text):
                     newVal += str(node)
                 else:
@@ -707,7 +707,7 @@ def transformBiblio(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.Element
 
 def transformAnchors(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
     lineNum = h.parseLineNumber(el) if el is not None else 1
-    anchors = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
+    anchors = parseInfoTree(data.split("\n"), lineNum)
     processAnchors(anchors, doc, lineNum)
     return None
 
@@ -807,7 +807,7 @@ def processAnchors(anchors: InfoTreeT, doc: t.SpecT, lineNum: int | None = None)
 
 def transformLinkDefaults(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
     lineNum = h.parseLineNumber(el) if el is not None else 1
-    lds = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
+    lds = parseInfoTree(data.split("\n"), lineNum)
     processLinkDefaults(lds, doc, lineNum)
     return None
 
@@ -845,7 +845,7 @@ def processLinkDefaults(lds: InfoTreeT, doc: t.SpecT, lineNum: int | None = None
 
 def transformIgnoredSpecs(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT | None:
     lineNum = h.parseLineNumber(el) if el is not None else 1
-    specs = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
+    specs = parseInfoTree(data.split("\n"), lineNum)
     processIgnoredSpecs(specs, doc, lineNum)
     return None
 
@@ -878,7 +878,7 @@ def transformInfo(data: str, el: t.ElementT | None, doc: t.SpecT) -> t.ElementT 
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
     lineNum = h.parseLineNumber(el) if el is not None else 1
-    infos = parseInfoTree(data.split("\n"), doc.md.indent, lineNum)
+    infos = parseInfoTree(data.split("\n"), lineNum)
     processInfo(infos, doc, lineNum)
     return None
 
@@ -936,7 +936,7 @@ def transformHighlightGrammar(data: str, el: t.ElementT | None, doc: t.SpecT) ->
 
 
 def transformInclude(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
+    infos = parseInfoTree(data.split("\n"), h.parseLineNumber(el))
     path = None
     macros = {}
     for info in infos:
@@ -971,7 +971,7 @@ def transformInclude(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | No
 
 
 def transformIncludeCode(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
+    infos = parseInfoTree(data.split("\n"), h.parseLineNumber(el))
     path = None
     highlight = None
     lineStart = None
@@ -1033,7 +1033,7 @@ def transformIncludeCode(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT 
 
 
 def transformIncludeRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT | None:
-    infos = parseInfoTree(data.split("\n"), doc.md.indent, h.parseLineNumber(el))
+    infos = parseInfoTree(data.split("\n"), h.parseLineNumber(el))
     path = None
     for info in infos:
         if "path" in info:
@@ -1052,7 +1052,7 @@ def transformIncludeRaw(data: str, el: t.ElementT, doc: t.SpecT) -> t.ElementT |
     return ret
 
 
-def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) -> InfoTreeT:
+def parseInfoTree(lines: list[str], lineNum: int | None = 0) -> InfoTreeT:
     # Parses sets of info, which can be arranged into trees.
     # Each info is a set of key/value pairs, semicolon-separated:
     # key1: val1; key2: val2; key3: val3
@@ -1071,7 +1071,18 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
     # Starting a line with # will comment it out.
 
     lines = removeCommentLines(lines)
-    lines = removeIndent(lines, indent)
+    # Strip any shared base indent without prematurely expanding tabs.
+    indents = [t.cast("t.Match", re.match(r"[ \t]*", line)).group(0) for line in lines if line.strip() != ""]
+    if indents:
+        shortest, longest = min(indents), max(indents)
+        prefixLen = 0
+        while prefixLen < len(shortest) and shortest[prefixLen] == longest[prefixLen]:
+            prefixLen += 1
+        if prefixLen:
+            commonPrefix = shortest[:prefixLen]
+            lines = [line[prefixLen:] if line.startswith(commonPrefix) else "" for line in lines]
+        elif all(indents):
+            lines = removeIndent(lines, 4)
 
     def extendData(datas: InfoTreeT, infoLevels: InfoTreeT) -> None:
         if not infoLevels:
@@ -1083,10 +1094,11 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
         datas.append(newData)
 
     # Determine the indents, separate the lines.
+    # Infer space indent width fresh from the first space-indented line rather than using doc.md.indent.
     datas: InfoTreeT = []
     infoLevels: InfoTreeT = []
     lastIndent = -1
-    indentSpace = " " * indent
+    inferredIndent: int | None = None
     for i, line in enumerate(lines):
         if lineNum is not None:
             thisLine = int(lineNum) + i
@@ -1101,15 +1113,21 @@ def parseInfoTree(lines: list[str], indent: int = 4, lineNum: int | None = 0) ->
         ws, text = t.cast("t.Match", re.match(r"(\s*)(.*)", line)).groups()
         if text.startswith("#"):  # comment
             continue
-        wsLen = len(ws.replace("\t", indentSpace))
-        if wsLen % indent != 0:
-            visibleWs = ws.replace("\t", "\\t").replace(" ", "\\s")
-            m.die(
-                f"Line has inconsistent indentation; use tabs or {indent} spaces:\n{visibleWs + text}",
-                lineNum=thisLine,
-            )
-            return []
-        wsLen = wsLen // indent
+        if ws:
+            if inferredIndent is None and "\t" not in ws:
+                inferredIndent = len(ws)
+            curIndent = inferredIndent if inferredIndent is not None else 4
+            wsLen = len(ws.replace("\t", " " * curIndent))
+            if wsLen % curIndent != 0:
+                visibleWs = ws.replace("\t", "\\t").replace(" ", "\\s")
+                m.die(
+                    f"Line has inconsistent indentation; use tabs or {curIndent} spaces:\n{visibleWs + text}",
+                    lineNum=thisLine,
+                )
+                return []
+            wsLen = wsLen // curIndent
+        else:
+            wsLen = 0
         if wsLen >= lastIndent + 2:
             m.die(
                 f"Line jumps {wsLen - lastIndent} indent levels:\n{text}",
