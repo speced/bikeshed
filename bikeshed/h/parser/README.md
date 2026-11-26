@@ -41,7 +41,7 @@ result, preds
 
 ### 1. Entry & Setup (`Spec.py`, `main.py`, `stream.py`)
 
-1. `Spec.assembleDocument()` extracts metadata first (`initMetadata()`), creates an optional `IndentChecker`, and invokes `earlyParse()` → **`initialDocumentParse()`**.
+1. `Spec.assembleDocument()` extracts metadata first (`initMetadata()` → `extractMetadata()`), creates an optional `IndentChecker`, and invokes **`initialDocumentParse()`** with the extracted `metadataSpans`.
 2. **`ParseConfig.fromSpec()`** builds the configuration snapshot (enabled shorthand/Markdown flags, macros, indent width, block/opaque element sets).
 3. **`Stream(...)`** wraps the input text, pre-indexes newline offsets (`_lineBreaks` for O(log N) `line()`/`col()`/`loc()` lookups), and initializes a **`TagStack`** (`s.openEls`) for tracking open elements and opacity.
 4. Fragment callers (`h.parseHTML()`, `includes.py`, `boilerplate.py`, `datablocks.py`, metadata helpers) enter through **`nodesFromHtml()`**, **`parseText()`**, **`parseTitle()`**, or **`parseLines()`** instead, optionally enabling `blockMarkdown=True` or `rawHtml=True`.

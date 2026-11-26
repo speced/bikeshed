@@ -226,21 +226,6 @@ class Spec:
         self.md.validate(doc=self)
         m.retroactivelyCheckErrorLevel()
 
-    def earlyParse(
-        self,
-        inputContent: InputSource.InputContent,
-        indentChecker: h.IndentChecker | None = None,
-    ) -> list[h.ParserNode]:
-        nodes = h.initialDocumentParse(
-            inputContent.content,
-            h.ParseConfig.fromSpec(self),
-            indentChecker=indentChecker,
-            metadataSpans=self.metadataSpans,
-        )
-        if self.debugPrint == "early-parse":
-            h.debugNodes(nodes)
-        return nodes
-
     def checkValidity(self) -> bool:
         return True
 
@@ -265,8 +250,15 @@ class Spec:
                 opaqueTags=h.DEFAULT_OPAQUE_ELEMENTS | frozenset(self.md.opaqueElements),
             )
 
-        with self.timer.phase("assembleDocument: earlyParse"):
-            self.nodes = self.earlyParse(self.inputContent, indentChecker=indentChecker)
+        with self.timer.phase("assembleDocument: initialDocumentParse"):
+            self.nodes = h.initialDocumentParse(
+                self.inputContent.content,
+                h.ParseConfig.fromSpec(self),
+                indentChecker=indentChecker,
+                metadataSpans=self.metadataSpans,
+            )
+            if self.debugPrint == "early-parse":
+                h.debugNodes(self.nodes)
 
         if indentChecker is not None:
             indentChecker.emit()
