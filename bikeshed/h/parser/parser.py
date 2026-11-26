@@ -212,7 +212,7 @@ def parseInlineNodes(
             break
         if ch in startSet:
             isAtLineStart = atLineStart and lastNode is None and (textStart == -1 or chars[textStart:i].strip() == "")
-            res = parseNode(s, i, atLineStart=isAtLineStart)
+            res = parseNode(s, i, atLineStart=isAtLineStart, parseFast=True, inOpaque=inOpaque, inProd=inProd)
             if isOk(res):
                 if textStart != -1:
                     emitRaw(RawText.fromStream(s, textStart, i), canMerge=True)
@@ -397,11 +397,12 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
         i = match.start() if match else s.length
         node = RawText.fromStream(s, start, i)
         return Ok(node, i)
+    inOpaque = s.inOpaqueElement()
     inProd = s.config.css and s.inProdElement()
-    inEmph = s.config.markdownInline and not s.inOpaqueElement() and not inProd
+    inEmph = s.config.markdownInline and not inOpaque and not inProd
     startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
     if s.chars[start] in startSet:
-        res = parseNode(s, start)
+        res = parseNode(s, start, parseFast=True, inOpaque=inOpaque, inProd=inProd)
         if isOk(res):
             val, i, err = res
             if not experimental:
@@ -440,6 +441,9 @@ def parseNode(
     start: int,
     *,
     atLineStart: bool = False,
+    parseFast: bool = False,
+    inOpaque: bool = False,
+    inProd: bool = False,
 ) -> ResultT[ParserNode | list[ParserNode]]:
     """
     Parses one or more Nodes from the start of the stream.
@@ -447,27 +451,39 @@ def parseNode(
     Failure means the stream doesn't start with a special Node
     (it'll just be text),
     but Text *can* be validly returned sometimes as the node.
+
+    When `parseFast` is True, the caller guarantees that:
+    - `start < s.length` (not at EOF),
+    - `s.config.rawHtml` is False,
+    - `s.chars[start]` is already in the active candidate start set
+      (`_PROD_NODE_START_SET`, `_EMPH_NODE_START_SET`, or `ACTUAL_NODE_START_SET`), and
+    - `inOpaque` and `inProd` reflect the current `Stream` / `TagStack` state.
+    Hot-path callers (`parseInlineNodes()`, `parseAnything()`) pass `parseFast=True`
+    to skip redundant EOF, `rawHtml`, `startSet`, and tag-stack checks.
     """
-    if s.eof(start):
-        return Err(start)
-
-    first1 = s.chars[start]
     node: ParserNode | list[ParserNode] | None
-    if s.config.rawHtml:
-        if first1 == "&":
-            return _parseCharRefNode(s, start)
-        if first1 == "<":
-            node, i, _ = parseAngleStart(s, start)
-            if node is not None:
-                return Ok(node, i)
-            return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
-        return Err(start)
+    if not parseFast:
+        if s.eof(start):
+            return Err(start)
+        first1 = s.chars[start]
+        if s.config.rawHtml:
+            if first1 == "&":
+                return _parseCharRefNode(s, start)
+            if first1 == "<":
+                node, i, _ = parseAngleStart(s, start)
+                if node is not None:
+                    return Ok(node, i)
+                return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
+            return Err(start)
 
-    inProd = s.config.css and s.inProdElement()
-    inEmph = s.config.markdownInline and not s.inOpaqueElement() and not inProd
-    startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
-    if first1 not in startSet:
-        return Err(start)
+        inOpaque = s.inOpaqueElement()
+        inProd = s.config.css and s.inProdElement()
+        inEmph = s.config.markdownInline and not inOpaque and not inProd
+        startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
+        if first1 not in startSet:
+            return Err(start)
+    else:
+        first1 = s.chars[start]
 
     if first1 in ("-", "—"):
         if (first1 == "-" and s.slice(start, start + 3) == "--\n") or (
@@ -497,7 +513,6 @@ def parseNode(
     first2 = s.slice(start, start + 2)
     first3 = s.slice(start, start + 3)
 
-    inOpaque = s.inOpaqueElement()
     inA = s.inTagContext("a")
     inDfn = s.inTagContext("dfn")
 
