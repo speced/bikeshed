@@ -156,6 +156,7 @@ def parseLinkText(
         f"{startingSigil}...{endingSigil} autolink was opened at {startTag.loc}, and used | to indicate it was providing explicit linktext, but never closed. Either close your autolink, or escape the initial characters that triggered autolink parsing.",
         lineNum=startTag.loc,
     )
+    s.observeShorthandClose(s.length, startTag, (startingSigil, endingSigil))
     return Err(start)
 
 
@@ -386,7 +387,7 @@ def parseAutolinkIdl(
         linkType=linkType,
         lt=lt,
         linkFor=linkFor,
-        autolinkSyntax=s.slice(start, innerEnd + 2),
+        autolinkSyntax="{{" + innerText + "}}",
     )
     startCode = StartTag.fromStream(
         s,
@@ -440,7 +441,7 @@ def parseAutolinkCddl(
         linkType=linkType,
         lt=lt,
         linkFor=linkFor,
-        autolinkSyntax=s.slice(start, innerEnd + 2),
+        autolinkSyntax="{^" + innerText + "^}",
     )
     startCode = StartTag.fromStream(
         s,
@@ -762,7 +763,7 @@ def parseDigits(s: Stream, start: int) -> ResultT[str]:
     while not s.eof(i):
         if not isDigit(s[i]):
             break
-        if i > (start + 10):
+        if i - start >= 10:
             return Err(start)
         i += 1
     if i == start:

@@ -1,5 +1,5 @@
 from . import result
-from .blocks import IndentChecker
+from .indents import IndentChecker
 from .main import (
     debugNodes,
     initialDocumentParse,

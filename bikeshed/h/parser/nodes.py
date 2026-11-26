@@ -271,6 +271,15 @@ class StartTag(ParserNode):
         return self
 
 
+def makeStartTag(tagName: str, lineNumber: int, attrs: dict[str, str] | None = None) -> StartTag:
+    """Create a synthetic `StartTag` with `bs-line-number` and escaped attributes."""
+    safeAttrs: t.SafeAttrDict = {"bs-line-number": t.SafeAttrStr(str(lineNumber))}
+    if attrs:
+        for k, v in attrs.items():
+            safeAttrs[k] = t.SafeAttrStr(escapeAttr(v))
+    return StartTag(tag=tagName, attrs=safeAttrs)
+
+
 @dataclass
 class SelfClosedTag(ParserNode):
     """An HTML void element or self-closed SVG/MathML tag node."""
@@ -567,16 +576,16 @@ class TagStack:
         """Pop the innermost Markdown-synthesized block element recorded by `pushBlockParent()`."""
         self._blockParents.pop()
 
-    def directParentContext(self) -> tuple[str | None, str | None]:
-        """Return `(parentTag, grandparentTag)` for the innermost open element (HTML or Markdown block)."""
-        n = len(self.tags)
+    def directParentContext(self, depth: int | None = None) -> tuple[str | None, str | None]:
+        """Return `(parentTag, grandparentTag)` for the innermost open element at `depth` (default current top)."""
+        n = len(self.tags) if depth is None else depth
         if self._blockParents and self._blockParents[-1][0] >= n:
             return self._blockParents[-1][1], None
         if n == 0:
             return None, None
-        parentTag = self.tags[-1].startTag.tag
+        parentTag = self.tags[n - 1].startTag.tag
         if n >= 2 and not (self._blockParents and self._blockParents[-1][0] >= n - 1):
-            grandparentTag = self.tags[-2].startTag.tag
+            grandparentTag = self.tags[n - 2].startTag.tag
         else:
             grandparentTag = None
         return parentTag, grandparentTag
@@ -684,6 +693,10 @@ class TagStack:
         if rules := elements.AUTO_CLOSE_START_RULES.get(tag):
             for closeTags, stopTags in rules:
                 self.virtualClose(node, closeTags, stopTags)
+
+    def autoCloseStartAt(self, s: Stream, tag: str, pos: int) -> None:
+        """Apply HTML auto-closing rules for a synthetic block opener `tag` at stream offset `pos`."""
+        self.autoCloseStart(tag, ParserNode(s=s, start=pos, end=pos))
 
     def autoCloseEnd(self, tag: str, node: ParserNode) -> None:
         """Handle valid HTML auto-closing triggered by closing `tag`."""

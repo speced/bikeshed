@@ -77,6 +77,8 @@ class ParseConfig:
     repositoryLinks: bool = False
     # Number of spaces per indentation level for Markdown lists.
     indent: int = 4
+    # Inferred document indentation character (`" "` or `"\t"`), if known.
+    indentChar: str | None = None
     # Map of lowercased [MACRO] names to their replacement text.
     macros: dict[str, str] = field(default_factory=dict)
     # Optional source description appended to Stream.loc() (e.g. for macros or includes).
@@ -113,6 +115,7 @@ class ParseConfig:
             markup="markup" in doc.md.markupShorthands,
             repositoryLinks="repository-links" in doc.md.markupShorthands,
             indent=doc.md.indent,
+            indentChar=doc.indentInfo.char if doc.indentInfo else None,
             macros=doc.macros,
             context=context,
             blockElements=set(doc.md.blockElements) | set(doc.md.opaqueElements),

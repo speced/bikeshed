@@ -5,9 +5,11 @@ This package implements Bikeshed's unified single-pass parser, turning raw spec 
 ## Module Overview
 
 - [`main.py`](main.py) — Top-level public entrypoints (`initialDocumentParse`, `nodesFromHtml`, `parseText`, `parseTitle`, `parseLines`, `strFromNodes`, `linesFromNodes`, `debugNodes`).
-- [`blocks.py`](blocks.py) — Block-level Markdown parser (`parseBlockStream`, `parseBlocks`, `parseList`, `parseBlockquote`, `parseBlockBsMacro`, `parseParagraph`) and `IndentChecker`.
+- [`blocks.py`](blocks.py) — Block-level Markdown parser (`parseBlockStream`, `parseBlocks`, `parseBlockquote`, `parseBlockBsMacro`, `parseParagraph`, heading builders).
+- [`lists.py`](lists.py) — Markdown and mixed HTML/Markdown list parsing (`ListStop`, `shouldStopForList`, `blankEndsList`, `matchHtmlListParent`, `parseHtmlListItem`, `parseList`).
+- [`indents.py`](indents.py) — Line/indentation scanning primitives (`skipHws`, `findLineEnd`, `prefixCountAt`, `consumeIndentAt`) and mixed-indentation linter (`IndentChecker`).
 - [`parser.py`](parser.py) — Core inline stream driver (`parseInlineNodes`, `_parseRawHtmlNodes`, `nodesFromStream`, `parseAnything`, `generateResults`, `generateExperimentalNodes`), top-level syntax dispatchers (`parseNode`, `parseAngleStart`, `parseLToEnd`, `parseBsMacro`), and `closeOpenElements`.
-- [`html.py`](html.py) — HTML lexical and tag-level parsing: tags, attributes, Bikeshed attribute shortcut canonicalization, character references, whitespace, comments, doctypes, raw-text elements (`<script>`, `<style>`, `<xmp>`, `<title>`, datablock `<pre>`), `<bs-macro>` balanced body scanning, datablocks, and metadata blocks.
+- [`html.py`](html.py) — HTML lexical and tag-level parsing: tags, attributes, Bikeshed attribute shortcut canonicalization, character references, whitespace, comments, doctypes, lookahead helpers (`peekHtmlTagAt`, `trySkipCommentOrDoctypeAt`), raw-text elements (`<script>`, `<style>`, `<xmp>`, `<title>`, datablock `<pre>`), `<bs-macro>` balanced body scanning, datablocks, and metadata blocks.
 - [`autolinks.py`](autolinks.py) — Non-CSS Bikeshed autolinks and shorthands (`[=dfn=]`, `[$abstract$]`, `[:Header:]`, `{{idl}}`, `{^cddl^}`, `<{element}>`, `|var|`, `[[biblio]]` / `[[#section]]`, `<#123>` / `<org/repo#123>`), plus shared `LinkData`, `parseLinkInfo`, and `parseLinkText`.
 - [`css.py`](css.py) — CSS autolink shorthands (`<<production>>`, `''maybe''` declarations/values, `'propdesc'`) and `.prod` production grammar symbol links (`parseCSSProductionGrammar()`, `parseCSSProductionGrammarInText()`).
 - [`markdown.py`](markdown.py) — Inline Markdown constructs and fenced code blocks (CommonMark `*`/`**` emphasis via `parseEmphasisRun()` and `resolveEmphasis()`, backtick code spans, fenced code blocks, `[text](dest "title")` links, backslash escapes).
@@ -25,14 +27,16 @@ The parser modules form an acyclic dependency graph (recursive inline sub-parser
 ```text
 result, preds
   └─> nodes <──(TYPE_CHECKING)──> stream
+        ├─> indents
         └─> macros
-              └─> html
+              └─> html (also imports indents)
                     ├─> markdown
                     └─> autolinks
                           └─> css
                                 └─> parser (also imports html, macros, markdown, autolinks)
-                                      └─> blocks
-                                            └─> main
+                                      └─> lists (also imports indents, html)
+                                            └─> blocks (also imports indents, html, macros, markdown, lists)
+                                                  └─> main (also imports indents, parser)
 ```
 
 ---
@@ -46,11 +50,11 @@ result, preds
 3. **`Stream(...)`** wraps the input text, pre-indexes newline offsets (`_lineBreaks` for O(log N) `line()`/`col()`/`loc()` lookups), and initializes a **`TagStack`** (`s.openEls`) for tracking open elements and opacity.
 4. Fragment callers (`h.parseRawHTML()`, `h.parseBikeshedHTML()`, `includes.py`, `boilerplate.py`, `datablocks.py`, metadata helpers) enter through **`nodesFromHtml()`**, **`parseText()`**, **`parseTitle()`**, or **`parseLines()`** instead, optionally enabling `blockMarkdown=True` or `rawHtml=True`.
 
-### 2. Block-Level Pass (`blocks.py`)
+### 2. Block-Level Pass (`blocks.py`, `lists.py`, `indents.py`)
 
 When `config.markdownBlock` is enabled, `initialDocumentParse()` runs **`parseBlockStream()` → `parseBlocks()`** (when disabled, it skips directly to inline **`nodesFromStream()`**).
 
-`parseBlocks()` scans the stream line by line while tracking indentation frames (`minIndent`, `ListStop`), paragraph eligibility (`canStartParagraph`), and optional `IndentChecker.checkLine()`:
+`parseBlocks()` scans the stream line by line using `_prepareBlockLine()` (handling metadata spans, blanks, standalone comments/doctypes, list exits, and indentation frames via `minIndent`, `ListStop`, and `IndentChecker.checkLine()`), dispatching raw openers or falling through to `_parseInlineBlockLine()`:
 
 1. **Opaque element passthrough**: If `s.inOpaqueElement()` is true (e.g. inside an unclosed `<pre>`, `<xmp>`, or `bs-opaque` element), block Markdown is skipped and the line goes straight to **`parseInlineNodes(..., stopAtNewline=True)`**.
 2. **Blank lines & standalone comments/doctypes**: Blank lines either terminate an active list (`blankEndsList()`) or set `canStartParagraph = True`. Standalone `<!-- ... -->` and `<!doctype ...>` lines are skipped (`trySkipCommentOrDoctypeAt()`).

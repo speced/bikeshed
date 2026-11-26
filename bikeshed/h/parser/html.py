@@ -9,6 +9,7 @@ from ... import config, t
 from ... import messages as m
 from .. import elements
 from . import macros, preds
+from .indents import findLineEnd, nextLinePos, skipHws
 from .nodes import (
     Comment,
     Doctype,
@@ -111,12 +112,19 @@ ATTR_SHORTCUTS = {
 }
 
 _ASCII_TAGNAME_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9._-]*")
+_HTML_TAG_PEEK_RE = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9._-]*)")
 _ASCII_ATTRNAME_RE = re.compile(r"[a-zA-Z0-9._:-]+")
 _WHITESPACE_RE = re.compile(r"[\t\n\x0c ]+")
 _UNQUOTED_ATTR_STOP_RE = re.compile(r"[\t\n\x0c >\"'<`&]")
 _SVG_DOCTYPE_RE = re.compile(r"\s+svg(?![\w-])", re.I)
 _DATABLOCK_PRE_STOP_RE = re.compile(r"</pre>|&")
-_BS_MACRO_SCAN_RE = re.compile(r"<!--|<bs-macro(?=[\t\n\x0c />])|</bs-macro>", re.I)
+_BS_MACRO_SCAN_RE = re.compile(
+    r"<!--|<(?P<tag>bs-macro|script|style|xmp|pre)(?=[\t\n\x0c />])|</bs-macro>|^[ \t]*(?P<fence>`{3,}|~{3,})",
+    re.I | re.M,
+)
+_BS_MACRO_CLOSE_TAG_RES: dict[str, t.Pattern] = {
+    tag: re.compile(rf"</{tag}>", re.I) for tag in ("script", "style", "xmp", "pre")
+}
 metadataPreEndRe = re.compile(r"</pre>(.*)")
 metadataXmpEndRe = re.compile(r"</xmp>(.*)")
 
@@ -550,7 +558,7 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str 
         if i == numStart:
             kind = "hex" if isHex else "decimal"
             m.die(
-                f"Saw the start of a {kind} char ref ({s.slice(start, i)}), but no hex digits follow it.",
+                f"Saw the start of a {kind} char ref ({s.slice(start, i)}), but no {kind} digits follow it.",
                 lineNum=s.loc(start),
             )
             return Ok(SafeText.fromStream(s, start, i), i)
@@ -676,6 +684,85 @@ def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
     return Ok(node, end)
 
 
+def peekHtmlTagAt(s: Stream, cStart: int, lineEnd: int) -> tuple[bool, str, int] | None:
+    """Read-only peek returning `(isClose, lowerTagName, afterName)` if `cStart` begins an HTML tag, else `None`."""
+    chars = s.chars
+    if cStart >= lineEnd or chars[cStart] != "<":
+        return None
+    match = _HTML_TAG_PEEK_RE.match(chars, cStart)
+    if match is None:
+        return None
+    afterName = match.end()
+    if afterName >= s.length:
+        return None
+    isClose = bool(match.group(1))
+    nextCh = chars[afterName]
+    if isClose:
+        closePos = skipHws(chars, afterName, lineEnd)
+        if closePos >= lineEnd or chars[closePos] != ">":
+            return None
+    else:
+        if nextCh not in (" ", "\t", "\n", "\x0c", ">", "/", "["):
+            return None
+        # Avoid mistaking <org/repo#123> repository links for HTML tags.
+        if nextCh == "/":
+            gt = chars.find(">", afterName, lineEnd)
+            if gt != -1 and "#" in chars[afterName:gt]:
+                return None
+    return isClose, match.group(2).lower(), afterName
+
+
+def trySkipCommentOrDoctypeAt(
+    s: Stream,
+    cStart: int,
+    *,
+    peekOnly: bool = False,
+) -> int | None:
+    """If `cStart` (already past leading whitespace) starts a standalone Comment or Doctype line, return the index after its trailing newline."""
+    chars = s.chars
+    length = s.length
+    if cStart + 1 >= length or chars[cStart] != "<" or chars[cStart + 1] != "!":
+        return None
+    if chars.startswith("<!--", cStart):
+        idx = cStart + 4
+        while True:
+            dashIdx = chars.find("--", idx)
+            if dashIdx == -1:
+                return None
+            if chars.startswith("-->", dashIdx):
+                afterComment = dashIdx + 3
+                afterLineEnd = findLineEnd(s, afterComment)
+                if skipHws(chars, afterComment, afterLineEnd) == afterLineEnd:
+                    return nextLinePos(afterLineEnd, length)
+                return None
+            if chars.startswith("--!>", dashIdx):
+                return None
+            idx = dashIdx + 1
+    if chars[cStart : cStart + 9].lower() == "<!doctype":
+        gtIdx = chars.find(">", cStart + 9)
+        if gtIdx == -1:
+            return None
+        afterDt = gtIdx + 1
+        afterLineEnd = findLineEnd(s, afterDt)
+        if skipHws(chars, afterDt, afterLineEnd) == afterLineEnd:
+            if not peekOnly:
+                parseDoctype(s, cStart)
+            return nextLinePos(afterLineEnd, length)
+    return None
+
+
+def trySkipCommentOrDoctypeLine(
+    s: Stream,
+    lineStart: int,
+    *,
+    peekOnly: bool = False,
+) -> int | None:
+    """If `lineStart` is a standalone single Comment or Doctype line (possibly multi-line), return the index after its trailing newline."""
+    lineEnd = findLineEnd(s, lineStart)
+    cStart = skipHws(s.chars, lineStart, lineEnd)
+    return trySkipCommentOrDoctypeAt(s, cStart, peekOnly=peekOnly)
+
+
 def parseRawElementToEnd(s: Stream, start: int, tag: str) -> OkT[str]:
     """Read raw `<script>`, `<style>`, or `<xmp>` contents from `start` through `</tag>` (or EOF)."""
     endTag = f"</{tag}>"
@@ -687,8 +774,33 @@ def parseRawElementToEnd(s: Stream, start: int, tag: str) -> OkT[str]:
     return Ok(s.slice(start, i), i + len(endTag))
 
 
+def _skipFencedCodeBlockInScan(chars: str, length: int, fence: str, afterFence: int) -> int:
+    """Advance past a fenced code block starting with `fence` if closed; otherwise return `afterFence`."""
+    lineEnd = chars.find("\n", afterFence)
+    if lineEnd == -1:
+        return afterFence
+    if "`" in chars[afterFence:lineEnd]:
+        return afterFence
+    fenceChar = fence[0]
+    scanPos = lineEnd + 1
+    while scanPos < length:
+        nextLineEnd = chars.find("\n", scanPos)
+        if nextLineEnd == -1:
+            nextLineEnd = length
+        cPos = scanPos
+        while cPos < nextLineEnd and chars[cPos] in (" ", "\t"):
+            cPos += 1
+        if chars.startswith(fence, cPos):
+            fEnd = cPos + len(fence)
+            while fEnd < nextLineEnd and chars[fEnd] == fenceChar:
+                fEnd += 1
+            return fEnd
+        scanPos = nextLineEnd + 1
+    return afterFence
+
+
 def parseBsMacroToEnd(s: Stream, start: int, startTag: StartTag) -> ResultT[str]:
-    """Read a `<bs-macro>` body from `start` through its matching `</bs-macro>`, tracking nested `<bs-macro>` tags."""
+    """Read a `<bs-macro>` body from `start` through its matching `</bs-macro>`, skipping comments, raw/pre blocks, and code fences."""
     chars = s.chars
     length = s.length
     depth = 1
@@ -710,8 +822,10 @@ def parseBsMacroToEnd(s: Stream, start: int, startTag: StartTag) -> ResultT[str]
             if depth == 0:
                 return Ok(s.slice(start, match.start()), match.end())
             pos = match.end()
+        elif (fence := match.group("fence")) is not None:
+            pos = _skipFencedCodeBlockInScan(chars, length, fence, match.end())
         else:
-            depth += 1
+            tagName = match.group("tag").lower()
             qPos = match.end()
             quote: str | None = None
             while qPos < length:
@@ -725,7 +839,12 @@ def parseBsMacroToEnd(s: Stream, start: int, startTag: StartTag) -> ResultT[str]
                     qPos += 1
                     break
                 qPos += 1
-            pos = qPos
+            if tagName == "bs-macro":
+                depth += 1
+                pos = qPos
+            else:
+                closeMatch = _BS_MACRO_CLOSE_TAG_RES[tagName].search(chars, qPos)
+                pos = closeMatch.end() if closeMatch is not None else qPos
 
 
 def parseTitleToEnd(s: Stream, start: int) -> ResultT[str]:

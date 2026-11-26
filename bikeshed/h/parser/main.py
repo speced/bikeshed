@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from ... import t
-from .blocks import IndentChecker, parseBlockStream
+from .blocks import parseBlockStream
+from .indents import IndentChecker
 from .nodes import ParserNode, RawText, StartTag, Text
 from .parser import closeOpenElements, debugNode, nodesFromStream
 from .stream import ParseConfig, Stream

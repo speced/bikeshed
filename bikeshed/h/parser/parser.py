@@ -941,6 +941,8 @@ def parseLToEnd(s: Stream, start: int, lTag: StartTag) -> ResultT[ParserNode | l
         nodes, i, _ = autolinks.parseAutolinkHeader(s, start, generateResults)
     elif first2 == "{{":
         nodes, i, _ = autolinks.parseAutolinkIdl(s, start, generateResults)
+    elif first2 == "{^":
+        nodes, i, _ = autolinks.parseAutolinkCddl(s, start, generateResults)
     elif first2 == "<{":
         nodes, i, _ = autolinks.parseAutolinkElement(s, start, generateResults)
     elif first2 == "[[":
