@@ -1,13 +1,10 @@
 from . import result
 from .blocks import IndentChecker
 from .main import (
-    ExtractedMetadata,
     debugNodes,
-    extractMetadata,
     initialDocumentParse,
     linesFromNodes,
     nodesFromHtml,
-    nodesFromStream,
     parseLines,
     parseText,
     parseTitle,
@@ -30,7 +27,10 @@ from .nodes import (
     isTag,
 )
 from .parser import (
+    ExtractedMetadata,
     closeOpenElements,
+    extractMetadata,
+    nodesFromStream,
 )
 from .stream import (
     DEFAULT_PARSE_CONFIG,

@@ -119,7 +119,7 @@ class Serializer:
 
         def _isBlockMath(el: t.ElementT) -> bool:
             """Returns whether a `<math>` element has `display=block` (ASCII case-insensitively)."""
-            return el.get("display", "inline") == "block"
+            return el.get("display", "inline").lower() == "block"
 
         def _formatClass(v: str) -> str:
             """

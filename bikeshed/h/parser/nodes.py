@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import re
 from collections import Counter
 from dataclasses import InitVar, dataclass, field
@@ -51,14 +50,19 @@ def sortAttrs(attrs: t.SafeAttrDict) -> t.Iterator[tuple[str, str]]:
         yield "class", attrs["class"]
 
 
-def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
-    """Populate synthetic line/context/class attributes on `node` and serialize its start tag."""
-    if "bs-line-number" not in node.attrs and node.loc:
+def populateTagAttrs(node: StartTag | SelfClosedTag, *, addLineInfo: bool = True) -> None:
+    """Populate synthetic `bs-line-number`, `bs-parse-context`, and serialized `class` attributes on `node`."""
+    if addLineInfo and "bs-line-number" not in node.attrs and node.loc:
         node.attrs["bs-line-number"] = escapeAttr(node.loc)
-    if "bs-parse-context" not in node.attrs and node.context:
+    if addLineInfo and "bs-parse-context" not in node.attrs and node.context:
         node.attrs["bs-parse-context"] = escapeAttr(node.context)
     if node.classes:
         node.attrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
+
+
+def startTagStrFromNode(node: StartTag | SelfClosedTag) -> str:
+    """Populate synthetic line/context/class attributes on `node` and serialize its start tag."""
+    populateTagAttrs(node)
     return startTagStr(node.tag, node.attrs)
 
 
@@ -84,11 +88,6 @@ class ParserNode:
     def loc(self) -> str:
         """Return the formatted starting `line:col` location (or `""` for synthetic nodes)."""
         return self.s.loc(self.start) if self.s is not None else ""
-
-    @property
-    def endLoc(self) -> str:
-        """Return the formatted ending `line:col` location (or `""` for synthetic nodes)."""
-        return self.s.loc(self.end) if self.s is not None else ""
 
     @property
     def context(self) -> str | None:
@@ -264,20 +263,12 @@ class StartTag(ParserNode):
         """Serialize this start tag to HTML."""
         return startTagStrFromNode(self)
 
-    def printEndTag(self) -> str:
-        """Return the matching `</tag>` string for this start tag."""
-        return f"</{self.tag}>"
-
     def finalize(self) -> StartTag:
         """Move any `class` attribute into `self.classes` for easier manipulation."""
         if "class" in self.attrs:
             self.classes = set(unescapeAttr(self.attrs["class"]).split())
             del self.attrs["class"]
         return self
-
-    def clone(self, **kwargs: t.Any) -> StartTag:
-        """Return a shallow copy of this `StartTag` with optional field overrides."""
-        return dataclasses.replace(self, **kwargs)
 
 
 @dataclass
@@ -308,18 +299,6 @@ class SelfClosedTag(ParserNode):
             attrs=attrs,
         )
 
-    @classmethod
-    def fromStartTag(cls, tag: StartTag) -> t.Self:
-        """Convert an existing `StartTag` into an equivalent `SelfClosedTag`."""
-        return cls(
-            s=tag.s,
-            start=tag.start,
-            end=tag.end,
-            tag=tag.tag,
-            attrs=tag.attrs,
-            classes=tag.classes,
-        )
-
     def __str__(self) -> str:
         """Serialize as `<tag ...>` for void elements, or `<tag ...></tag>` for non-void elements."""
         s = startTagStrFromNode(self)
@@ -333,10 +312,6 @@ class SelfClosedTag(ParserNode):
             self.classes = set(unescapeAttr(self.attrs["class"]).split())
             del self.attrs["class"]
         return self
-
-    def clone(self, **kwargs: t.Any) -> SelfClosedTag:
-        """Return a shallow copy of this `SelfClosedTag` with optional field overrides."""
-        return dataclasses.replace(self, **kwargs)
 
 
 @dataclass
@@ -441,6 +416,31 @@ def isTag(node: ParserNode) -> t.TypeIs[TagNodeT]:
     return isinstance(node, (StartTag, EndTag, SelfClosedTag, RawElement, SafeElement))
 
 
+def isBlockMathTag(node: TagNodeT) -> bool:
+    """Return True if `node` is a `<math display=block>` tag (or its matching `</math>`)."""
+    if isinstance(node, (StartTag, SelfClosedTag)):
+        attrs = node.attrs
+    elif node.startTag is not None:
+        attrs = node.startTag.attrs
+    else:
+        return False
+    return bool(attrs) and attrs.get("display", "inline").lower() == "block"
+
+
+def isInlineTag(
+    node: TagNodeT,
+    blockElements: t.Collection[str],
+    extraInline: t.Collection[str] = (),
+) -> bool:
+    """Return True if `node` is an inline HTML tag (considering `<math display=block>` and custom elements)."""
+    tagname = node.tag
+    if tagname == "math":
+        return tagname not in blockElements and not isBlockMathTag(node)
+    if tagname in elements.INLINE_ELEMENTS or tagname in extraInline:
+        return True
+    return "-" in tagname and tagname not in blockElements
+
+
 def escapeHTML(text: str) -> str:
     """Escape `&` and `<` as numeric character references for HTML text serialization."""
     return text.replace("&", "&#38;").replace("<", "&#60;")
@@ -505,7 +505,7 @@ class TagStack:
         """Return True if currently inside a `<pre class=prod>` CSS production element."""
         return self._prodCount > 0
 
-    def inTagContext(self, tagName: str, stopTags: list[str] | None = None) -> bool:
+    def inTagContext(self, tagName: str, stopTags: t.Collection[str] | None = None) -> bool:
         """Return True if `<tagName>` is open (and appears above any `stopTags` scoping barrier)."""
         if self._tagCounts[tagName] == 0:
             return False
@@ -536,9 +536,9 @@ class TagStack:
             self._prodCount += 1
         self._tagCounts[entry.startTag.tag] += 1
 
-    def popEntry(self) -> TagStackEntry:
-        """Pop the top entry from the stack and update opacity, prod, and per-tag counters."""
-        entry = self.tags.pop()
+    def popEntry(self, index: int = -1) -> TagStackEntry:
+        """Pop the entry at `index` (default top) from the stack and update opacity, prod, and per-tag counters."""
+        entry = self.tags.pop(index)
         if entry.isOpaque:
             self._opaqueCount -= 1
         if entry.isProd:
@@ -554,17 +554,9 @@ class TagStack:
 
     def popSynthetic(self, entry: TagStackSyntheticEntry) -> None:
         """Remove a previously pushed synthetic container `entry` from the stack, preserving any unclosed inner tags."""
-        if self.tags and self.tags[-1] is entry:
-            self.popEntry()
-            return
         for idx in range(len(self.tags) - 1, -1, -1):
             if self.tags[idx] is entry:
-                removed = self.tags.pop(idx)
-                if removed.isOpaque:
-                    self._opaqueCount -= 1
-                if removed.isProd:
-                    self._prodCount -= 1
-                self._tagCounts[removed.startTag.tag] -= 1
+                self.popEntry(idx)
                 return
 
     def pushBlockParent(self, tagName: str, tagDepth: int | None = None) -> None:
@@ -588,16 +580,6 @@ class TagStack:
         else:
             grandparentTag = None
         return parentTag, grandparentTag
-
-    def undo(self, startTag: StartTag) -> None:
-        """Roll back the stack through an experimentally pushed `startTag`."""
-        while entry := self.popEntry():
-            if entry.startTag == startTag:
-                return
-        m.die(
-            f"PROGRAMMING ERROR: Tried to pop an experimental <{startTag.tag}> from the tag stack, but instead popped the entire stack away.",
-            lineNum=startTag.loc,
-        )
 
     def update(self, node: ParserNode) -> None:
         """Update the open-element stack for `node`, applying HTML auto-closing and logging nesting errors."""
@@ -642,7 +624,7 @@ class TagStack:
                             f"Saw an end tag {node}, but there were unclosed elements remaining before the nearest matching start tag (at {entry.startTag.loc}).\nOpen tags: {', '.join(self.printOpenTags())}",
                             lineNum=node.loc,
                         )
-                        self.virtualCloseUntil([node.tag], node, realEndTag=True)
+                        self.virtualCloseUntil([node.tag], node)
                         break
                 else:
                     # Didn't encounter the corresponding start tag, so this is just
@@ -690,65 +672,18 @@ class TagStack:
                 lineNum=s.loc(i),
             )
 
-    def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
-        """Discard a failed shorthand opener and any elements pushed inside it."""
-        if not any(x.startTag == startTag for x in self.tags):
-            shorthand = sigils[0] + "..." + sigils[1]
-            m.die(
-                f"Programming error - tried to close a {shorthand} shorthand, but there's no matching open tag on the stack of open elements. Please report this!",
-                lineNum=startTag.loc,
-            )
-            return
-        while self.tags and self.tags[-1].startTag != startTag:
-            self.popEntry()
-        self.popEntry()
-
     def autoCloseStart(self, tag: str, node: ParserNode) -> None:
         """Handle valid HTML auto-closing triggered by opening `tag`."""
         # (Only valid HTML; real parsers do a lot more work.)
         if not self.tags:
             return
         if tag in elements.AUTO_CLOSE_P_START_ELEMENTS:
-            self.virtualClose(node, ["p"])
-        if tag == "li":
-            self.virtualClose(node, ["p"], ["ol", "ul"])
-            self.virtualClose(node, ["li"], ["ol", "ul"])
-        elif tag in ("dt", "dd"):
-            self.virtualClose(node, ["p"], ["dl"])
-            self.virtualClose(node, ["dt", "dd"], ["dl"])
-        elif tag == "option":
-            self.virtualClose(node, ["option"])
-        elif tag == "optgroup":
-            self.virtualClose(node, ["option"])
-            self.virtualClose(node, ["optgroup"])
-        elif tag in ("td", "th"):
-            self.virtualClose(node, ["p"], ["table"])
-            self.virtualClose(node, ["td", "th"], ["table"])
-        elif tag == "tr":
-            self.virtualClose(node, ["p"], ["table"])
-            self.virtualClose(node, ["td", "th"], ["table"])
-            self.virtualClose(node, ["tr"], ["table"])
-            self.virtualClose(node, ["caption", "colgroup"], ["table"])
-        elif tag in ("thead", "tbody", "tfoot"):
-            self.virtualClose(node, ["p"], ["table"])
-            self.virtualClose(node, ["td", "th"], ["table"])
-            self.virtualClose(node, ["tr"], ["table"])
-            self.virtualClose(node, ["thead", "tbody", "tfoot", "caption", "colgroup"], ["table"])
-        elif tag in ("caption", "colgroup"):
-            self.virtualClose(node, ["p"], ["table"])
-            self.virtualClose(node, ["td", "th"], ["table"])
-            self.virtualClose(node, ["tr"], ["table"])
-            self.virtualClose(node, ["thead", "tbody", "tfoot", "caption", "colgroup"], ["table"])
-        elif tag == "col":
-            self.virtualClose(node, ["p"], ["table"])
-            self.virtualClose(node, ["td", "th"], ["table"])
-            self.virtualClose(node, ["tr"], ["table"])
-            self.virtualClose(node, ["thead", "tbody", "tfoot", "caption"], ["table"])
-        elif tag in ("rb", "rtc"):
-            self.virtualClose(node, ["rb", "rp", "rt"], ["ruby"])
-            self.virtualClose(node, ["rtc"], ["ruby"])
-        elif tag in ("rp", "rt"):
-            self.virtualClose(node, ["rb", "rp", "rt"], ["ruby"])
+            self.virtualClose(node, ("p",))
+        if pScopes := elements.AUTO_CLOSE_P_SCOPED_START_ELEMENTS.get(tag):
+            self.virtualClose(node, ("p",), pScopes)
+        if rules := elements.AUTO_CLOSE_START_RULES.get(tag):
+            for closeTags, stopTags in rules:
+                self.virtualClose(node, closeTags, stopTags)
 
     def autoCloseEnd(self, tag: str, node: ParserNode) -> None:
         """Handle valid HTML auto-closing triggered by closing `tag`."""
@@ -756,45 +691,23 @@ class TagStack:
         if not self.tags:
             return
         if tag in elements.AUTO_CLOSE_P_END_ELEMENTS:
-            self.virtualClose(node, ["p"])
-        if tag in ("ol", "ul"):
-            self.virtualClose(node, ["li"], ["ol", "ul"])
-        elif tag == "dl":
-            self.virtualClose(node, ["dt", "dd"], ["dl"])
-        elif tag == "tr":
-            self.virtualClose(node, ["td", "th"], ["table"])
-        elif tag in ("thead", "tbody", "tfoot"):
-            self.virtualClose(node, ["td", "th"], ["table"])
-            self.virtualClose(node, ["tr"], ["table"])
-        elif tag == "table":
-            self.virtualClose(node, ["td", "th"], ["table"])
-            self.virtualClose(node, ["tr"], ["table"])
-            self.virtualClose(node, ["thead", "tbody", "tfoot", "caption", "colgroup"], ["table"])
-        elif tag == "rtc":
-            self.virtualClose(node, ["rt"], ["ruby"])
-        elif tag == "ruby":
-            self.virtualClose(node, ["rt", "rb", "rp"], ["ruby"])
-            self.virtualClose(node, ["rtc"], ["ruby"])
-        elif tag == "optgroup":
-            self.virtualClose(node, ["option"])
-        elif tag == "select":
-            self.virtualClose(node, ["option"])
-            self.virtualClose(node, ["optgroup"])
+            self.virtualClose(node, ("p",))
+        if rules := elements.AUTO_CLOSE_END_RULES.get(tag):
+            for closeTags, stopTags in rules:
+                self.virtualClose(node, closeTags, stopTags)
 
     def virtualClose(
         self,
         node: ParserNode,
-        tags: list[str],
-        stopTags: list[str] | None = None,
+        tags: t.Collection[str],
+        stopTags: t.Collection[str] | None = None,
     ) -> None:
         """Pop the top tag if it matches `tags`; otherwise log an error if a matching tag is buried under unclosed elements."""
         if not self.tags:
             return
-        entry: TagStackEntry | None
         if self.tags[-1].startTag.tag in tags:
-            # If the tag is top of the stack, silently pop it
-            entry = self.popEntry()
-            # yield makeVirtualEndTag(entry.startTag, node, virtual=self.distinguishVirtualTags)
+            # If the tag is top of the stack, silently pop it.
+            self.popEntry()
         else:
             # Otherwise, see if it needs popping further up, which is an error.
             for tag in tags:
@@ -805,9 +718,8 @@ class TagStack:
                         f"Tried to auto-close a <{tag}>, but there were unclosed elements remaining before the nearest matching start tag (at {entry.startTag.loc}).\nOpen tags: {', '.join(self.printOpenTags())}",
                         lineNum=node.loc,
                     )
-                    # yield from self.virtualCloseUntil([tag], node)
 
-    def virtualCloseUntil(self, tags: t.Collection[str], node: ParserNode, realEndTag: bool = False) -> None:
+    def virtualCloseUntil(self, tags: t.Collection[str], node: ParserNode) -> None:
         """Pop misordered open tags up to and including one in `tags`, stopping at shorthand or paired-tag barriers."""
         # Shorthand entries and manually-paired start tags act as hard scoping barriers
         # so a stray end tag inside a shorthand cannot close elements outside it.
@@ -815,11 +727,7 @@ class TagStack:
             lastEntry = self.tags[-1]
             lastStartTag = lastEntry.startTag
             if lastStartTag.tag in tags:
-                # The tag I'm stopping at.
                 self.popEntry()
-                if not realEndTag:
-                    pass
-                    # yield makeVirtualEndTag(entry.startTag, node, virtual=self.distinguishVirtualTags)
                 return
             if isinstance(lastEntry, TagStackShorthandEntry):
                 # Can't virtual-close past a shorthand opener
@@ -827,9 +735,7 @@ class TagStack:
             if lastStartTag.endTag and isinstance(node, EndTag) and node.startTag != lastStartTag.endTag:
                 # Can't virtual-close past a manually-paired start tag
                 return
-            # Otherwise, good to pop the tag
             self.popEntry()
-            # yield makeVirtualEndTag(entry.startTag, node, virtual=self.distinguishVirtualTags)
         m.die(
             f"PROGRAMMING ERROR: Tried to auto-close a still-open element, but the specified opening tags {tags} aren't on the stack. Please report this!",
             lineNum=node.loc,

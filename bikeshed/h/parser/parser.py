@@ -8,6 +8,7 @@ import re
 
 from ... import messages as m
 from ... import t
+from .. import elements
 from . import autolinks, css, html, macros, markdown
 from .nodes import (
     EmphDelim,
@@ -142,12 +143,8 @@ def extractMetadata(text: str, config: ParseConfig | None = None) -> ExtractedMe
                     i = nextI
                     continue
 
-            if tagLower == "script":
-                _, i, _ = html.parseScriptToEnd(s, tagEnd)
-            elif tagLower == "style":
-                _, i, _ = html.parseStyleToEnd(s, tagEnd)
-            elif tagLower == "xmp":
-                _, i, _ = html.parseXmpToEnd(s, tagEnd)
+            if tagLower in elements.RAW_ELEMENTS:
+                _, i, _ = html.parseRawElementToEnd(s, tagEnd, tagLower)
             elif tagLower == "pre" and html.isDatablock(startTag, s.loc(tagEnd)):
                 _, nextI, _ = html.parseDatablockPreToEnd(s, tagEnd)
                 i = nextI if nextI > tagEnd else tagEnd
@@ -188,20 +185,27 @@ def _parseRawHtmlNodes(s: Stream, start: int) -> tuple[list[ParserNode], int]:
     # Start offset of an accumulated plain-text run (-1 when no run is open).
     textStart = -1
 
+    def pushRaw(node: RawText, canMerge: bool) -> None:
+        nonlocal lastRaw
+        if canMerge and lastRaw is not None and lastRaw.end == node.start:
+            lastRaw.text += node.text
+            lastRaw.end = node.end
+        else:
+            if lastRaw is not None:
+                nodes.append(lastRaw)
+            if canMerge:
+                lastRaw = node
+            else:
+                nodes.append(node)
+                lastRaw = None
+
     while i < end:
         ch = chars[i]
         if ch in ("&", "<"):
             res = parseNode(s, i)
             if isOk(res):
                 if textStart != -1:
-                    textNode = RawText.fromStream(s, textStart, i)
-                    if lastRaw is not None and lastRaw.end == textNode.start:
-                        lastRaw.text += textNode.text
-                        lastRaw.end = textNode.end
-                    else:
-                        if lastRaw is not None:
-                            nodes.append(lastRaw)
-                        lastRaw = textNode
+                    pushRaw(RawText.fromStream(s, textStart, i), canMerge=True)
                     textStart = -1
                 val, i, _ = res
                 assert not isinstance(val, list)
@@ -209,17 +213,7 @@ def _parseRawHtmlNodes(s: Stream, start: int) -> tuple[list[ParserNode], int]:
                     val = RawText.fromSafeText(val)
                 if isinstance(val, RawText):
                     canMerge = val.s is s and val.text.count("\n") == chars.count("\n", val.start, val.end)
-                    if canMerge and lastRaw is not None and lastRaw.end == val.start:
-                        lastRaw.text += val.text
-                        lastRaw.end = val.end
-                    else:
-                        if lastRaw is not None:
-                            nodes.append(lastRaw)
-                        if canMerge:
-                            lastRaw = val
-                        else:
-                            nodes.append(val)
-                            lastRaw = None
+                    pushRaw(val, canMerge)
                 else:
                     if lastRaw is not None:
                         nodes.append(lastRaw)
@@ -232,14 +226,7 @@ def _parseRawHtmlNodes(s: Stream, start: int) -> tuple[list[ParserNode], int]:
         i = match.start() if match else end
 
     if textStart != -1:
-        textNode = RawText.fromStream(s, textStart, i)
-        if lastRaw is not None and lastRaw.end == textNode.start:
-            lastRaw.text += textNode.text
-            lastRaw.end = textNode.end
-        else:
-            if lastRaw is not None:
-                nodes.append(lastRaw)
-            lastRaw = textNode
+        pushRaw(RawText.fromStream(s, textStart, i), canMerge=True)
     if lastRaw is not None:
         nodes.append(lastRaw)
     return nodes, i
@@ -277,46 +264,67 @@ def parseInlineNodes(
     end = s.length
     i = start
     openEls = s.openEls
-    inOpaque = openEls.inOpaqueElement()
     cssEnabled = s.config.css
-    inProd = cssEnabled and s.inProdElement()
     mdInline = s.config.markdownInline
-    inEmph = mdInline and not inOpaque and not inProd
     indent = s.config.indent
+
+    inOpaque = False
+    inProd = False
+    inEmph = False
+    startSet: frozenset[str] = ACTUAL_NODE_START_SET
+    scanRe: t.Pattern = _ACTUAL_NODE_START_RE
+
+    def refreshMode() -> None:
+        nonlocal inOpaque, inProd, inEmph, startSet, scanRe
+        inOpaque = openEls.inOpaqueElement()
+        inProd = cssEnabled and s.inProdElement()
+        inEmph = mdInline and not inOpaque and not inProd
+        stopLine = stopAtNewline and not inOpaque
+        if inProd:
+            startSet = _PROD_NODE_START_SET
+            scanRe = _PROD_LINE_STOP_RE if stopLine else _PROD_NODE_START_RE
+        elif inEmph:
+            startSet = _EMPH_NODE_START_SET
+            scanRe = _EMPH_LINE_STOP_RE if stopLine else _EMPH_NODE_START_RE
+        else:
+            startSet = ACTUAL_NODE_START_SET
+            scanRe = _ACTUAL_LINE_STOP_RE if stopLine else _ACTUAL_NODE_START_RE
+
+    def emitRaw(node: RawText, canMerge: bool) -> None:
+        nonlocal lastNode, heldLast, heldCanMerge
+        if not inOpaque:
+            if minIndent > 0 and "\n" in node.text and node.s is s:
+                node.text = _stripIndentAfterNewlines(node.text, indent, minIndent)
+            node.curlifyApostrophes(lastNode)
+        if heldLast and heldCanMerge and canMerge and isinstance(lastNode, RawText) and lastNode.end == node.start:
+            lastNode.text += node.text
+            lastNode.end = node.end
+        else:
+            if heldLast:
+                assert lastNode is not None
+                nodes.append(lastNode)
+            lastNode = node
+            heldLast = True
+            heldCanMerge = canMerge
+
+    refreshMode()
 
     while i < end:
         ch = chars[i]
         if stopAtNewline and ch == "\n" and not inOpaque:
             break
-        startSet = _PROD_NODE_START_SET if inProd else (_EMPH_NODE_START_SET if inEmph else ACTUAL_NODE_START_SET)
         if ch in startSet:
             isAtLineStart = atLineStart and lastNode is None and (textStart == -1 or chars[textStart:i].strip() == "")
             res = parseNode(s, i, atLineStart=isAtLineStart)
             if isOk(res):
                 if textStart != -1:
-                    textNode = RawText.fromStream(s, textStart, i)
-                    if not inOpaque:
-                        if minIndent > 0 and "\n" in textNode.text:
-                            textNode.text = _stripIndentAfterNewlines(textNode.text, indent, minIndent)
-                        textNode.curlifyApostrophes(lastNode)
-                    if heldLast and heldCanMerge and isinstance(lastNode, RawText) and lastNode.end == textNode.start:
-                        lastNode.text += textNode.text
-                        lastNode.end = textNode.end
-                    else:
-                        if heldLast:
-                            assert lastNode is not None
-                            nodes.append(lastNode)
-                        lastNode = textNode
-                        heldLast = True
-                        heldCanMerge = True
+                    emitRaw(RawText.fromStream(s, textStart, i), canMerge=True)
                     textStart = -1
 
                 val, nextI, _ = res
                 wasOpaque = inOpaque
                 s.observeResult(res)
-                inOpaque = openEls.inOpaqueElement()
-                inProd = cssEnabled and s.inProdElement()
-                inEmph = mdInline and not inOpaque and not inProd
+                refreshMode()
                 if isinstance(val, list):
                     # Macro expansions are parsed in a child Stream, so `val[0].s is not s` identifies them.
                     if (
@@ -334,39 +342,12 @@ def parseInlineNodes(
                 for item in items:
                     if isinstance(item, SafeText):
                         item = RawText.fromSafeText(item)
-                    if isinstance(item, EmphDelim):
-                        if heldLast:
-                            assert lastNode is not None
-                            nodes.append(lastNode)
-                        nodes.append(item)
-                        lastNode = item
-                        heldLast = False
-                        heldCanMerge = False
-                    elif isinstance(item, RawText):
-                        if not inOpaque:
-                            if minIndent > 0 and "\n" in item.text and item.s is s:
-                                item.text = _stripIndentAfterNewlines(item.text, indent, minIndent)
-                            item.curlifyApostrophes(lastNode)
+                    if isinstance(item, RawText) and not isinstance(item, EmphDelim):
                         # Only merge RawText nodes belonging to this stream whose emitted
                         # newlines match their source line span (not line-ending em-dashes),
                         # so downstream `node.line + j` line tracking stays accurate.
                         nodeCanMerge = item.s is s and item.text.count("\n") == chars.count("\n", item.start, item.end)
-                        if (
-                            heldLast
-                            and heldCanMerge
-                            and nodeCanMerge
-                            and isinstance(lastNode, RawText)
-                            and lastNode.end == item.start
-                        ):
-                            lastNode.text += item.text
-                            lastNode.end = item.end
-                        else:
-                            if heldLast:
-                                assert lastNode is not None
-                                nodes.append(lastNode)
-                            lastNode = item
-                            heldLast = True
-                            heldCanMerge = nodeCanMerge
+                        emitRaw(item, nodeCanMerge)
                     else:
                         if heldLast:
                             assert lastNode is not None
@@ -380,29 +361,11 @@ def parseInlineNodes(
 
         if textStart == -1:
             textStart = i
-        if stopAtNewline and not inOpaque:
-            lineRe = _PROD_LINE_STOP_RE if inProd else (_EMPH_LINE_STOP_RE if inEmph else _ACTUAL_LINE_STOP_RE)
-            match = lineRe.search(chars, i + 1)
-        else:
-            nodeRe = _PROD_NODE_START_RE if inProd else (_EMPH_NODE_START_RE if inEmph else _ACTUAL_NODE_START_RE)
-            match = nodeRe.search(chars, i + 1)
+        match = scanRe.search(chars, i + 1)
         i = match.start() if match else end
 
     if textStart != -1:
-        textNode = RawText.fromStream(s, textStart, i)
-        if not inOpaque:
-            if minIndent > 0 and "\n" in textNode.text:
-                textNode.text = _stripIndentAfterNewlines(textNode.text, indent, minIndent)
-            textNode.curlifyApostrophes(lastNode)
-        if heldLast and heldCanMerge and isinstance(lastNode, RawText) and lastNode.end == textNode.start:
-            lastNode.text += textNode.text
-            lastNode.end = textNode.end
-        else:
-            if heldLast:
-                assert lastNode is not None
-                nodes.append(lastNode)
-            lastNode = textNode
-            heldLast = True
+        emitRaw(RawText.fromStream(s, textStart, i), canMerge=True)
     if heldLast:
         assert lastNode is not None
         nodes.append(lastNode)
@@ -452,31 +415,16 @@ def closeOpenElements(s: Stream, start: int | None, context: str | StartTag | t.
                 msg = f"<{entry.startTag.tag}> element was still open at the end of your document."
             m.die(msg, lineNum=entry.startTag.loc)
         else:
-            if containerLoc:
-                msg = f"{len(s.openEls.tags)} elements were still open at the end of the {containerLoc}.\nOpen tags: {', '.join(s.openEls.printOpenTags())}"
-            else:
-                msg = f"{len(s.openEls.tags)} elements were still open at the end of your document.\nOpen tags: {', '.join(s.openEls.printOpenTags())}"
-            m.die(msg)
+            endTarget = f"the {containerLoc}" if containerLoc else "your document"
+            m.die(
+                f"{len(s.openEls.tags)} elements were still open at the end of {endTarget}.\nOpen tags: {', '.join(s.openEls.printOpenTags())}",
+            )
         while s.openEls.tags:
-            if s.openEls.tags[-1] == stopper:
+            if s.openEls.tags[-1].startTag == stopper:
                 break
             entry = s.openEls.popEntry()
             nodes.append(EndTag.fromStream(s, i, i, entry.startTag))
     return nodes
-
-
-def generateNodes(s: Stream, start: int) -> t.Generator[ParserNode, None, None]:
-    """Consume `s` from `start` to EOF using `parseAnything()`, yielding unmerged `ParserNode`s."""
-    i = start
-    end = len(s)
-    while i < end:
-        nodes, i, _ = parseAnything(s, i)
-        if nodes is None:
-            return
-        elif isinstance(nodes, list):
-            yield from nodes
-        else:
-            yield nodes
 
 
 def debugNode(node: ParserNode | list[ParserNode]) -> str:
@@ -571,6 +519,25 @@ def parseAnything(s: Stream, start: int, experimental: bool = False) -> ResultT[
     return Ok(node, i)
 
 
+def _parseCharRefNode(s: Stream, start: int) -> OkT[RawText | SafeText]:
+    """Parse a character reference at `start`, returning a normalized `RawText` or fallback `SafeText`."""
+    ch, i, _ = html.parseCharRef(s, start, context=html.CharRefContext.NonAttr)
+    if ch is not None:
+        if isinstance(ch, str):
+            return Ok(RawText.fromStream(s, start, i, f"&#{ord(ch)};"), i)
+        return Ok(ch, i)
+    return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
+
+
+def _checkAutolinkNotInA(inA: bool, description: str, s: Stream, start: int) -> None:
+    """Log an error if an autolink shorthand was parsed inside an already-open `<a>`."""
+    if inA:
+        m.die(
+            f"Parsed {description} inside of an <a>. Either close the <a> properly, or escape the autolink.",
+            lineNum=s.loc(start),
+        )
+
+
 def parseNode(
     s: Stream,
     start: int,
@@ -591,12 +558,7 @@ def parseNode(
     node: ParserNode | list[ParserNode] | None
     if s.config.rawHtml:
         if first1 == "&":
-            ch, i, _ = html.parseCharRef(s, start, context=html.CharRefContext.NonAttr)
-            if ch is not None:
-                if isinstance(ch, str):
-                    return Ok(RawText.fromStream(s, start, i, f"&#{ord(ch)};"), i)
-                return Ok(ch, i)
-            return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
+            return _parseCharRefNode(s, start)
         if first1 == "<":
             node, i, _ = parseAngleStart(s, start)
             if node is not None:
@@ -610,20 +572,13 @@ def parseNode(
     if first1 not in startSet:
         return Err(start)
 
-    if first1 == "-":
-        if s.slice(start, start + 3) == "--\n":
+    if first1 in ("-", "—"):
+        if (first1 == "-" and s.slice(start, start + 3) == "--\n") or (
+            first1 == "—" and s.slice(start, start + 2) == "—\n"
+        ):
             match, i, _ = s.matchRe(start, emdashRe)
             if match is not None:
-                node = RawText.fromStream(s, start, i, "—\u200b")
-                return Ok(node, i)
-        return Err(start)
-
-    if first1 == "—":
-        if s.slice(start, start + 2) == "—\n":
-            match, i, _ = s.matchRe(start, emdashRe)
-            if match is not None:
-                node = RawText.fromStream(s, start, i, "—\u200b")
-                return Ok(node, i)
+                return Ok(RawText.fromStream(s, start, i, "—\u200b"), i)
         return Err(start)
 
     if first1 == "&":
@@ -631,14 +586,7 @@ def parseNode(
             grammarRes = css.parseCSSProductionGrammar(s, start)
             if isOk(grammarRes):
                 return grammarRes
-        ch, i, _ = html.parseCharRef(s, start, context=html.CharRefContext.NonAttr)
-        if ch is not None:
-            if isinstance(ch, str):
-                node = RawText.fromStream(s, start, i, f"&#{ord(ch)};")
-                return Ok(node, i)
-            else:
-                return Ok(ch, i)
-        return Ok(SafeText.fromStream(s, start, start + 1), start + 1)
+        return _parseCharRefNode(s, start)
 
     if first1 == "<":
         node, i, _ = parseAngleStart(s, start)
@@ -701,11 +649,7 @@ def parseNode(
         elif first1 == "'":
             propdescRes = css.parseCSSPropdesc(s, start)
             if isOk(propdescRes):
-                if inA:
-                    m.die(
-                        "Parsed a CSS property autolink ('foo') inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "a CSS property autolink ('foo')", s, start)
                 return propdescRes
     if s.config.css:
         if first3 == "\\<<":
@@ -733,20 +677,12 @@ def parseNode(
         if first2 == "[=":
             dfnRes = autolinks.parseAutolinkDfn(s, start, generateResults)
             if isOk(dfnRes):
-                if inA:
-                    m.die(
-                        "Parsed a dfn autolink ([=...=]) inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "a dfn autolink ([=...=])", s, start)
                 return dfnRes
         if first2 == "[$":
             abstractRes = autolinks.parseAutolinkAbstract(s, start, generateResults)
             if isOk(abstractRes):
-                if inA:
-                    m.die(
-                        "Parsed an abstract-op autolink ([$...$]) inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "an abstract-op autolink ([$...$])", s, start)
                 return abstractRes
     if s.config.header and not inOpaque:
         if first3 == "\\[:":
@@ -755,11 +691,7 @@ def parseNode(
         if first2 == "[:":
             headerRes = autolinks.parseAutolinkHeader(s, start, generateResults)
             if isOk(headerRes):
-                if inA:
-                    m.die(
-                        "Parsed an http-header autolink ([:...:]) inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "an http-header autolink ([:...:])", s, start)
                 return headerRes
     if s.config.idl and not inOpaque:
         if first3 == "\\{{":
@@ -768,11 +700,7 @@ def parseNode(
         if first2 == "{{":
             idlRes = autolinks.parseAutolinkIdl(s, start, generateResults)
             if isOk(idlRes):
-                if inA:
-                    m.die(
-                        "Parsed an IDL autolink ({{...}}) inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "an IDL autolink ({{...}})", s, start)
                 return idlRes
     if s.config.cddl and not inOpaque:
         if first3 == "\\{^":
@@ -781,11 +709,7 @@ def parseNode(
         if first2 == "{^":
             cddlRes = autolinks.parseAutolinkCddl(s, start, generateResults)
             if isOk(cddlRes):
-                if inA:
-                    m.die(
-                        "Parsed a CDDL autolink ({^...^}) inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "a CDDL autolink ({^...^})", s, start)
                 return cddlRes
     if s.config.markup and not inOpaque:
         if first3 == "\\<{":
@@ -798,11 +722,7 @@ def parseNode(
         if first2 == "<{":
             elementRes = autolinks.parseAutolinkElement(s, start, generateResults)
             if isOk(elementRes):
-                if inA:
-                    m.die(
-                        "Parsed a markup autolink (<{...}>) inside of an <a>. Either close the <a> properly, or escape the autolink.",
-                        lineNum=s.loc(start),
-                    )
+                _checkAutolinkNotInA(inA, "a markup autolink (<{...}>)", s, start)
                 return elementRes
     if s.config.algorithm and not inOpaque:
         if first2 == "\\|":
@@ -847,7 +767,7 @@ def parseNode(
             return macroRes
     if s.config.markdownEscapes and not inOpaque:
         if first1 == "\\" and markdown.isMarkdownEscape(s, start):
-            node = RawText.fromStream(s, start, start + 2, markdown.htmlifyMarkdownEscapes(s.slice(start, start + 2)))
+            node = RawText.fromStream(s, start, start + 2, f"&#{ord(s[start + 1])};")
             return Ok(node, start + 2)
 
     if first1 == "<":
@@ -891,20 +811,8 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
         if isinstance(startTag, (SelfClosedTag, list)):
             return Ok(startTag, i)
         if s.config.rawHtml:
-            if startTag.tag == "script":
-                text, i, _ = html.parseScriptToEnd(s, i)
-                if text is None:
-                    return Err(start)
-                return Ok(RawElement.fromStream(s, start, i, startTag, text), i)
-            if startTag.tag == "style":
-                text, i, _ = html.parseStyleToEnd(s, i)
-                if text is None:
-                    return Err(start)
-                return Ok(RawElement.fromStream(s, start, i, startTag, text), i)
-            if startTag.tag == "xmp":
-                text, i, _ = html.parseXmpToEnd(s, i)
-                if text is None:
-                    return Err(start)
+            if startTag.tag in elements.RAW_ELEMENTS:
+                text, i, _ = html.parseRawElementToEnd(s, i, startTag.tag)
                 return Ok(RawElement.fromStream(s, start, i, startTag, text), i)
             return Ok(startTag, i)
         if startTag.tag == "l":
@@ -958,22 +866,16 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
                 return Ok(el, i)
             else:
                 return Ok(startTag, i)
-        elif startTag.tag == "script":
-            text, i, _ = html.parseScriptToEnd(s, i)
-            if text is None:
-                return Err(start)
+        elif startTag.tag in ("script", "style"):
+            text, i, _ = html.parseRawElementToEnd(s, i, startTag.tag)
             if "bs-macros" in startTag.attrs:
-                text = macros.replaceMacrosInText(text, s.config.macros, s, start, context="<script> contents")
-            if blockType := html.isDatablock(startTag, s.loc(i)):
-                startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
-            el = RawElement.fromStream(s, start, i, startTag, text)
-            return Ok(el, i)
-        elif startTag.tag == "style":
-            text, i, _ = html.parseStyleToEnd(s, i)
-            if text is None:
-                return Err(start)
-            if "bs-macros" in startTag.attrs:
-                text = macros.replaceMacrosInText(text, s.config.macros, s, start, context="<style> contents")
+                text = macros.replaceMacrosInText(
+                    text,
+                    s.config.macros,
+                    s,
+                    start,
+                    context=f"<{startTag.tag}> contents",
+                )
             if blockType := html.isDatablock(startTag, s.loc(i)):
                 startTag.attrs["bs-datablock-type"] = escapeAttr(blockType)
             el = RawElement.fromStream(s, start, i, startTag, text)
@@ -983,9 +885,7 @@ def parseAngleStart(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNo
             startTag.tag = "pre"
             startTag.attrs["bs-was-xmp"] = ""
             bodyStart = i
-            text, i, _ = html.parseXmpToEnd(s, i)
-            if text is None:
-                return Err(start)
+            text, i, _ = html.parseRawElementToEnd(s, i, "xmp")
             hasMacros = "bs-macros" in startTag.attrs
             if hasMacros:
                 text = macros.replaceMacrosInText(text, s.config.macros, s, start, context="<xmp> contents")

@@ -307,7 +307,6 @@ def parseTagName(s: Stream, start: int) -> ResultT[str]:
 def parseAttributeList(s: Stream, start: int) -> ResultT[dict[str, str]]:
     """Parse zero or more HTML attributes (and attribute-list macros) inside a start tag."""
     _, i, _ = parseWhitespace(s, start)
-    attr = None
     attrs: dict[str, str] = {}
     while True:
         if s.eof(i):
@@ -541,35 +540,24 @@ def parseCharRef(s: Stream, start: int, context: CharRefContext) -> ResultT[str 
         return Ok(charRefs[s.slice(start, i)], i)
     elif s[i] == "#":
         i += 1
-        if s[i] == "x" or s[i] == "X":
+        isHex = s[i] in ("x", "X")
+        if isHex:
             i += 1
-            numStart = i
-            while preds.isHexDigit(s[i]):
-                i += 1
-            if i == numStart:
-                m.die(
-                    f"Saw the start of a hex char ref ({s.slice(start, i)}), but no hex digits follow it.",
-                    lineNum=s.loc(start),
-                )
-                return Ok(SafeText.fromStream(s, start, i), i)
-            if s[i] != ";":
-                m.die(f"Char ref '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
-                return Ok(SafeText.fromStream(s, start, i), i)
-            cp = int(s.slice(numStart, i), 16)
-        else:
-            numStart = i
-            while preds.isDigit(s[i]):
-                i += 1
-            if i == numStart:
-                m.die(
-                    f"Saw the start of a decimal char ref ({s.slice(start, i)}), but no hex digits follow it.",
-                    lineNum=s.loc(start),
-                )
-                return Ok(SafeText.fromStream(s, start, i), i)
-            if s[i] != ";":
-                m.die(f"Char ref '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
-                return Ok(SafeText.fromStream(s, start, i), i)
-            cp = int(s.slice(numStart, i), 10)
+        numStart = i
+        digitPred = preds.isHexDigit if isHex else preds.isDigit
+        while digitPred(s[i]):
+            i += 1
+        if i == numStart:
+            kind = "hex" if isHex else "decimal"
+            m.die(
+                f"Saw the start of a {kind} char ref ({s.slice(start, i)}), but no hex digits follow it.",
+                lineNum=s.loc(start),
+            )
+            return Ok(SafeText.fromStream(s, start, i), i)
+        if s[i] != ";":
+            m.die(f"Char ref '{s.slice(start, i)}' didn't end in ;.", lineNum=s.loc(start))
+            return Ok(SafeText.fromStream(s, start, i), i)
+        cp = int(s.slice(numStart, i), 16 if isHex else 10)
         i += 1
         if cp == 0:
             m.die("Char refs can't resolve to U+0000 NULL.", lineNum=s.loc(start))
@@ -688,31 +676,15 @@ def parseDoctype(s: Stream, start: int) -> ResultT[Doctype]:
     return Ok(node, end)
 
 
-def parseScriptToEnd(s: Stream, start: int) -> OkT[str]:
-    """Read raw `<script>` contents from `start` through `</script>` (or EOF), returning the body text."""
-    i = s.chars.find("</script>", start)
+def parseRawElementToEnd(s: Stream, start: int, tag: str) -> OkT[str]:
+    """Read raw `<script>`, `<style>`, or `<xmp>` contents from `start` through `</tag>` (or EOF)."""
+    endTag = f"</{tag}>"
+    i = s.chars.find(endTag, start)
     if i == -1:
-        m.die("Hit EOF in the middle of a <script>.", lineNum=s.loc(start))
+        article = "an" if tag == "xmp" else "a"
+        m.die(f"Hit EOF in the middle of {article} <{tag}>.", lineNum=s.loc(start))
         return Ok(s.slice(start, None), len(s))
-    return Ok(s.slice(start, i), i + 9)
-
-
-def parseStyleToEnd(s: Stream, start: int) -> OkT[str]:
-    """Read raw `<style>` contents from `start` through `</style>` (or EOF), returning the body text."""
-    i = s.chars.find("</style>", start)
-    if i == -1:
-        m.die("Hit EOF in the middle of a <style>.", lineNum=s.loc(start))
-        return Ok(s.slice(start, None), len(s))
-    return Ok(s.slice(start, i), i + 8)
-
-
-def parseXmpToEnd(s: Stream, start: int) -> OkT[str]:
-    """Read raw `<xmp>` contents from `start` through `</xmp>` (or EOF), returning the body text."""
-    i = s.chars.find("</xmp>", start)
-    if i == -1:
-        m.die("Hit EOF in the middle of an <xmp>.", lineNum=s.loc(start))
-        return Ok(s.slice(start, None), len(s))
-    return Ok(s.slice(start, i), i + 6)
+    return Ok(s.slice(start, i), i + len(endTag))
 
 
 def parseBsMacroToEnd(s: Stream, start: int, startTag: StartTag) -> ResultT[str]:
