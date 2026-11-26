@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import re
 from collections import OrderedDict, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from . import biblio, config, h, idl, printjson, railroadparser, refs, t
 from . import messages as m
@@ -95,13 +95,11 @@ def _transformDataBlocksInSubtree(
                 _transformDataBlocksInSubtree(doc, newEl, blockTypes, customOpaqueElements, atomicTags)
             else:
                 h.removeNode(el)
-        elif el.tag == "pre":
-            transformPre(el, atomicTags)
-            _transformDataBlocksInSubtree(doc, el, blockTypes, customOpaqueElements, atomicTags)
-        elif el.tag in customOpaqueElements:
-            transformOpaque(el, atomicTags)
-            _transformDataBlocksInSubtree(doc, el, blockTypes, customOpaqueElements, atomicTags)
         else:
+            if el.tag == "pre":
+                transformPre(el, atomicTags)
+            elif el.tag in customOpaqueElements:
+                transformOpaque(el, atomicTags)
             _transformDataBlocksInSubtree(doc, el, blockTypes, customOpaqueElements, atomicTags)
 
 
@@ -215,7 +213,7 @@ def dedentElement(
 
     # Measure minimum shared indent across non-blank lines (expanding leading tabs to `tabSize` spaces),
     # and clear stray whitespace on blank lines while preserving their newlines.
-    minIndentSize = 1000
+    minIndentSize: int | None = None
     nonBlankLines: list[_DomLine] = []
     for lineIdx in range(startIdx, len(domLines)):
         line = domLines[lineIdx]
@@ -238,10 +236,10 @@ def dedentElement(
         if "\t" in indent:
             indent = indent.replace("\t", " " * tabSize)
             slot.parts[idx] = indent + match[2]
-        minIndentSize = min(minIndentSize, len(indent))
+        minIndentSize = len(indent) if minIndentSize is None else min(minIndentSize, len(indent))
 
     # Strip the shared indent from each non-blank line's leading text segment.
-    if 0 < minIndentSize < 1000:
+    if minIndentSize is not None and minIndentSize > 0:
         minIndent = " " * minIndentSize
         for line in nonBlankLines:
             if line.leadingSegment is None:
@@ -600,9 +598,10 @@ def parseDefBlock(
         else:
             vals[key] = (lineNum, val)
     retVals: OrderedDict[str, str] = OrderedDict()
+    keyConfig = h.ParseConfig.fromSpec(doc, "the line's key (before the colon)")
+    valConfig = h.ParseConfig.fromSpec(doc, "the line's value (after the colon)")
+    prodValConfig = replace(valConfig, inProd=True)
     for key, (lineNum, val) in vals.items():
-        keyConfig = h.ParseConfig.fromSpec(doc, "the line's key (before the colon)")
-        valConfig = h.ParseConfig.fromSpec(doc, "the line's value (after the colon)")
         key = h.parseText(key, keyConfig, startLine=lineNum, closeElements=True, context=el)
         if type in ("propdef", "descdef") and key == "Name":
             newVal = ""
@@ -616,9 +615,14 @@ def parseDefBlock(
                     )
             retVals[key] = newVal
         else:
-            if (type == "propdef" and key in ("Value", "New values")) or (type == "descdef" and key == "Value"):
-                valConfig.inProd = True
-            retVals[key] = h.parseText(val, valConfig, startLine=lineNum, closeElements=True, context=el)
+            isProdVal = (type == "propdef" and key in ("Value", "New values")) or (type == "descdef" and key == "Value")
+            retVals[key] = h.parseText(
+                val,
+                prodValConfig if isProdVal else valConfig,
+                startLine=lineNum,
+                closeElements=True,
+                context=el,
+            )
     return retVals
 
 

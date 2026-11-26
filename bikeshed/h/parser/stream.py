@@ -123,7 +123,6 @@ class ParseConfig:
 DEFAULT_PARSE_CONFIG = ParseConfig()
 
 
-@dataclass
 class Stream:
     """Character buffer with line/column mapping, parse configuration, and open-element tracking."""
 
@@ -135,10 +134,10 @@ class Stream:
     _colOffsets: list[int] | None
     startLine: int
     config: ParseConfig
-    depth: int = 1
-    openEls: TagStack = field(default_factory=TagStack)
-    blockParser: BlockParserFn | None = None
-    metadataSpans: dict[int, int] | None = None
+    depth: int
+    openEls: TagStack
+    blockParser: BlockParserFn | None
+    metadataSpans: dict[int, int] | None
 
     def __init__(
         self,
@@ -302,13 +301,12 @@ class Stream:
 
     def precedingLinebreakIndex(self, start: int) -> int:
         """Return the index in `_lineBreaks` of the newline before `start` (or `-1` on line 0)."""
-        lineIndex = bisect.bisect_left(self._lineBreaks, start)
-        return lineIndex - 1
+        return self.lineIndex(start) - 1
 
     def followingLinebreakIndex(self, start: int) -> int:
         """Return the index in `_lineBreaks` of the newline ending `start`'s line."""
         # A newline char terminates its line; the break to the next line occurs after it.
-        return bisect.bisect_left(self._lineBreaks, start)
+        return self.lineIndex(start)
 
     def currentLineStart(self, start: int) -> int:
         """Return the stream index of the first character on `start`'s line."""
@@ -356,13 +354,9 @@ class Stream:
         """Push an open shorthand wrapper onto `openEls`."""
         self.openEls.updateShorthandOpen(startTag, sigils)
 
-    def observeShorthandClose(self, s: Stream, i: int, startTag: StartTag, sigils: tuple[str, str]) -> list[ParserNode]:
+    def observeShorthandClose(self, i: int, startTag: StartTag, sigils: tuple[str, str]) -> list[ParserNode]:
         """Close a shorthand wrapper on `openEls`, returning any auto-closed inner `EndTag`s."""
-        return list(self.openEls.updateShorthandClose(s, i, startTag, sigils))
-
-    def cancelShorthandOpen(self, startTag: StartTag, sigils: tuple[str, str]) -> None:
-        """Roll back an unclosed shorthand opener from `openEls` after a failed parse."""
-        self.openEls.cancelShorthandOpen(startTag, sigils)
+        return list(self.openEls.updateShorthandClose(self, i, startTag, sigils))
 
     def inOpaqueElement(self) -> bool:
         """Return True if the parser is currently inside an opaque element (e.g. `pre`, `script`, `bs-opaque`)."""

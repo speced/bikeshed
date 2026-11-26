@@ -22,6 +22,7 @@ from .nodes import (
     StartTag,
     TagNodeT,
     escapeAttr,
+    isInlineTag,
 )
 from .preds import isControl, isWhitespace
 from .result import Err, Ok
@@ -38,7 +39,7 @@ codeSpanEnd2Re = re.compile(r"(.*?[^`])(``)([^`]|$)")
 
 fencedStartRe = re.compile(r"`{3,}|~{3,}")
 
-MARKDOWN_ESCAPE_RE = re.compile(r"\\([\\!\"#$%&'()*+,./:;<=>?@\[\]^_`{|}~-])")
+_MARKDOWN_ESCAPE_CHARS = frozenset(r"""\!"#$%&'()*+,-./:;<=>?@[]^_`{|}~""")
 _BLANK_LINE_RE = re.compile(r"\n[ \t]*\n")
 _INLINE_EMPH_EXTRA_TAGS = frozenset({"ins", "del"})
 
@@ -95,19 +96,7 @@ class _EmphFrame:
 
 def _isInlineEmphTag(node: TagNodeT, blockElements: t.Collection[str]) -> bool:
     """Return True if `node` is an inline HTML tag that emphasis may span across."""
-    tagname = node.tag
-    if tagname == "math":
-        if tagname in blockElements:
-            return False
-        attrs = (
-            node.attrs
-            if isinstance(node, (StartTag, SelfClosedTag))
-            else (node.startTag.attrs if node.startTag is not None else None)
-        )
-        return not (attrs and attrs.get("display", "inline") == "block")
-    if tagname in elements.INLINE_ELEMENTS or tagname in _INLINE_EMPH_EXTRA_TAGS:
-        return True
-    return "-" in tagname and tagname not in blockElements
+    return isInlineTag(node, blockElements, _INLINE_EMPH_EXTRA_TAGS)
 
 
 def _resolveDelimFrame(
@@ -204,13 +193,13 @@ def _autoCloseFrameTop(
     frames: list[_EmphFrame],
     closeTags: tuple[str, ...],
     flushFrame: t.Callable[[_EmphFrame], None],
-    stopTags: tuple[str, ...] = (),
+    stopTags: tuple[str, ...] | None = None,
 ) -> None:
     """Flush and pop the top frame if its tag matches `closeTags` (without crossing `stopTags`)."""
     if len(frames) <= 1:
         return
     topTag = frames[-1].tag
-    if topTag in stopTags:
+    if stopTags and topTag in stopTags:
         return
     if topTag in closeTags:
         flushFrame(frames.pop())
@@ -226,38 +215,11 @@ def _autoCloseEmphFramesForStart(
         return
     if tag in elements.AUTO_CLOSE_P_START_ELEMENTS:
         _autoCloseFrameTop(frames, ("p",), flushFrame)
-    if tag == "li":
-        _autoCloseFrameTop(frames, ("p",), flushFrame, ("ol", "ul"))
-        _autoCloseFrameTop(frames, ("li",), flushFrame, ("ol", "ul"))
-    elif tag in ("dt", "dd"):
-        _autoCloseFrameTop(frames, ("p",), flushFrame, ("dl",))
-        _autoCloseFrameTop(frames, ("dt", "dd"), flushFrame, ("dl",))
-    elif tag == "option":
-        _autoCloseFrameTop(frames, ("option",), flushFrame)
-    elif tag == "optgroup":
-        _autoCloseFrameTop(frames, ("option",), flushFrame)
-        _autoCloseFrameTop(frames, ("optgroup",), flushFrame)
-    elif tag in ("td", "th"):
-        _autoCloseFrameTop(frames, ("p",), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
-    elif tag == "tr":
-        _autoCloseFrameTop(frames, ("p",), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("caption", "colgroup"), flushFrame, ("table",))
-    elif tag in ("thead", "tbody", "tfoot", "caption", "colgroup", "col"):
-        _autoCloseFrameTop(frames, ("p",), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
-        if tag == "col":
-            _autoCloseFrameTop(frames, ("thead", "tbody", "tfoot", "caption"), flushFrame, ("table",))
-        else:
-            _autoCloseFrameTop(frames, ("thead", "tbody", "tfoot", "caption", "colgroup"), flushFrame, ("table",))
-    elif tag in ("rb", "rtc"):
-        _autoCloseFrameTop(frames, ("rb", "rp", "rt"), flushFrame, ("ruby",))
-        _autoCloseFrameTop(frames, ("rtc",), flushFrame, ("ruby",))
-    elif tag in ("rp", "rt"):
-        _autoCloseFrameTop(frames, ("rb", "rp", "rt"), flushFrame, ("ruby",))
+    if pScopes := elements.AUTO_CLOSE_P_SCOPED_START_ELEMENTS.get(tag):
+        _autoCloseFrameTop(frames, ("p",), flushFrame, pScopes)
+    if rules := elements.AUTO_CLOSE_START_RULES.get(tag):
+        for closeTags, stopTags in rules:
+            _autoCloseFrameTop(frames, closeTags, flushFrame, stopTags)
 
 
 def _autoCloseEmphFramesForEnd(
@@ -270,29 +232,9 @@ def _autoCloseEmphFramesForEnd(
         return
     if tag in elements.AUTO_CLOSE_P_END_ELEMENTS:
         _autoCloseFrameTop(frames, ("p",), flushFrame)
-    if tag in ("ol", "ul"):
-        _autoCloseFrameTop(frames, ("li",), flushFrame, ("ol", "ul"))
-    elif tag == "dl":
-        _autoCloseFrameTop(frames, ("dt", "dd"), flushFrame, ("dl",))
-    elif tag == "tr":
-        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
-    elif tag in ("thead", "tbody", "tfoot"):
-        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
-    elif tag == "table":
-        _autoCloseFrameTop(frames, ("td", "th"), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("tr",), flushFrame, ("table",))
-        _autoCloseFrameTop(frames, ("thead", "tbody", "tfoot", "caption", "colgroup"), flushFrame, ("table",))
-    elif tag == "rtc":
-        _autoCloseFrameTop(frames, ("rt",), flushFrame, ("ruby",))
-    elif tag == "ruby":
-        _autoCloseFrameTop(frames, ("rt", "rb", "rp"), flushFrame, ("ruby",))
-        _autoCloseFrameTop(frames, ("rtc",), flushFrame, ("ruby",))
-    elif tag == "optgroup":
-        _autoCloseFrameTop(frames, ("option",), flushFrame)
-    elif tag == "select":
-        _autoCloseFrameTop(frames, ("option",), flushFrame)
-        _autoCloseFrameTop(frames, ("optgroup",), flushFrame)
+    if rules := elements.AUTO_CLOSE_END_RULES.get(tag):
+        for closeTags, stopTags in rules:
+            _autoCloseFrameTop(frames, closeTags, flushFrame, stopTags)
 
 
 def resolveEmphasis(nodes: list[ParserNode], blockElements: t.Collection[str] = ()) -> list[ParserNode]:
@@ -526,7 +468,7 @@ def parseMarkdownLink(
     # Now that we've seen the ](, we're committed.
     s.observeShorthandOpen(startTag, (startingSigil, endingSigil))
     s.observeNodes(nodes)
-    virtualEndTags = s.observeShorthandClose(s, linkTextEnd, startTag, (startingSigil, endingSigil))
+    virtualEndTags = s.observeShorthandClose(linkTextEnd, startTag, (startingSigil, endingSigil))
 
     # I'm not doing bracket-checking in the link text,
     # as CommonMark requires, because I've already lost
@@ -792,47 +734,4 @@ def parseMarkdownEscape(s: Stream, start: int) -> ResultT[str]:
 
 def isMarkdownEscape(s: Stream, start: int) -> bool:
     """Return True if `s[start:start+2]` is a handled Markdown backslash escape."""
-    return s[start] == "\\" and s[start + 1] in (
-        "\\",
-        "!",
-        '"',
-        "#",
-        "$",
-        "%",
-        "&",
-        "'",
-        "(",
-        ")",
-        "*",
-        "+",
-        ",",
-        "-",
-        ".",
-        "/",
-        ":",
-        ";",
-        "<",
-        "=",
-        ">",
-        "?",
-        "@",
-        "[",
-        "]",
-        "^",
-        "_",
-        "`",
-        "{",
-        "|",
-        "}",
-        "~",
-    )
-
-
-def htmlifyMarkdownEscapes(val: str) -> str:
-    """Replace Markdown backslash escapes in `val` with numeric HTML character references."""
-    return re.sub(MARKDOWN_ESCAPE_RE, markdownEscapeReplacer, val)
-
-
-def markdownEscapeReplacer(match: t.Match) -> str:
-    """Regex callback converting an escaped Markdown punctuation char into a numeric HTML entity."""
-    return f"&#{ord(match[1])};"
+    return s[start] == "\\" and s[start + 1] in _MARKDOWN_ESCAPE_CHARS

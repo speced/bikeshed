@@ -64,6 +64,7 @@ _PROD_DOUBLE_AMP_RE = re.compile(r"(?:&&|&amp;&amp;|&#38;&#38;|&#[xX]0*26;&#[xX]
 _PROD_GRAMMAR_TEXT_RE = re.compile(
     r"#\{\s*\d+(?:\s*,(?:\s*\d+)?)?\s*\}|\{\s*\d+(?:\s*,(?:\s*\d+)?)?\s*\}|(?:&&|\|\||[?!#*+|,])(?!')",
 )
+_RANGE_NUM_RE = re.compile(r"(\d+)([\w-]*)")
 
 
 def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[ParserNode]]:
@@ -87,15 +88,14 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
     elif "<" in text or ">" in text:
         # Allow <<boolean [<<foo>>]>>
         if "[" in text:
-            _, endOfArg, _ = s.skipTo(textEnd, "]")
-            _, newTextEnd, _ = s.skipTo(endOfArg, ">>")
-            if endOfArg == textEnd or newTextEnd == endOfArg:  # noqa: PLR1714
+            argVal, endOfArg, _ = s.skipTo(textEnd, "]")
+            endVal, newTextEnd, _ = s.skipTo(endOfArg, ">>")
+            if argVal is None or endVal is None:
                 m.die(
                     "It seems like you wrote a CSS production with an argument (like <<foo [<<bar>>]>>), but either included more [] in the argument, or otherwise messed up the syntax.",
                     lineNum=s.loc(start),
                 )
-                failNode = SafeText.fromStream(s, start, start + 2)
-                return Ok(failNode, start + 2)
+                return Ok(SafeText.fromStream(s, start, start + 2), start + 2)
             textEnd = newTextEnd
             text = s.slice(textStart, textEnd)
         else:
@@ -103,8 +103,7 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
                 "It seems like you wrote a CSS production (like <<foo>>), but there's more markup inside of it, or you didn't close it properly.",
                 lineNum=s.loc(start),
             )
-            failNode = SafeText.fromStream(s, start, start + 2)
-            return Ok(failNode, start + 2)
+            return Ok(SafeText.fromStream(s, start, start + 2), start + 2)
     nodeEnd = textEnd + 2
 
     attrs: t.SafeAttrDict = {
@@ -112,94 +111,69 @@ def parseCSSProduction(s: Stream, start: int) -> ResultT[ParserNode | list[Parse
         "class": t.SafeAttrStr("production"),
         "bs-opaque": "",
     }
-    # Single-iteration loop used as a breakable dispatch block; the `else:` runs if no grammar matches.
-    for _ in [1]:
-        match = PROD_PROPDESC_RE.match(text)
-        if match:
-            linkFor, lt, linkType = match.groups()
-            if linkFor == "":
-                linkFor = "/"
-            if linkType is None:
-                if linkFor is None:
-                    linkType = "property"
-                else:
-                    linkType = "propdesc"
-            elif linkType in ("property", "descriptor"):
-                pass
-            else:
+    if match := PROD_PROPDESC_RE.match(text):
+        linkFor, lt, linkType = match.groups()
+        if linkFor == "":
+            linkFor = "/"
+        if linkType is None:
+            linkType = "property" if linkFor is None else "propdesc"
+        elif linkType not in ("property", "descriptor"):
+            m.die(
+                f"Shorthand <<{match[0]}>> gives type as '{match[3]}', but only 'property' and 'descriptor' are allowed.",
+                lineNum=s.loc(start),
+            )
+            return Ok(SafeText.fromStream(s, start, nodeEnd), nodeEnd)
+        attrs["data-link-type"] = escapeAttr(linkType)
+        attrs["bs-lt"] = escapeAttr(lt)
+        if linkFor is not None:
+            attrs["bs-link-for"] = escapeAttr(linkFor)
+        text = f"<'{lt}'>"
+    elif match := PROD_FUNC_RE.match(text):
+        attrs["data-link-type"] = t.SafeAttrStr("function")
+        attrs["bs-lt"] = escapeAttr(match[2])
+        if match[1] is not None:
+            attrs["bs-link-for"] = escapeAttr(match[1])
+        text = f"<{match[2]}>"
+    elif match := PROD_ATRULE_RE.match(text):
+        attrs["data-link-type"] = t.SafeAttrStr("at-rule")
+        attrs["bs-lt"] = escapeAttr(match[2])
+        if match[1] is not None:
+            attrs["bs-link-for"] = escapeAttr(match[1])
+        text = f"<{match[2]}>"
+    elif match := PROD_TYPE_RE.match(text):
+        for_, term, rangeStart, rangeEnd = match.groups()
+        attrs["data-link-type"] = t.SafeAttrStr("type")
+        attrs["bs-lt"] = escapeAttr(f"<{term}>")
+        if for_ is not None:
+            attrs["bs-link-for"] = escapeAttr(for_)
+        if rangeStart is not None:
+            formattedStart, numStart = parseRangeComponent(s, textStart + match.start(3), rangeStart)
+            formattedEnd, numEnd = parseRangeComponent(s, textStart + match.start(4), rangeEnd)
+            if formattedStart is None or formattedEnd is None:
+                m.die(f"Shorthand <<{text}>> has an invalid range.", lineNum=s.loc(start))
+                return Ok(SafeText.fromStream(s, start, nodeEnd), nodeEnd)
+            elif numStart >= numEnd:
                 m.die(
-                    f"Shorthand <<{match[0]}>> gives type as '{match[3]}', but only 'property' and 'descriptor' are allowed.",
+                    f"Shorthand <<{text}>> has a range whose start is equal or greater than its end.",
                     lineNum=s.loc(start),
                 )
-                failNode = SafeText.fromStream(s, start, nodeEnd)
-                return Ok(failNode, nodeEnd)
-            attrs["data-link-type"] = escapeAttr(linkType)
-            attrs["bs-lt"] = escapeAttr(lt)
-            if linkFor is not None:
-                attrs["bs-link-for"] = escapeAttr(linkFor)
-            text = f"<'{lt}'>"
-            break
-
-        match = PROD_FUNC_RE.match(text)
-        if match:
-            attrs["data-link-type"] = t.SafeAttrStr("function")
-            attrs["bs-lt"] = escapeAttr(match[2])
-            if match[1] is not None:
-                attrs["bs-link-for"] = escapeAttr(match[1])
-            text = f"<{match[2]}>"
-            break
-
-        match = PROD_ATRULE_RE.match(text)
-        if match:
-            attrs["data-link-type"] = t.SafeAttrStr("at-rule")
-            attrs["bs-lt"] = escapeAttr(match[2])
-            if match[1] is not None:
-                attrs["bs-link-for"] = escapeAttr(match[1])
-            text = f"<{match[2]}>"
-            break
-
-        match = PROD_TYPE_RE.match(text)
-        if match:
-            for_, term, rangeStart, rangeEnd = match.groups()
-            attrs["data-link-type"] = t.SafeAttrStr("type")
-            attrs["bs-lt"] = escapeAttr(f"<{term}>")
-            if for_ is not None:
-                attrs["bs-link-for"] = escapeAttr(for_)
-            if rangeStart is not None:
-                formattedStart, numStart = parseRangeComponent(s, textStart + match.start(3), rangeStart)
-                formattedEnd, numEnd = parseRangeComponent(s, textStart + match.start(4), rangeEnd)
-                if formattedStart is None or formattedEnd is None:
-                    m.die(f"Shorthand <<{text}>> has an invalid range.", lineNum=s.loc(start))
-                    failNode = SafeText.fromStream(s, start, nodeEnd)
-                    return Ok(failNode, nodeEnd)
-                elif numStart >= numEnd:
-                    m.die(
-                        f"Shorthand <<{text}>> has a range whose start is equal or greater than its end.",
-                        lineNum=s.loc(start),
-                    )
-                    # Getting this wrong is an error, but shouldn't stop
-                    # the link from working, so continue on if you can.
-                text = f"<{term} [{formattedStart},{formattedEnd}]>"
-            else:
-                text = f"<{term}>"
-            break
-
-        match = TYPEWITHARGS_RE.match(text)
-        if match:
-            for_, term, arg = match.groups()
-            attrs["bs-lt"] = escapeAttr(f"<{term}>")
-            attrs["data-link-type"] = t.SafeAttrStr("type")
-            if for_ is not None:
-                attrs["bs-link-for"] = escapeAttr(for_)
-            if "<<" in arg:
-                arg = arg.replace("<<", "<").replace(">>", ">")
-            text = f"<{term}[{arg}]>"
-            break
-
+                # Getting this wrong is an error, but shouldn't stop
+                # the link from working, so continue on if you can.
+            text = f"<{term} [{formattedStart},{formattedEnd}]>"
+        else:
+            text = f"<{term}>"
+    elif match := TYPEWITHARGS_RE.match(text):
+        for_, term, arg = match.groups()
+        attrs["bs-lt"] = escapeAttr(f"<{term}>")
+        attrs["data-link-type"] = t.SafeAttrStr("type")
+        if for_ is not None:
+            attrs["bs-link-for"] = escapeAttr(for_)
+        if "<<" in arg:
+            arg = arg.replace("<<", "<").replace(">>", ">")
+        text = f"<{term}[{arg}]>"
     else:
         m.die(f"Shorthand <<{text}>> does not match any recognized shorthand grammar.", lineNum=s.loc(start))
-        failNode = SafeText.fromStream(s, start, nodeEnd)
-        return Ok(failNode, nodeEnd)
+        return Ok(SafeText.fromStream(s, start, nodeEnd), nodeEnd)
 
     startTag = StartTag.fromStream(s, start, textStart, "a", attrs).finalize()
     contents = SafeText.fromStream(s, textStart, textEnd, text)
@@ -229,7 +203,7 @@ def parseRangeComponent(s: Stream, i: int, val: str) -> tuple[str | None, float 
     if val == "∞":
         return sign + val, signVal * float("inf")
 
-    match = re.match(r"(\d+)([\w-]*)", val)
+    match = _RANGE_NUM_RE.match(val)
     if match is None:
         return None, 0
     digits, unit = match.groups()
@@ -335,23 +309,20 @@ def parseMaybeValue(
     # and then, only if it looks like we need to, process the parse results.
 
     nodes: list[ParserNode] = []
+    textEnd = -1
     for i in generateExperimentalNodes(s, textStart, nodes):
         if s.chars.count("\n", start, i) > 3:
-            m.die(
-                "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &bs';&bs'; if it wasn't intended at all.",
-                lineNum=s.loc(textStart),
-            )
-            return Err(textStart)
+            break
         if s.slice(i, i + 2) == "''":
             textEnd = i
-            nodeEnd = i + 2
             break
-    else:
+    if textEnd == -1:
         m.die(
             "CSS-maybe autolink (''foo'') was opened, but no closing '' was found within a few lines. Either close your autolink, switch to the <css></css> element if you need the contents to stretch across that many lines, or escape the initial '' as &bs';&bs'; if it wasn't intended at all.",
             lineNum=s.loc(textStart),
         )
         return Err(textStart)
+    nodeEnd = textEnd + 2
 
     rawText = s.slice(textStart, textEnd)
     if s.config.macrosInAutolinks:
@@ -439,23 +410,14 @@ def parseMaybeValue(
     else:
         startTag.attrs["bs-replace-text-on-link-success"] = escapeAttr(safeFromDoubleAngles(text))
         s.observeNodes(nodes)
-    virtualEndTags = s.observeShorthandClose(s, textEnd, startTag, ("''", "''"))
+    virtualEndTags = s.observeShorthandClose(textEnd, startTag, ("''", "''"))
     endTag = EndTag.fromStream(s, textEnd, nodeEnd, startTag)
     return Ok([startTag, *nodes, *virtualEndTags, endTag], nodeEnd)
 
 
-def rawFromDoubleAngles(text: str) -> str:
-    """Convert `<<` and `>>` in CSS maybe text into HTML-escaped `&lt;` and `>`."""
-    text = re.sub(r"<<", "&lt;", text)
-    text = re.sub(r">>", ">", text)
-    return text
-
-
 def safeFromDoubleAngles(text: str) -> str:
     """Convert `<<` and `>>` in CSS maybe text into literal `<` and `>` (for `SafeText` or attribute escaping)."""
-    text = re.sub(r"<<", "<", text)
-    text = re.sub(r">>", ">", text)
-    return text
+    return text.replace("<<", "<").replace(">>", ">")
 
 
 def parseCSSPropdesc(s: Stream, start: int) -> ResultT[SafeText | list[ParserNode]]:
@@ -620,12 +582,14 @@ def parseCSSProductionGrammarInText(
     """Split raw `<xmp class=prod>` or fenced `prod` body text into `SafeText` and CSS grammar link nodes."""
     nodes: list[ParserNode] = []
     pos = 0
+
+    def off(n: int) -> int:
+        return baseOffset + n if exactOffsets else baseOffset
+
     for match in _PROD_GRAMMAR_TEXT_RE.finditer(text):
         mStart, mEnd = match.span()
         if mStart > pos:
-            segStart = baseOffset + pos if exactOffsets else baseOffset
-            segEnd = baseOffset + mStart if exactOffsets else baseOffset
-            nodes.append(SafeText.fromStream(s, segStart, segEnd, text[pos:mStart]))
+            nodes.append(SafeText.fromStream(s, off(pos), off(mStart), text[pos:mStart]))
         tok = match.group(0)
         if tok.startswith("#{"):
             lt = "#"
@@ -633,12 +597,8 @@ def parseCSSProductionGrammarInText(
             lt = "{A,B}" if "," in tok else "{A}"
         else:
             lt = tok
-        tokStart = baseOffset + mStart if exactOffsets else baseOffset
-        tokEnd = baseOffset + mEnd if exactOffsets else baseOffset
-        nodes.extend(_makeGrammarLink(s, tokStart, tokEnd, lt, tok))
+        nodes.extend(_makeGrammarLink(s, off(mStart), off(mEnd), lt, tok))
         pos = mEnd
     if pos < len(text):
-        segStart = baseOffset + pos if exactOffsets else baseOffset
-        segEnd = baseOffset + len(text) if exactOffsets else baseOffset
-        nodes.append(SafeText.fromStream(s, segStart, segEnd, text[pos:]))
+        nodes.append(SafeText.fromStream(s, off(pos), off(len(text)), text[pos:]))
     return nodes

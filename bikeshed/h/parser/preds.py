@@ -232,44 +232,6 @@ _ASCII_TAGNAME = _ASCII_ALPHANUM | frozenset("-._")
 _ASCII_ATTRNAME = _ASCII_TAGNAME | frozenset(":")
 WHITESPACE_CHARS = frozenset("\t\n\x0c ")
 _WHITESPACE_CPS = frozenset((0x9, 0xA, 0xC, 0x20))
-_NONCHARACTER_CPS = frozenset(
-    (
-        0xFFFE,
-        0xFFFF,
-        0x1FFFE,
-        0x1FFF,
-        0x2FFFE,
-        0x2FFFF,
-        0x3FFFE,
-        0x3FFFF,
-        0x4FFFE,
-        0x4FFFF,
-        0x5FFFE,
-        0x5FFFF,
-        0x6FFFE,
-        0x6FFFF,
-        0x7FFFE,
-        0x7FFFF,
-        0x8FFFE,
-        0x8FFFF,
-        0x9FFFE,
-        0x9FFFF,
-        0xAFFFE,
-        0xAFFFF,
-        0xBFFFE,
-        0xBFFFF,
-        0xCFFFE,
-        0xCFFFF,
-        0xDFFFE,
-        0xDFFFF,
-        0xEFFFE,
-        0xEFFFF,
-        0xFFFFE,
-        0xFFFFF,
-        0x10FFFE,
-        0x10FFFF,
-    ),
-)
 
 
 def isXMLishTagname(tagname: str) -> bool:
@@ -388,7 +350,7 @@ def isNoncharacter(ch: str | int) -> bool:
         cp = ord(ch)
     else:
         cp = ch
-    return 0xFDD0 <= cp <= 0xFDEF or cp in _NONCHARACTER_CPS
+    return 0xFDD0 <= cp <= 0xFDEF or (0 <= cp <= 0x10FFFF and (cp & 0xFFFE) == 0xFFFE)
 
 
 charRefs = {

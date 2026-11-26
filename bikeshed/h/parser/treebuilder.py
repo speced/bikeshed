@@ -19,7 +19,7 @@ from .nodes import (
     SafeText,
     SelfClosedTag,
     StartTag,
-    escapeAttr,
+    populateTagAttrs,
     sortAttrs,
 )
 
@@ -56,19 +56,15 @@ _ESCAPE_RE = re.compile(r"&(?:#x([^;]*);|#([^;]*);|(lt|amp|apos|quot);)")
 
 def _replaceEscape(match: re.Match[str]) -> str:
     """Decode a single numeric or basic named HTML entity match."""
-    if (hexDigits := match.group(1)) is not None:
+    hexDigits, decDigits, named = match.groups()
+    if hexDigits is not None or decDigits is not None:
+        digits, base = (hexDigits, 16) if hexDigits is not None else (decDigits, 10)
         try:
-            return chr(int(hexDigits, 16))
+            return chr(int(digits, base))
         except ValueError:
             m.die(f"Couldn't parse the HTML escape '{match.group(0)}'.")
             return match.group(0)
-    if (decDigits := match.group(2)) is not None:
-        try:
-            return chr(int(decDigits))
-        except ValueError:
-            m.die(f"Couldn't parse the HTML escape '{match.group(0)}'.")
-            return match.group(0)
-    return _NAMED_ESCAPES[match.group(3)]
+    return _NAMED_ESCAPES[named]
 
 
 def unescapeHtml(text: str) -> str:
@@ -80,16 +76,10 @@ def unescapeHtml(text: str) -> str:
 
 def prepareAttrs(node: StartTag | SelfClosedTag) -> dict[str, str]:
     """Finalize, sort, normalize, and unescape a tag node's attributes for LXML SAX."""
-    rawAttrs = node.attrs
     addLineInfo = node.s is None or not node.s.config.rawHtml
-    if addLineInfo and "bs-line-number" not in rawAttrs and node.loc:
-        rawAttrs["bs-line-number"] = escapeAttr(node.loc)
-    if addLineInfo and "bs-parse-context" not in rawAttrs and node.context:
-        rawAttrs["bs-parse-context"] = escapeAttr(node.context)
-    if node.classes:
-        rawAttrs["class"] = escapeAttr(" ".join(sorted(node.classes)))
+    populateTagAttrs(node, addLineInfo=addLineInfo)
     attrs: dict[str, str] = {}
-    for k, v in sortAttrs(rawAttrs):
+    for k, v in sortAttrs(node.attrs):
         # LXML's SAX handler rejects undeclared XML namespace prefixes, so strip any `prefix:`.
         if ":" in k:
             _, _, k = k.partition(":")
@@ -208,9 +198,10 @@ class TreeBuilder:
             self._handler.endElement(tagName)
             return
         if self._inHead and tagName in elements.HEAD_ELEMENTS:
-            self.autoCloseEnd(tagName)
-            self.popEl()
-            self._handler.endElement(tagName)
+            if tagName in self._tagStack:
+                self.autoCloseEnd(tagName)
+                self.popEl()
+                self._handler.endElement(tagName)
             return
         self.startBody()
         if tagName in ("html", "head", "body"):
@@ -276,41 +267,12 @@ class TreeBuilder:
     def autoCloseStart(self, tagName: str) -> None:
         """Close any HTML elements implicitly terminated by opening `tagName`."""
         if tagName in elements.AUTO_CLOSE_P_START_ELEMENTS:
-            self.virtualClose(["p"])
-        if tagName == "li":
-            self.virtualClose(["li"], ["ol", "ul"])
-        elif tagName in ("dt", "dd"):
-            self.virtualClose(["dt", "dd"], ["dl"])
-        elif tagName == "option":
-            self.virtualClose(["option"])
-        elif tagName == "optgroup":
-            self.virtualClose(["option"])
-            self.virtualClose(["optgroup"])
-        elif tagName in ("td", "th"):
-            self.virtualClose(["td", "th"], ["table"])
-        elif tagName == "tr":
-            self.virtualClose(["td", "th"], ["table"])
-            self.virtualClose(["tr"], ["table"])
-            self.virtualClose(["caption", "colgroup"], ["table"])
-        elif tagName in ("thead", "tbody", "tfoot"):
-            self.virtualClose(["td", "th"], ["table"])
-            self.virtualClose(["tr"], ["table"])
-            self.virtualClose(["thead", "tbody", "tfoot", "caption", "colgroup"], ["table"])
-        elif tagName in ("caption", "colgroup"):
-            self.virtualClose(["td", "th"], ["table"])
-            self.virtualClose(["tr"], ["table"])
-            self.virtualClose(["thead", "tbody", "tfoot", "caption", "colgroup"], ["table"])
-        elif tagName == "col":
-            self.virtualClose(["td", "th"], ["table"])
-            self.virtualClose(["tr"], ["table"])
-            self.virtualClose(["thead", "tbody", "tfoot", "caption"], ["table"])
-        elif tagName in ("rb", "rtc"):
-            self.virtualClose(["rb", "rp", "rt"], ["ruby"])
-            self.virtualClose(["rtc"], ["ruby"])
-        elif tagName in ("rp", "rt"):
-            self.virtualClose(["rb", "rp", "rt"], ["ruby"])
+            self.virtualClose(("p",))
+        if rules := elements.AUTO_CLOSE_START_RULES.get(tagName):
+            for closeTags, scopes in rules:
+                self.virtualClose(closeTags, scopes)
 
-    def virtualClose(self, tags: list[str] | frozenset[str], scopes: list[str] | None = None) -> None:
+    def virtualClose(self, tags: t.Collection[str], scopes: t.Collection[str] | None = None) -> None:
         """If any tag in `tags` is open within `scopes`, close it and everything nested inside it."""
         i = len(self._tagStack) - 1
         while i >= 0:

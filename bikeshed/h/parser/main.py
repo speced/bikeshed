@@ -1,33 +1,9 @@
-# pylint: skip-file
 from __future__ import annotations
 
-import enum
-import io
-import os
-import re
-
-from ... import messages as m
 from ... import t
 from .blocks import IndentChecker, parseBlockStream
-from .nodes import (
-    Doctype,
-    EndTag,
-    ParserNode,
-    RawElement,
-    RawText,
-    SafeText,
-    SelfClosedTag,
-    StartTag,
-    Text,
-)
-from .parser import (
-    POSSIBLE_NODE_START_CHARS,
-    ExtractedMetadata,
-    closeOpenElements,
-    debugNode,
-    extractMetadata,
-    nodesFromStream,
-)
+from .nodes import ParserNode, RawText, StartTag, Text
+from .parser import closeOpenElements, debugNode, nodesFromStream
 from .stream import ParseConfig, Stream
 
 
