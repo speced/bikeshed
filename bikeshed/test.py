@@ -179,7 +179,7 @@ def run(
             total += 1
             start = time.perf_counter()
             consoleFh = io.StringIO()
-            with m.withMessageState(fh=consoleFh, printMode="plain") as _:
+            with m.newMessageState(fh=consoleFh, printMode="plain") as _:
                 doc = processTest(path, md)
                 testConsole = consoleFh.getvalue()
             testOutput = doc.serialize()
@@ -232,7 +232,7 @@ def rebase(
             testName = testNameForPath(path, testDir)
             pathProgress.text(testName)  # type: ignore
             start = time.perf_counter()
-            with m.withMessageState(fh=replaceExtension(path, ".console.txt"), printMode="plain") as _:
+            with m.newMessageState(fh=replaceExtension(path, ".console.txt"), printMode="plain") as _:
                 doc = processTest(path, md)
             with m.messagesSilent() as _:
                 doc.finish(newline="\n")

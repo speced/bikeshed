@@ -8,6 +8,7 @@ This package implements Bikeshed's unified single-pass parser, turning raw spec 
 - [`blocks.py`](blocks.py) — Block-level Markdown parser (`parseBlockStream`, `parseBlocks`, `parseBlockquote`, `parseBlockBsMacro`, `parseParagraph`, heading builders).
 - [`lists.py`](lists.py) — Markdown and mixed HTML/Markdown list parsing (`ListStop`, `shouldStopForList`, `blankEndsList`, `matchHtmlListParent`, `parseHtmlListItem`, `parseList`).
 - [`indents.py`](indents.py) — Line/indentation scanning primitives (`skipHws`, `findLineEnd`, `prefixCountAt`, `consumeIndentAt`) and mixed-indentation linter (`IndentChecker`).
+- [`metadata.py`](metadata.py) — Bounded front-of-document metadata block and fallback `<h1>` extraction (`ExtractedMetadata`, `extractMetadata`).
 - [`parser.py`](parser.py) — Core inline stream driver (`parseInlineNodes`, `_parseRawHtmlNodes`, `nodesFromStream`, `parseAnything`, `generateResults`, `generateExperimentalNodes`), top-level syntax dispatchers (`parseNode`, `parseAngleStart`, `parseLToEnd`, `parseBsMacro`), and `closeOpenElements`.
 - [`html.py`](html.py) — HTML lexical and tag-level parsing: tags, attributes, Bikeshed attribute shortcut canonicalization, character references, whitespace, comments, doctypes, lookahead helpers (`peekHtmlTagAt`, `trySkipCommentOrDoctypeAt`), raw-text elements (`<script>`, `<style>`, `<xmp>`, `<title>`, datablock `<pre>`), `<bs-macro>` balanced body scanning, datablocks, and metadata blocks.
 - [`autolinks.py`](autolinks.py) — Non-CSS Bikeshed autolinks and shorthands (`[=dfn=]`, `[$abstract$]`, `[:Header:]`, `{{idl}}`, `{^cddl^}`, `<{element}>`, `|var|`, `[[biblio]]` / `[[#section]]`, `<#123>` / `<org/repo#123>`), plus shared `LinkData`, `parseLinkInfo`, and `parseLinkText`.
@@ -31,6 +32,7 @@ result, preds
         └─> macros
               └─> html (also imports indents)
                     ├─> markdown
+                    │     └─> metadata (also imports html)
                     └─> autolinks
                           └─> css
                                 └─> parser (also imports html, macros, markdown, autolinks)
