@@ -3,9 +3,7 @@ from .indents import IndentChecker
 from .main import (
     debugNodes,
     initialDocumentParse,
-    linesFromNodes,
     nodesFromHtml,
-    parseLines,
     parseText,
     parseTitle,
     strFromNodes,
@@ -29,10 +27,6 @@ from .nodes import (
     TagNodeT,
     Text,
     isTag,
-)
-from .parser import (
-    closeOpenElements,
-    nodesFromStream,
 )
 from .stream import (
     DEFAULT_PARSE_CONFIG,

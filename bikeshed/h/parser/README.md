@@ -4,7 +4,7 @@ This package implements Bikeshed's unified single-pass parser, turning raw spec 
 
 ## Module Overview
 
-- [`main.py`](main.py) — Top-level public entrypoints (`initialDocumentParse`, `nodesFromHtml`, `parseText`, `parseTitle`, `parseLines`, `strFromNodes`, `linesFromNodes`, `debugNodes`).
+- [`main.py`](main.py) — Top-level public entrypoints (`initialDocumentParse`, `nodesFromHtml`, `parseText`, `parseTitle`, `strFromNodes`, `debugNodes`).
 - [`blocks.py`](blocks.py) — Block-level Markdown parser (`parseBlockStream`, `parseBlocks`, `parseBlockquote`, `parseBlockBsMacro`, `parseParagraph`, heading builders).
 - [`lists.py`](lists.py) — Markdown and mixed HTML/Markdown list parsing (`ListStop`, `shouldStopForList`, `blankEndsList`, `matchHtmlListParent`, `parseHtmlListItem`, `parseList`).
 - [`indents.py`](indents.py) — Line/indentation scanning primitives (`skipHws`, `findLineEnd`, `prefixCountAt`, `consumeIndentAt`) and mixed-indentation linter (`IndentChecker`).
@@ -50,7 +50,7 @@ result, preds
 1. `Spec.assembleDocument()` extracts metadata first (`initMetadata()` → `extractMetadata()`), creates an optional `IndentChecker`, and invokes **`initialDocumentParse()`** with the extracted `metadataSpans`.
 2. **`ParseConfig.fromSpec()`** builds the configuration snapshot (enabled shorthand/Markdown flags, macros, indent width, block/opaque element sets).
 3. **`Stream(...)`** wraps the input text, pre-indexes newline offsets (`_lineBreaks` for O(log N) `line()`/`col()`/`loc()` lookups), and initializes a **`TagStack`** (`s.openEls`) for tracking open elements and opacity.
-4. Fragment callers (`h.parseRawHTML()`, `h.parseBikeshedHTML()`, `includes.py`, `boilerplate.py`, `datablocks.py`, metadata helpers) enter through **`nodesFromHtml()`**, **`parseText()`**, **`parseTitle()`**, or **`parseLines()`** instead, optionally enabling `blockMarkdown=True` or `rawHtml=True`.
+4. Fragment callers (`h.parseRawHTML()`, `h.parseBikeshedHTML()`, `includes.py`, `boilerplate.py`, `datablocks.py`, metadata helpers) enter through **`nodesFromHtml()`**, **`parseText()`**, or **`parseTitle()`** instead, optionally enabling `blockMarkdown=True` or `rawHtml=True`.
 
 ### 2. Block-Level Pass (`blocks.py`, `lists.py`, `indents.py`)
 

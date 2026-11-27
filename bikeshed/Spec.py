@@ -186,6 +186,13 @@ class Spec:
         self.metadataSpans = extracted.spans
         self.indentInfo = metadata.inferIndent(inputContent.content, excludeSpans=extracted.spans)
         self.mdDocument = metadata.parse(inputContent.content, extracted=extracted)
+        if (
+            self.testing
+            and (self.mdCommandLine is None or "Date" not in self.mdCommandLine.manuallySetKeys)
+            and self.mdDocument.allData.get("Date")
+            and self.mdDocument.allData["Date"][-1] == "now"
+        ):
+            self.mdDocument.addData("Date", "1970-01-01")
 
         # Combine the data so far, and compute the doctype
         # (the other md sources need the doctype in order to be found)
@@ -259,8 +266,10 @@ class Spec:
                 indentChecker=indentChecker,
                 metadataSpans=self.metadataSpans,
             )
-            if self.debugPrint == "early-parse":
-                h.debugNodes(self.nodes)
+        if self.debugPrint == "parse-nodes":
+            h.debugNodes(self.nodes)
+        elif self.debugPrint == "parsed-html":
+            print(h.strFromNodes(self.nodes))  # noqa: T201
 
         if indentChecker is not None:
             indentChecker.emit()
@@ -273,9 +282,6 @@ class Spec:
             self.refs.initializeRefs(doc=self, datablocks=datablocks)
         with self.timer.phase("assembleDocument: initializeBiblio"):
             self.refs.initializeBiblio(doc=self)
-
-        if self.debugPrint == "post-md":
-            print(h.strFromNodes(self.nodes))  # noqa: T201
 
         with self.timer.phase("assembleDocument: addHeaderFooter"):
             boilerplate.addHeaderFooter(self)
