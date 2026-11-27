@@ -292,10 +292,6 @@ def addTestMetadata(doc: t.SpecT) -> None:
     doc.mdBaseline.addData("Date", "1970-01-01")
     if "Inline Github Issues" not in doc.mdCommandLine.manuallySetKeys:
         doc.mdCommandLine.addData("Inline Github Issues", "no")
-    with m.messagesSilent():
-        md = metadata.parse(doc.inputContent.content)
-    if "Date" not in doc.mdCommandLine.manuallySetKeys and md.allData.get("Date") and md.allData["Date"][-1] == "now":
-        doc.mdCommandLine.addData("Date", "1970-01-01")
 
 
 def replaceExtension(path: str, newExt: str) -> str:

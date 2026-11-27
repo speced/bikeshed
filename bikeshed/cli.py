@@ -130,7 +130,7 @@ def main() -> None:
     specParser.add_argument(
         "--debug-print",
         dest="debugPrint",
-        choices=["none", "early-parse", "post-md", "boilerplate", "datablocks", "final"],
+        choices=["none", "parse-nodes", "parsed-html", "boilerplate", "datablocks", "final"],
         nargs="?",
         help="Debug tool to print various views of the document at different stages.",
     )

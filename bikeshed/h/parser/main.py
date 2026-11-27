@@ -73,11 +73,6 @@ def strFromNodes(nodes: t.Iterable[ParserNode]) -> str:
     return "".join(str(node) for node in nodes)
 
 
-def linesFromNodes(nodes: t.Iterable[ParserNode]) -> list[str]:
-    """Serialize an iterable of `ParserNode`s and split the result on newlines."""
-    return strFromNodes(nodes).split("\n")
-
-
 def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     """Print a debug representation of each node and return the materialized list."""
     nodes = list(nodes)
@@ -85,29 +80,6 @@ def debugNodes(nodes: t.Iterable[ParserNode]) -> list[ParserNode]:
     for node in nodes:
         print(debugNode(node))  # noqa: T201
     return nodes
-
-
-def parseLines(
-    textLines: list[str],
-    config: ParseConfig,
-    context: str | StartTag | t.ElementT | None,
-    startLine: int = 1,
-    closeElements: bool = False,
-) -> list[str]:
-    """Parse a list of source lines into HTML, preserving whether lines end with `\\n`."""
-    if len(textLines) == 0:
-        return textLines
-    endingWithNewline = textLines[0].endswith("\n")
-    if endingWithNewline:
-        text = "".join(textLines)
-    else:
-        text = "\n".join(textLines)
-    parsedNodes = list(nodesFromHtml(text, config, startLine=startLine, closeElements=closeElements, context=context))
-    parsedLines = linesFromNodes(parsedNodes)
-    if endingWithNewline:
-        parsedLines = [x + "\n" for x in parsedLines]
-
-    return parsedLines
 
 
 def parseText(

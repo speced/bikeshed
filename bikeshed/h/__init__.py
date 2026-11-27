@@ -126,7 +126,6 @@ from .parser import (
     initialDocumentParse,
     isTag,
     nodesFromHtml,
-    parseLines,
     parseText,
     parseTitle,
     strFromNodes,
