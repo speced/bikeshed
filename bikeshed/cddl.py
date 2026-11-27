@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import get_args
 
 import cddlparser
+from lxml import etree
 
 from . import config, dfns, h, t
 from . import messages as m
@@ -11,20 +12,27 @@ _PRELUDE_TYPES: frozenset[str] = frozenset(get_args(cddlparser.ast.PreludeType))
 _EXTEND_ASSIGN_TOKENS: frozenset[cddlparser.Tokens] = frozenset(
     (cddlparser.Tokens.TCHOICEALT, cddlparser.Tokens.GCHOICEALT),
 )
+_VALUE_WRAPPERS: dict[str, tuple[str, str]] = {
+    "text": ('"', '"'),
+    "bytes": ("'", "'"),
+    "hex": ("h'", "'"),
+    "base64": ("b64'", "'"),
+    "number": ("", ""),
+}
 
 
-class CDDLMarker(cddlparser.ast.Marker):
+class CDDLBuilder:
     """
-    Marker that wraps CDDL definitions and references in <cddl> and <a> blocks
-    so that cross-referencing logic may take place.
+    Walks a cddlparser AST and populates an lxml container directly,
+    wrapping CDDL definitions and references in <cddl> and <a> elements.
     """
 
     # Keep pointers on the current rule context to track generic parameters
-    # that are scoped to it
+    # that are scoped to it.
     currentRule: cddlparser.ast.Rule | None
     currentParameters: set[str]
 
-    # Track all CDDL terms defined so far to report duplicates:
+    # Track all CDDL terms defined so far across blocks to report duplicates:
     # - defined: (type, name, dfnFor) for exact duplicate errors
     # - definedNonParams: (name, dfnFor) -> first non-parameter type, for cross-type duplicate warnings
     defined: set[tuple[str, str, str | None]]
@@ -35,6 +43,49 @@ class CDDLMarker(cddlparser.ast.Marker):
         self.currentParameters = set()
         self.defined = set()
         self.definedNonParams = {}
+        self._container: t.ElementT | None = None
+        self._textBuf: list[str] = []
+        self._lastChild: t.ElementT | None = None
+
+    def buildInto(self, container: t.ElementT, ast: cddlparser.ast.CDDLTree) -> None:
+        h.clearContents(container)
+        self._container = container
+        self._textBuf.clear()
+        self._lastChild = None
+        self.currentRule = None
+        self.currentParameters.clear()
+        self._visit(ast, parent=None, forName=None)
+        self._flushText()
+        self._container = None
+        self._lastChild = None
+
+    def _flushText(self) -> None:
+        if not self._textBuf:
+            return
+        assert self._container is not None
+        chunk = "".join(self._textBuf)
+        self._textBuf.clear()
+        if self._lastChild is None:
+            self._container.text = chunk
+        else:
+            self._lastChild.tail = chunk
+
+    def _emitText(self, text: str) -> None:
+        if text:
+            self._textBuf.append(text)
+
+    def _emitToken(self, token: cddlparser.Token | None) -> None:
+        if token is not None:
+            serialized = token.serialize()
+            if serialized:
+                self._textBuf.append(serialized)
+
+    def _emitElement(self, tag: str, attrs: dict[str, str], text: str) -> None:
+        self._flushText()
+        assert self._container is not None
+        child = etree.SubElement(self._container, tag, attrs)
+        child.text = text
+        self._lastChild = child
 
     def _recordDefinition(self, type: str, name: str, dfnFor: str | None = None) -> bool:
         exactKey = (type, name, dfnFor)
@@ -57,77 +108,87 @@ class CDDLMarker(cddlparser.ast.Marker):
         self.defined.add(exactKey)
         return True
 
-    def _wrapCddl(self, cddlType: str, name: str, lt: str, dfnFor: str | None = None) -> str:
+    def _emitCddl(self, cddlType: str, name: str, lt: str, dfnFor: str | None = None) -> None:
         if dfnFor is None:
-            return f'<cddl bs-cddl-type="{cddlType}" bs-lt="{h.escapeAttr(lt)}">{name}</cddl>'
-        return f'<cddl bs-cddl-type="{cddlType}" bs-cddl-for="{h.escapeAttr(dfnFor)}" bs-lt="{h.escapeAttr(lt)}">{name}</cddl>'
+            attrs = {"bs-cddl-type": cddlType, "bs-lt": lt}
+        else:
+            attrs = {"bs-cddl-type": cddlType, "bs-cddl-for": dfnFor, "bs-lt": lt}
+        self._emitElement("cddl", attrs, name)
 
-    def serializeValue(self, prefix: str, value: str, suffix: str, node: cddlparser.ast.Value) -> str:
-        name = prefix + value + suffix
+    def _emitValue(
+        self,
+        node: cddlparser.ast.Value,
+        parent: cddlparser.ast.CDDLNode | None,
+        forName: str | None,
+    ) -> None:
+        prefix, suffix = _VALUE_WRAPPERS[node.type]
+        name = prefix + node.value + suffix
         if node.type not in {"text", "bytes"}:
-            return name
-        parent = node.parentNode
-        assert parent is not None
+            self._emitText(name)
+            return
         if isinstance(parent, cddlparser.ast.Memberkey) and node.type == "text":
             # A literal text string also gives rise to a type
             # see RFC 8610, section 3.5.1:
             # https://datatracker.ietf.org/doc/html/rfc8610#section-3.5.1
-            assert parent.parentNode is not None
-            forName = self._getFor(parent.parentNode)
             if forName is None:
                 # Cannot easily link member key back to a definition
-                return name
-            if self._recordDefinition("key", value, forName):
+                self._emitText(name)
+                return
+            if self._recordDefinition("key", node.value, forName):
                 # Create a key with and without quotes as linking text
-                return self._wrapCddl("key", name, f"{value}|{name}", forName)
-            # Duplicate found, don't create a dfn
-            return name
+                self._emitCddl("key", name, f"{node.value}|{name}", forName)
+            else:
+                # Duplicate found, don't create a dfn
+                self._emitText(name)
         elif isinstance(parent, cddlparser.ast.Operator) and parent.controller is node:
             # Probably a ".default" value. It may be possible to link the value
             # back to an enumeration but it's equally possible that this is just
             # a string that's not defined anywhere. Let's ignore.
-            return name
+            self._emitText(name)
         else:
-            forName = self._getFor(node)
             if forName is None:
-                return name
-            if self._recordDefinition("value", value, forName):
-                return self._wrapCddl("value", name, f"{value}|{name}", forName)
-            # Duplicate found, don't create a dfn
-            return name
+                self._emitText(name)
+                return
+            if self._recordDefinition("value", node.value, forName):
+                self._emitCddl("value", name, f"{node.value}|{name}", forName)
+            else:
+                # Duplicate found, don't create a dfn
+                self._emitText(name)
 
-    def serializeName(self, name: str, node: cddlparser.ast.CDDLNode) -> str:
-        # The node is a Typename. Such a node may appear in a Rule, a Type,
-        # a Reference, a Memberkey, a GroupEntry, or GenericParameters
-        parent = node.parentNode
+    def _emitTypename(
+        self,
+        node: cddlparser.ast.Typename,
+        parent: cddlparser.ast.CDDLNode | None,
+        forName: str | None,
+        genericOwner: str | None,
+    ) -> None:
+        name = node.name
         if isinstance(parent, cddlparser.ast.Rule):
-            # Rule definition
-            # Keep a pointer to the rule not to have to look for it again
-            # when the function is called on the rule's children
-            self.currentRule = parent
-            self.currentParameters.clear()
-            if parent.name.parameters is not None:
-                assert isinstance(parent.name.parameters, cddlparser.ast.GenericParameters)
-                self.currentParameters.update(p.name for p in parent.name.parameters.parameters)
             if parent.assign.type in _EXTEND_ASSIGN_TOKENS:
                 # The definition extends a base definition
-                return f'<a data-link-type="cddl-type" bs-link-for="/">{name}</a>'
-            if self._recordDefinition("type", name):
-                return self._wrapCddl("type", name, name)
-            # Duplicate found, don't create a dfn
-            return name
+                self._emitElement("a", {"data-link-type": "cddl-type", "bs-link-for": "/"}, name)
+            elif self._recordDefinition("type", name):
+                self._emitCddl("type", name, name)
+            else:
+                # Duplicate found, don't create a dfn
+                self._emitText(name)
         elif isinstance(parent, cddlparser.ast.Memberkey):
             # Member definition
             if not parent.hasColon:
                 # The key is actually a reference to a type
                 if name in _PRELUDE_TYPES:
-                    return f'<a data-link-type="cddl-type" bs-link-for="/" bs-link-spec="rfc8610">{name}</a>'
-                return f'<a data-link-type="cddl-type" bs-link-for="/">{name}</a>'
-            assert parent.parentNode is not None
-            forName = self._getFor(parent.parentNode)
+                    self._emitElement(
+                        "a",
+                        {"data-link-type": "cddl-type", "bs-link-for": "/", "bs-link-spec": "rfc8610"},
+                        name,
+                    )
+                else:
+                    self._emitElement("a", {"data-link-type": "cddl-type", "bs-link-for": "/"}, name)
+                return
             if forName is None:
                 # Cannot easily link member key back to a definition
-                return name
+                self._emitText(name)
+                return
             if name.startswith('"'):
                 unquoted = name[1:-1]
                 lt = f"{unquoted}|{name}"
@@ -135,51 +196,143 @@ class CDDLMarker(cddlparser.ast.Marker):
                 unquoted = name
                 lt = f'{name}|"{name}"'
             if self._recordDefinition("key", unquoted, forName):
-                return self._wrapCddl("key", name, lt, forName)
-            # Duplicate found, don't create a dfn
-            return name
+                self._emitCddl("key", name, lt, forName)
+            else:
+                # Duplicate found, don't create a dfn
+                self._emitText(name)
         elif isinstance(parent, cddlparser.ast.GenericParameters):
-            typename = parent.parentNode
-            assert isinstance(typename, cddlparser.ast.Typename)
-            if self._recordDefinition("parameter", name, typename.name):
-                return self._wrapCddl("parameter", name, name, typename.name)
-            # Duplicate found, don't create a dfn
-            return name
+            assert genericOwner is not None
+            if self._recordDefinition("parameter", name, genericOwner):
+                self._emitCddl("parameter", name, name, genericOwner)
+            else:
+                # Duplicate found, don't create a dfn
+                self._emitText(name)
         elif name in _PRELUDE_TYPES:
             # Link types that come from the CDDL prelude in RFC 8610
-            return f'<a data-link-type="cddl-type" bs-link-for="/" bs-link-spec="rfc8610">{name}</a>'
+            self._emitElement(
+                "a",
+                {"data-link-type": "cddl-type", "bs-link-for": "/", "bs-link-spec": "rfc8610"},
+                name,
+            )
         elif name in self.currentParameters:
             # Name is a reference to a generic parameter
             assert self.currentRule is not None
-            return f'<a data-link-type="cddl-parameter" bs-link-for="{h.escapeAttr(self.currentRule.name.name)}">{name}</a>'
+            self._emitElement(
+                "a",
+                {"data-link-type": "cddl-parameter", "bs-link-for": self.currentRule.name.name},
+                name,
+            )
         else:
-            return f'<a data-link-type="cddl" bs-link-for="/">{name}</a>'
+            self._emitElement("a", {"data-link-type": "cddl", "bs-link-for": "/"}, name)
 
-    def _getFor(self, node: cddlparser.ast.CDDLNode) -> str | None:
-        """
-        Retrieve the "for" attribute for the node.
-        """
-        parent = node.parentNode
-        while parent is not None:
-            if isinstance(parent, cddlparser.ast.Rule):
-                # Something defined in a rule
-                return parent.name.name
-            elif isinstance(parent, cddlparser.ast.GroupEntry) and parent.key is not None:
-                # A type in a member key definition
-                keyType = parent.key.type
-                if isinstance(keyType, cddlparser.ast.Value) and keyType.type == "text":
-                    keyName = keyType.value
-                elif isinstance(keyType, cddlparser.ast.Typename):
-                    keyName = keyType.name
+    def _visit(
+        self,
+        node: cddlparser.ast.CDDLNode,
+        parent: cddlparser.ast.CDDLNode | None,
+        forName: str | None,
+        genericOwner: str | None = None,
+    ) -> None:
+        if isinstance(node, cddlparser.ast.TokenNode):
+            if isinstance(node, cddlparser.ast.Typename):
+                self._emitToken(node.unwrapped)
+            for comment in node.comments:
+                self._emitToken(comment)
+            if node.whitespace:
+                self._textBuf.append(node.whitespace)
+            self._emitToken(node.openToken)
+        elif isinstance(node, cddlparser.ast.WrappedNode):
+            self._emitToken(node.openToken)
+
+        if isinstance(node, cddlparser.ast.CDDLTree):
+            for rule in node.rules:
+                self._visit(rule, node, None)
+        elif isinstance(node, cddlparser.ast.Rule):
+            self.currentRule = node
+            self.currentParameters.clear()
+            if node.name.parameters is not None:
+                assert isinstance(node.name.parameters, cddlparser.ast.GenericParameters)
+                self.currentParameters.update(p.name for p in node.name.parameters.parameters)
+            ruleFor = node.name.name
+            self._visit(node.name, node, ruleFor)
+            self._emitToken(node.assign)
+            self._visit(node.type, node, ruleFor)
+        elif isinstance(node, cddlparser.ast.Typename):
+            self._emitTypename(node, parent, forName, genericOwner)
+            if node.parameters is not None:
+                if isinstance(node.parameters, cddlparser.ast.GenericParameters):
+                    self._visit(node.parameters, node, forName, genericOwner=node.name)
                 else:
-                    return None
-                assert parent.parentNode is not None
-                parentFor = self._getFor(parent.parentNode)
-                if parentFor is None:
-                    return None
-                return f"{parentFor}/{keyName}"
-            parent = parent.parentNode
-        return None
+                    argFor = (
+                        f"{forName}/{node.name}"
+                        if (isinstance(parent, cddlparser.ast.Memberkey) and forName is not None)
+                        else forName
+                    )
+                    self._visit(node.parameters, node, argFor)
+        elif isinstance(node, cddlparser.ast.Value):
+            self._emitValue(node, parent, forName)
+        elif isinstance(node, cddlparser.ast.Type):
+            for item in node.types:
+                self._visit(item, node, forName)
+        elif isinstance(node, cddlparser.ast.GroupEntry):
+            if node.occurrence is not None:
+                self._visit(node.occurrence, node, forName)
+            entryFor = forName
+            if node.key is not None:
+                keyType = node.key.type
+                keyFor: str | None = None
+                if isinstance(keyType, cddlparser.ast.Value) and keyType.type == "text":
+                    keyFor = forName
+                    entryFor = f"{forName}/{keyType.value}" if forName is not None else None
+                elif isinstance(keyType, cddlparser.ast.Typename):
+                    keyFor = forName
+                    entryFor = f"{forName}/{keyType.name}" if forName is not None else None
+                else:
+                    entryFor = None
+                self._visit(node.key, node, keyFor)
+            self._visit(node.type, node, entryFor)
+        elif isinstance(node, cddlparser.ast.Memberkey):
+            self._visit(node.type, node, forName)
+            for tok in node.tokens:
+                self._emitToken(tok)
+        elif isinstance(node, cddlparser.ast.Group):
+            for choice in node.groupChoices:
+                self._visit(choice, node, forName)
+        elif isinstance(node, cddlparser.ast.GroupChoice):
+            for entry in node.groupEntries:
+                self._visit(entry, node, forName)
+        elif isinstance(node, cddlparser.ast.Operator):
+            self._visit(node.type, node, forName)
+            self._emitToken(node.name)
+            self._visit(node.controller, node, forName)
+        elif isinstance(node, cddlparser.ast.Range):
+            self._visit(node.min, node, forName)
+            self._emitToken(node.rangeop)
+            self._visit(node.max, node, forName)
+        elif isinstance(node, cddlparser.ast.Tag):
+            self._textBuf.append("#")
+            self._emitToken(node.numericPart)
+            if node.typePart is not None:
+                self._visit(node.typePart, node, forName)
+        elif isinstance(node, cddlparser.ast.ChoiceFrom):
+            self._textBuf.append("&")
+            self._visit(node.target, node, forName)
+        elif isinstance(node, cddlparser.ast.Occurrence):
+            for tok in node.tokens:
+                self._emitToken(tok)
+        elif isinstance(node, cddlparser.ast.GenericParameters):
+            for param in node.parameters:
+                self._visit(param, node, forName, genericOwner=genericOwner)
+        elif isinstance(node, cddlparser.ast.GenericArguments):
+            for arg in node.parameters:
+                self._visit(arg, node, forName)
+        else:
+            msg = f"Unexpected CDDL AST node: {type(node).__name__}"
+            raise TypeError(msg)
+
+        if isinstance(node, cddlparser.ast.WrappedNode):
+            self._emitToken(node.closeToken)
+        if isinstance(node, cddlparser.ast.TokenNode):
+            self._emitToken(node.separator)
 
 
 def findCDDLBlocks(doc: t.SpecT) -> list[t.ElementT]:
@@ -195,16 +348,13 @@ def markupCDDL(doc: t.SpecT) -> None:
     if not cddlEls:
         return
 
-    marker = CDDLMarker()
+    builder = CDDLBuilder()
     for el in cddlEls:
         if h.isNormative(doc, el):
             text = h.textContent(el)
             try:
                 ast = cddlparser.parse(text)
-                lineNum = (h.parseLineNumber(el) or 1) + int(el.get("bs-line-number-content-adjustment", "0"))
-                parseContext = el.get("bs-parse-context")
-                cddlContext = f"CDDL block in {parseContext}" if parseContext else "CDDL block"
-                h.parseInto(el, ast.serialize(marker), startLine=lineNum, context=cddlContext)
+                builder.buildInto(el, ast)
             except Exception as err:
                 m.die(
                     f"{err}\nInvalid CDDL block (first 100 characters):\n{text[0:100]}{'...' if len(text) > 100 else ''}",

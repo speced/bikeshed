@@ -6,8 +6,19 @@ import widlparser
 
 from .. import config, dfns, h, t
 from .. import messages as m
-from .markers import IDLUI, DebugMarker, IDLMarker, IDLSilent
+from .markers import IDLUI, DebugIDLBuilder, IDLBuilder, IDLSilent, IDLTreeBuilder
 from .merge import mergeMarkup
+
+
+class IDLParser(widlparser.parser.Parser):
+    """`widlparser.Parser` subclass that can defer symbol lookups during single-pass parsing."""
+
+    deferSymbolLookup: bool = False
+
+    def get_type(self, name: str) -> widlparser.Construct | None:
+        if self.deferSymbolLookup:
+            return None
+        return super().get_type(name)
 
 
 def markupIDL(doc: t.SpecT) -> None:
@@ -18,69 +29,64 @@ def markupIDL(doc: t.SpecT) -> None:
         el.tag = "pre"
         h.removeAttr(el, "type")
         h.addClass(doc, el, "idl")
-    # One pass with a silent parser to collect the symbol table.
-    symbolTable = None
-    for el in idlEls:
-        p = widlparser.parser.Parser(h.textContent(el), ui=IDLSilent(), symbol_table=symbolTable)
-        symbolTable = p.symbol_table
-    # Then a real pass to actually mark up the IDL,
-    # and collect it for the index.
+    if not idlEls:
+        return
+
+    assert isinstance(doc.widl, IDLParser)
+    # Single parse pass into doc.widl, deferring symbol lookups (which widlparser
+    # only uses during parsing to validate required dictionary arguments) until
+    # every block's symbols are registered.
+    doc.widl.deferSymbolLookup = True
+    parsedBlocks: list[tuple[t.ElementT, IDLUI, t.ElementT | None, list[widlparser.Construct]]] = []
     for el in idlEls:
         if h.isNormative(doc, el):
-            checkForExtraneousXmp(el)
-            lineNum = getContentStartingLineNum(el) or 1
+            extraneousXmp = checkForExtraneousXmp(el)
             text = h.textContent(el)
-            # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
-            widl = widlparser.parser.Parser(text, ui=IDLUI.fromEl(el), symbol_table=symbolTable)
-            marker = DebugMarker() if doc.debug else IDLMarker()
-            markedUp = str(widl.markup(marker)).lstrip()
-            if isinstance(marker, IDLMarker) and marker.errors:
-                for error in marker.errors:
+            ui = IDLUI.fromEl(el, buffered=True)
+            doc.widl.ui = ui
+            startIdx = len(doc.widl.constructs)
+            doc.widl.parse(text)
+            parsedBlocks.append((el, ui, extraneousXmp, doc.widl.constructs[startIdx:]))
+        h.addClass(doc, el, "highlight")
+    doc.widl.ui = IDLSilent()
+    doc.widl.deferSymbolLookup = False
+    doc.extraJC.addIDLHighlighting()
+
+    # Build lxml markup directly from the already-parsed constructs and run the
+    # deferred required-dictionary-argument check against the full symbol table.
+    symbolTable = doc.widl.symbol_table
+    for el, ui, extraneousXmp, blockConstructs in parsedBlocks:
+        if extraneousXmp is not None:
+            m.warn("Instead of nesting an <xmp> inside of <pre>, just use an <xmp> directly.", el=extraneousXmp)
+        ui.flush()
+        builder: IDLTreeBuilder = DebugIDLBuilder() if doc.debug else IDLBuilder()
+        if len(el) == 0:
+            builder.buildIntoConstructs(el, blockConstructs, symbolTable=symbolTable, ui=ui)
+            if isinstance(builder, IDLBuilder) and builder.errors:
+                for error in builder.errors:
                     m.die(error, el=el)
-            parseContext = el.get("bs-parse-context")
-            idlContext = f"IDL block in {parseContext}" if parseContext else "IDL block"
-            parsed = list(h.parseRawHTML(markedUp, startLine=lineNum, context=idlContext))
+        else:
+            parsed = builder.buildNodesFromConstructs(blockConstructs, symbolTable=symbolTable, ui=ui)
+            if isinstance(builder, IDLBuilder) and builder.errors:
+                for error in builder.errors:
+                    m.die(error, el=el)
             merged = mergeMarkup(el, parsed)
             h.replaceContents(el, merged)
-            # Parse a second time with the global one, which collects all data in the doc.
-            doc.widl.parse(text)
-        h.addClass(doc, el, "highlight")
-        doc.extraJC.addIDLHighlighting()
 
 
-def checkForExtraneousXmp(el: t.ElementT) -> None:
+def checkForExtraneousXmp(el: t.ElementT) -> t.ElementT | None:
     # Some specs do <pre class=idl><xmp>...</xmp></pre>,
     # which makes the markup-merger complain.
     # Strip the xmp out; it performed its duties of safely parsing.
-    # Warn that they can just use an <xmp> directly.
+    # Return the stripped element so the caller can warn in document order.
     onlyChild = h.hasOnlyChild(el)
     if onlyChild is None:
-        return
+        return None
     if h.hasAttr(onlyChild, "bs-was-xmp"):
         h.transferAttributes(onlyChild, el, mergeClass=True)
         h.replaceWithContents(onlyChild)
-        m.warn("Instead of nesting an <xmp> inside of <pre>, just use an <xmp> directly.", el=onlyChild)
-
-
-def getContentStartingLineNum(el: t.ElementT) -> int | None:
-    lineNum = h.parseLineNumber(el)
-    if not lineNum:
-        return None
-    lineNum += int(el.get("bs-line-number-content-adjustment", "0"))
-    if len(el) == 0:
-        return lineNum
-    for node in h.childNodes(el):
-        if isinstance(node, str):
-            if node.strip() != "":
-                return lineNum
-            else:
-                pass
-        if h.isElement(node):
-            if h.hasAttr(el, "bs-line-number-content-adjustment"):
-                lineNum += int(el.get("bs-line-number-content-adjustment", "0"))
-            else:
-                return lineNum
-    return lineNum
+        return onlyChild
+    return None
 
 
 def markupIDLBlock(pre: t.ElementT, doc: t.SpecT) -> set[t.ElementT]:
@@ -165,8 +171,8 @@ def normalizeIdlWhitespace(text: str) -> str:
     return text
 
 
-def getParser() -> widlparser.parser.Parser:
-    return widlparser.parser.Parser(ui=IDLSilent())
+def getParser() -> IDLParser:
+    return IDLParser(ui=IDLSilent())
 
 
 def processIDL(doc: t.SpecT) -> None:
