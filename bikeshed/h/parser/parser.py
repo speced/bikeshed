@@ -73,7 +73,7 @@ def _stripIndentAfterNewlines(text: str, indent: int, numIndents: int) -> str:
 
 
 def _parseRawHtmlNodes(s: Stream, start: int) -> tuple[list[ParserNode], int]:
-    """Fast-path plain-HTML parser for `rawHtml` mode, skipping Bikeshed shorthands, macros, and TagStack tracking."""
+    """Fast-path plain-HTML parser for `rawHtml` mode, skipping Bikeshed shorthands and macros."""
     nodes: list[ParserNode] = []
     chars = s.chars
     end = s.length
@@ -115,6 +115,7 @@ def _parseRawHtmlNodes(s: Stream, start: int) -> tuple[list[ParserNode], int]:
                     if lastRaw is not None:
                         nodes.append(lastRaw)
                         lastRaw = None
+                    s.observeNode(val)
                     nodes.append(val)
                 continue
         if textStart == -1:

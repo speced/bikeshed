@@ -275,13 +275,17 @@ def sortElements(el: t.Iterable[t.ElementT]) -> list[t.ElementT]:
 
 def parseRawHTML(text: str, *, context: str, startLine: int = 1) -> list[t.NodeT]:
     config = parser.ParseConfig(rawHtml=True, context=context)
-    container = parser.buildFragment(parser.nodesFromHtml(text, config, startLine=startLine, context=context))
+    container = parser.buildFragment(
+        parser.nodesFromHtml(text, config, startLine=startLine, closeElements=True, context=context),
+    )
     return childNodes(container, clear=True)
 
 
 def parseBikeshedHTML(doc: t.SpecT, text: str, *, context: str, startLine: int = 1) -> list[t.NodeT]:
     config = parser.ParseConfig.fromSpec(doc, context=context)
-    container = parser.buildFragment(parser.nodesFromHtml(text, config, startLine=startLine, context=context))
+    container = parser.buildFragment(
+        parser.nodesFromHtml(text, config, startLine=startLine, closeElements=True, context=context),
+    )
     return childNodes(container, clear=True)
 
 
