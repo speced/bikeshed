@@ -34,8 +34,8 @@ if t.TYPE_CHECKING:
 
 codeSpanStartRe = re.compile(r"`+")
 # A few common lengths to pre-compile for speed.
-codeSpanEnd1Re = re.compile(r"(.*?[^`])(`)([^`]|$)")
-codeSpanEnd2Re = re.compile(r"(.*?[^`])(``)([^`]|$)")
+codeSpanEnd1Re = re.compile(r"([^`])(`)([^`]|$)")
+codeSpanEnd2Re = re.compile(r"([^`])(``)([^`]|$)")
 
 fencedStartRe = re.compile(r"`{3,}|~{3,}")
 
